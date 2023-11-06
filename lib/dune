@@ -4,5 +4,5 @@
 (ocamllex lexer)
 
 (library
- (name core)
+ (name jvml)
 )

@@ -5,7 +5,6 @@ type expr =
   | MUL of expr * expr
   | DIV of expr * expr
 
-
 let rec print_helper indent = function
   | INT i -> print_endline (indent ^ " " ^ (string_of_int i))
   | ADD (e1, e2) -> let new_indent = indent ^ "----" in
