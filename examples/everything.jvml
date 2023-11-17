@@ -1,0 +1,22 @@
+type 'a tree = Leaf | Branch of (tree * 'a * tree)
+type ('a, 'b) dict = Lf | Br of (tree * 'a * 'b * tree)
+
+val sum = fun t -> match t with
+    | Leaf -> 0
+    | Branch(l, v, r) -> v + sum l + sum r
+
+val fact = fun x -> match x with
+    | 0 | 1 -> 1
+    | x -> x * fact (x - 1)
+
+val iszero = fun x -> match x with
+    | 0 -> true
+    |_ -> false
+
+val map = fun f -> fun t ->
+    match t with
+        | Leaf -> 1
+        | Branch(l, v, r) -> Branch ((l, v, r))
+
+
+val scope = let x = (1, 2, 3) in fun y -> y + x
