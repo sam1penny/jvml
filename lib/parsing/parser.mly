@@ -36,15 +36,15 @@ prog:
 
 
 %inline infix_op:
-  | ADD { Parsed_ast.ADD }
-  | SUB { Parsed_ast.SUB }
-  | MUL {Parsed_ast.MUL }
-  | DIV { Parsed_ast.DIV }
-  | EQ  { Parsed_ast.EQ }
-  | LT  { Parsed_ast.LT }
-  | GT { Parsed_ast.GT }
-  | AND { Parsed_ast.AND }
-  | OR { Parsed_ast.OR }
+  | ADD { Common.ADD }
+  | SUB { Common.SUB }
+  | MUL {Common.MUL }
+  | DIV { Common.DIV }
+  | EQ  { Common.EQ }
+  | LT  { Common.LT }
+  | GT { Common.GT }
+  | AND { Common.AND }
+  | OR { Common.OR }
 
 (* expressions in decreasing order of precedence *)
 

@@ -1,6 +1,6 @@
-type oper = ADD | SUB | MUL | DIV | EQ | LT | GT | AND | OR
+open Common
 
-and expr =
+type expr =
   | Int of int
   | Ident of string
   | Constr of string

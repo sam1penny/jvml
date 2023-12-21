@@ -1,16 +1,7 @@
 open Typed_ast
 open Printf
 open Parsing
-
-let ( >>=? ) x f = Result.bind x f
-let ( >>= ) x f = Option.bind x f
-
-let collect_result l =
-  List.fold_right
-    (fun x acc ->
-      acc >>=? fun acc ->
-      x >>=? fun x -> Ok (x :: acc))
-    l (Ok [])
+open Common
 
 let get_type = function
   | Int _ -> TyInt
@@ -285,7 +276,7 @@ let e =
   (*Fun ("x", Fun ("y", Tuple [ App (Ident "x", Ident "y"); Int 3 ]))*)
   Match
     ( Int 5,
-      [ (Pat_Or (Pat_Int 4, Pat_Bool true), Int 6); (Pat_Ident "x", Ident "x") ]
+      [ (Pat_Or (Pat_Int 4, Pat_Int 0), Int 6); (Pat_Ident "x", Ident "x") ]
     )
 
 let () =

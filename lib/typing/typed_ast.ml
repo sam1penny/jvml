@@ -3,7 +3,7 @@ type expr =
   | Ident of type_expr * string
   | Bool of bool
   | Unit
-  | Oper of type_expr * expr * Parsing.Parsed_ast.oper * expr
+  | Oper of type_expr * expr * Common.oper * expr
   | If of type_expr * expr * expr * expr
   | Fun of type_expr * string * expr
   | App of type_expr * expr * expr
@@ -11,6 +11,7 @@ type expr =
   | Tuple of type_expr * expr list
   | Let of type_expr * string * expr * expr
 
+(*
 and pattern =
   | Pat_Int of int
   | Pat_Ident of string
@@ -20,7 +21,7 @@ and pattern =
   | Pat_Or of pattern * pattern
   | Pat_Tuple of type_expr * pattern list
   | Pat_Constr of type_expr * string * pattern option
-
+*)
 and type_expr =
   | TyInt
   | TyBool
@@ -42,17 +43,17 @@ let rec ty_repr = function
       ^ match c with TyFun _ -> "" ^ ty_repr c ^ "" | _ -> ty_repr c)
 
 let oper_arg_type =
-  let open Parsing in
+  let open Common in
   function
-  | Parsed_ast.ADD | Parsed_ast.SUB | Parsed_ast.MUL | Parsed_ast.DIV
-  | Parsed_ast.LT | Parsed_ast.GT ->
+  | ADD | SUB | MUL | DIV
+  | LT | GT ->
       TyInt
-  | Parsed_ast.AND | Parsed_ast.OR -> TyBool
-  | Parsed_ast.EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
+  | AND | OR -> TyBool
+  | EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
 
 let oper_return_type =
-  let open Parsing in
+  let open Common in
   function
-  | Parsed_ast.ADD | Parsed_ast.SUB | Parsed_ast.MUL | Parsed_ast.DIV -> TyInt
-  | Parsed_ast.AND | Parsed_ast.OR | Parsed_ast.LT | Parsed_ast.GT -> TyBool
-  | Parsed_ast.EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
+  | ADD | SUB | MUL | DIV -> TyInt
+  | AND | OR | LT | GT -> TyBool
+  | EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
