@@ -8,6 +8,9 @@ license: "LICENSE"
 depends: [
   "dune" {>= "3.4"}
   "bisect_ppx" {dev & >= "2.5.0"}
+  "ppx_expect" {>= "0.16.0"}
+  "menhir" {>= "20220210"}
+  "ocamlformat" {>= "0.26.1"}
   "odoc" {with-doc}
 ]
 build: [
