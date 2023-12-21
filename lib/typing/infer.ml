@@ -5,6 +5,13 @@ open Parsing
 let ( >>=? ) x f = Result.bind x f
 let ( >>= ) x f = Option.bind x f
 
+let collect_result l =
+  List.fold_right
+    (fun x acc ->
+      acc >>=? fun acc ->
+      x >>=? fun x -> Ok (x :: acc))
+    l (Ok [])
+
 let get_type = function
   | Int _ -> TyInt
   | Ident (t, _) -> t
@@ -58,6 +65,52 @@ let generalize env ty =
 
 (* end environment stuff *)
 
+(* return (type, variable bindings, )*)
+let rec validate_pattern nt =
+  let union_maps_if_disjoint maps =
+    List.fold_left
+      (fun acc map ->
+        acc >>=? fun acc ->
+        let intersection =
+          StringMap.merge
+            (fun _ x y ->
+              x >>= fun x ->
+              y >>= fun _ -> Some x)
+            acc map
+        in
+        if StringMap.cardinal intersection > 0 then
+          Error "pattern contains duplicate bindings"
+        else Ok (StringMap.union (fun _ x _ -> Some x) acc map))
+      (Ok StringMap.empty) maps
+  in
+  let open Parsing in
+  function
+  | Parsed_ast.Pat_Int _ -> Ok (TyInt, StringMap.empty)
+  | Parsed_ast.Pat_Ident v ->
+      let v_type = nt () in
+      Ok (v_type, StringMap.singleton v (v_type, StringSet.empty))
+  | Parsed_ast.Pat_Bool _ -> Ok (TyBool, StringMap.empty)
+  | Parsed_ast.Pat_Unit -> Ok (TyUnit, StringMap.empty)
+  | Parsed_ast.Pat_Any ->
+      Ok (nt (), StringMap.empty) (* think about this more, but seems legit *)
+  | Parsed_ast.Pat_Or (p1, p2) ->
+      validate_pattern nt p1 >>=? fun (p1type, p1bindings) ->
+      validate_pattern nt p2 >>=? fun (p2type, p2bindings) ->
+      union_maps_if_disjoint [ p1bindings; p2bindings ]
+      >>=? fun updated_bindings ->
+      if p1type <> p2type then Error "patterns are not of the same type"
+      else Ok (p1type, updated_bindings)
+  | Parsed_ast.Pat_Tuple ps ->
+      List.map (validate_pattern nt) ps |> collect_result >>=? fun results ->
+      List.fold_right
+        (fun p acc -> acc >>=? fun acc -> Ok (p :: acc))
+        results (Ok [])
+      >>=? fun recursive_calls ->
+      let t = TyTuple (List.map (fun (x, _) -> x) recursive_calls) in
+      union_maps_if_disjoint (List.map (fun (_, y) -> y) recursive_calls)
+      >>=? fun bindings -> Ok (t, bindings)
+  | _ -> raise @@ Invalid_argument "unsupported pattern!"
+
 let instantiate nt bound t =
   let remap =
     StringSet.fold
@@ -106,6 +159,8 @@ let make_new_type () =
     let _ = t := !t + 1 in
     TyVar ("t" ^ string_of_int n)
 
+let list_all_eq = function [] -> true | x :: xs -> List.for_all (( = ) x) xs
+
 let rec infer unifications nt env expr =
   match expr with
   | Parsed_ast.Int i -> Ok (Typed_ast.Int i)
@@ -142,13 +197,24 @@ let rec infer unifications nt env expr =
       unify unifications (TyFun (get_type e1node, tau')) (get_type e0node)
       >>=? fun _ -> Ok (App (tau', e0node, e1node))
   (* ignore the type of the pattern at the moment *)
-  | Parsed_ast.Match (_, _) -> raise @@ Invalid_argument "todo"
+  | Parsed_ast.Match (e, cases) ->
+      infer unifications nt env e >>=? fun enode ->
+      List.map (check_case (get_type enode) unifications nt env) cases
+      |> collect_result
+      >>=? fun inferred_cases ->
+      let first_case = List.hd inferred_cases in
+      let other_cases = List.tl inferred_cases in
+      List.map
+        (unify unifications (get_type first_case))
+        (List.map get_type other_cases)
+      |> collect_result
+      >>=? fun _ ->
+      let typed_cases =
+        List.combine (List.map (fun (x, _) -> x) cases) inferred_cases
+      in
+      Ok (Typed_ast.Match (get_type first_case, enode, typed_cases))
   | Parsed_ast.Tuple ts ->
-      List.fold_right
-        (fun e acc ->
-          acc >>=? fun acc' ->
-          infer unifications nt env e >>=? fun e' -> Ok (e' :: acc'))
-        ts (Ok [])
+      List.map (infer unifications nt env) ts |> collect_result
       >>=? fun enodes ->
       let ty = TyTuple (List.map get_type enodes) in
       Ok (Typed_ast.Tuple (ty, enodes))
@@ -162,6 +228,19 @@ let rec infer unifications nt env expr =
       infer unifications nt env' e1 >>=? fun e1node ->
       Ok (Typed_ast.Let (get_type e1node, x, e0node, e1node))
   | _ -> Error (sprintf "current unsupported expression")
+
+and check_case e_type unifications nt env (pattern, case_expr) =
+  validate_pattern nt pattern >>=? fun (pattern_type, new_bindings) ->
+  (* todo : give better error than 'cannot unify' *)
+  unify unifications e_type pattern_type >>=? fun _ ->
+  let env' =
+    StringMap.union
+      (fun _ _ shadow_binding -> Some shadow_binding)
+      env new_bindings
+  in
+  infer unifications nt env' case_expr >>=? fun case_node ->
+  (*Ok (pattern_type, case_node)*)
+  Ok case_node
 
 let make_new_char () =
   let t = ref (Char.code 'a') in
@@ -203,7 +282,11 @@ let infer_expr expr =
 
 let e =
   let open Parsed_ast in
-  Fun ("x", Fun ("y", Tuple [ App (Ident "x", Ident "y"); Int 3 ]))
+  (*Fun ("x", Fun ("y", Tuple [ App (Ident "x", Ident "y"); Int 3 ]))*)
+  Match
+    ( Int 5,
+      [ (Pat_Or (Pat_Int 4, Pat_Bool true), Int 6); (Pat_Ident "x", Ident "x") ]
+    )
 
 let () =
   (infer_expr e |> function
