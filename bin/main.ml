@@ -1,8 +1,8 @@
 open Jvml
 
-let () = Driver.parse_file "examples/everything.jvml"
-|> List.iter (fun d -> Ast.pp_decl d |> print_endline)
-
+let () =
+  Run_frontend.run_frontend "examples/everything.jvml"
+  |> List.iter (fun d -> Parsing.Parsed_ast.pp_decl d |> print_endline)
 
 (*
 let () = Driver.parse_file "examples/conditionals.jvml"
