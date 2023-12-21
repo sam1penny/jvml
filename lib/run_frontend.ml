@@ -1,2 +1,4 @@
 let run_frontend filename =
-  Parsing.Driver.parse_file filename |> Typing.Driver.type_tree
+  match Parsing.Driver.parse_file filename |> List.hd with
+  | Parsing.Parsed_ast.Val (_, e) -> Typing.Driver.type_tree e
+  | _ -> raise @@ Invalid_argument "unsupported more than expressions"

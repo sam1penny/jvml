@@ -1,1 +1,1 @@
-let type_tree = Infer.dothing
+let type_tree = Infer.infer_expr

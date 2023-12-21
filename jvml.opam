@@ -7,6 +7,7 @@ authors: ["Sam Penny"]
 license: "LICENSE"
 depends: [
   "dune" {>= "3.4"}
+  "bisect_ppx" {dev & >= "2.5.0"}
   "odoc" {with-doc}
 ]
 build: [

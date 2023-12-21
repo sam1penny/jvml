@@ -1,3 +1,5 @@
 (library
  (name typing)
- (libraries common parsing))
+ (libraries common parsing)
+ (instrumentation
+  (backend bisect_ppx)))

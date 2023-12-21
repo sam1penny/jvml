@@ -36,7 +36,11 @@ let rec ty_repr = function
   | TyUnit -> "unit"
   | TyVar v -> v
   | TyTuple ts ->
-      List.map ty_repr ts |> String.concat "*" |> Printf.sprintf "(%s)"
+      List.map
+        (fun t ->
+          match t with TyFun _ -> "(" ^ ty_repr t ^ ")" | _ -> ty_repr t)
+        ts
+      |> String.concat " * " |> Printf.sprintf "(%s)"
   | TyFun (f, c) -> (
       (match f with TyFun _ -> "(" ^ ty_repr f ^ ")" | _ -> ty_repr f)
       ^ " -> "
@@ -45,9 +49,7 @@ let rec ty_repr = function
 let oper_arg_type =
   let open Common in
   function
-  | ADD | SUB | MUL | DIV
-  | LT | GT ->
-      TyInt
+  | ADD | SUB | MUL | DIV | LT | GT -> TyInt
   | AND | OR -> TyBool
   | EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
 

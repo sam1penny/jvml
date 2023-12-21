@@ -9,4 +9,3 @@ let collect_result l =
       acc >>=? fun acc ->
       x >>=? fun x -> Ok (x :: acc))
     l (Ok [])
-

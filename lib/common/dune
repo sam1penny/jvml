@@ -1,2 +1,4 @@
 (library
- (name common))
+ (name common)
+ (instrumentation
+  (backend bisect_ppx)))

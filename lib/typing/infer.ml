@@ -269,8 +269,9 @@ let infer_expr expr =
   let type_gen = make_new_type () in
   infer u type_gen env expr
   |> Result.map (fun tytree ->
-         find_unified_type u (get_type tytree) |> simplify_types |> ty_repr)
+         find_unified_type u (get_type tytree) |> simplify_types)
 
+(*
 let e =
   let open Parsed_ast in
   (*Fun ("x", Fun ("y", Tuple [ App (Ident "x", Ident "y"); Int 3 ]))*)
@@ -281,8 +282,8 @@ let e =
 
 let () =
   (infer_expr e |> function
-   | Ok s -> print_endline s
+   | Ok s -> print_endline (ty_repr s)
    | Error e -> print_endline e);
   print_newline ()
-
+*)
 let dothing x = x
