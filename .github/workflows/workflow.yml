@@ -34,8 +34,8 @@ jobs:
       - name: Upload the build artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}-${{ matrix.ocaml-compiler }}-world.exe
-          path: _build/default/world.exe
+          name: ${{ matrix.os }}-${{ matrix.ocaml-compiler }}-main.exe
+          path: _build/default/main.exe
 
   lint-doc:
     runs-on: ubuntu-latest
