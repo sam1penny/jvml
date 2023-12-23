@@ -49,56 +49,56 @@ prog:
 (* expressions in decreasing order of precedence *)
 
 expr4:
-  | i = INT { Parsed_ast.Int i }
-  | i = LOWERCASE_IDENT {Parsed_ast.Ident i}
-  | i = UPPERCASE_IDENT {Parsed_ast.Constr i}
-  | TRUE { Parsed_ast.Bool true }
-  | FALSE { Parsed_ast.Bool false}
-  | UNIT { Parsed_ast.Unit }
+  | i = INT { Parsed_ast.Int ($sloc, i) }
+  | i = LOWERCASE_IDENT {Parsed_ast.Ident ($sloc, i)}
+  | i = UPPERCASE_IDENT {Parsed_ast.Constr ($sloc, i)}
+  | TRUE { Parsed_ast.Bool ($sloc, true) }
+  | FALSE { Parsed_ast.Bool ($sloc, false)}
+  | UNIT { Parsed_ast.Unit $sloc }
   | LPAREN; e = expr; RPAREN { e }
 
 expr3:
   | e = expr4 { e }
-  | e = expr3; e2 = expr4 { Parsed_ast.App (e, e2)}
+  | e = expr3; e2 = expr4 { Parsed_ast.App ($sloc, e, e2)}
 
 expr2:
  | e = expr3 {e}
- | e1 = expr2; op = infix_op; e2 = expr2 { Parsed_ast.Oper(e1, op, e2) }
+ | e1 = expr2; op = infix_op; e2 = expr2 { Parsed_ast.Oper($sloc, e1, op, e2) }
 
 expr:
  | e = expr2 { e }
- | IF; e1 = expr; THEN; e2 = expr; ELSE; e3 = expr {Parsed_ast.If(e1, e2, e3)}
- | FUN; i = LOWERCASE_IDENT; ARROW; e = expr; {Parsed_ast.Fun(i, e)}
- | MATCH; e = expr; WITH ; option(BAR); cl = separated_nonempty_list(BAR, case) {Parsed_ast.Match(e, cl)}
- | LPAREN; exprs = tuple_sep(COMMA, expr); RPAREN {Parsed_ast.Tuple (exprs)}
- | LET; i = LOWERCASE_IDENT; EQ; e1 = expr; IN; e2 = expr; {Parsed_ast.Let (i, e1, e2)}
+ | IF; e1 = expr; THEN; e2 = expr; ELSE; e3 = expr {Parsed_ast.If($sloc, e1, e2, e3)}
+ | FUN; i = LOWERCASE_IDENT; ARROW; e = expr; {Parsed_ast.Fun($sloc, i, e)}
+ | MATCH; e = expr; WITH ; option(BAR); cl = separated_nonempty_list(BAR, case) {Parsed_ast.Match($sloc, e, cl)}
+ | LPAREN; exprs = tuple_sep(COMMA, expr); RPAREN {Parsed_ast.Tuple ($sloc, exprs)}
+ | LET; i = LOWERCASE_IDENT; EQ; e1 = expr; IN; e2 = expr; {Parsed_ast.Let ($sloc, i, e1, e2)}
 
 pattern1:
-  | i = INT { Parsed_ast.Pat_Int i }
-  | i = LOWERCASE_IDENT {Parsed_ast.Pat_Ident i}
-  | i = UPPERCASE_IDENT {Parsed_ast.Pat_Constr (i, None)}
-  | TRUE { Parsed_ast.Pat_Bool true }
-  | FALSE { Parsed_ast.Pat_Bool false}
-  | UNIT { Parsed_ast.Pat_Unit }
-  | UNDERSCORE {Parsed_ast.Pat_Any}
-  | LPAREN; pats = tuple_sep(COMMA, pattern1); RPAREN {Parsed_ast.Pat_Tuple (pats)}
-  | cname = UPPERCASE_IDENT; p = pattern1 {Parsed_ast.Pat_Constr (cname, Some p)}
+  | i = INT { Parsed_ast.Pat_Int ($sloc, i) }
+  | i = LOWERCASE_IDENT {Parsed_ast.Pat_Ident ($sloc, i)}
+  | i = UPPERCASE_IDENT {Parsed_ast.Pat_Constr ($sloc, i, None)}
+  | TRUE { Parsed_ast.Pat_Bool ($sloc, true) }
+  | FALSE { Parsed_ast.Pat_Bool ($sloc, false)}
+  | UNIT { Parsed_ast.Pat_Unit $sloc }
+  | UNDERSCORE {Parsed_ast.Pat_Any $sloc}
+  | LPAREN; pats = tuple_sep(COMMA, pattern1); RPAREN {Parsed_ast.Pat_Tuple ($sloc, pats)}
+  | cname = UPPERCASE_IDENT; p = pattern1 {Parsed_ast.Pat_Constr ($sloc, cname, Some p)}
 
 pattern:
   | p = pattern1 { p }
-  | p1 = pattern; BAR; p2 = pattern {Parsed_ast.Pat_Or (p1, p2)}
+  | p1 = pattern; BAR; p2 = pattern {Parsed_ast.Pat_Or ($sloc, p1, p2)}
 
 case:
   (* removes ambiguity of nested matches *)
   | p = pattern; ARROW; e = expr2 {(p, e)}
 
 decl:
-  | TYPE; tparams = loption(type_params) tname = LOWERCASE_IDENT; EQ; option(BAR); cl = separated_nonempty_list(BAR, type_constr) {Parsed_ast.Type(tparams, tname, cl)}
-  | VAL; vname = LOWERCASE_IDENT; EQ; e = expr {Parsed_ast.Val (vname, e)}
+  | TYPE; tparams = loption(type_params) tname = LOWERCASE_IDENT; EQ; option(BAR); cl = separated_nonempty_list(BAR, type_constr) {Parsed_ast.Type($sloc, tparams, tname, cl)}
+  | VAL; vname = LOWERCASE_IDENT; EQ; e = expr {Parsed_ast.Val ($sloc, vname, e)}
 
 type_constr:
-  | tconstr = UPPERCASE_IDENT; {Parsed_ast.DeclConstr (tconstr, None) }
-  | tconstr = UPPERCASE_IDENT; OF; texpr = type_expr { Parsed_ast.DeclConstr (tconstr, Some(texpr))}
+  | tconstr = UPPERCASE_IDENT; {Parsed_ast.DeclConstr ($sloc, tconstr, None) }
+  | tconstr = UPPERCASE_IDENT; OF; texpr = type_expr { Parsed_ast.DeclConstr ($sloc, tconstr, Some(texpr))}
 
 (* do not require parenthesis when only one type parameter present *)
 
