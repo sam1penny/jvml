@@ -7,13 +7,13 @@ let pp_tree_result = function
   | Error _ -> "Error"
 
 let%expect_test "basic int arithmetic" =
-  let x = Oper (Int 6, MUL, Oper (Int 3, ADD, Int 4)) in
+  let x = Bop (Int 6, MUL, Bop (Int 3, ADD, Int 4)) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_tree |> pp_tree_result
   |> print_string;
   [%expect {|Ok(int)|}]
 
 let%expect_test "invalid arithmetic" =
-  let x = Oper (Int 6, MUL, Bool false) in
+  let x = Bop (Int 6, MUL, Bool false) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_tree |> pp_tree_result
   |> print_string;
   [%expect {|Error|}]
@@ -31,7 +31,7 @@ let%expect_test "basic if statement" =
   [%expect {|Ok(unit)|}]
 
 let%expect_test "infer simple function argument" =
-  let x = Fun ("x", Oper (Ident "x", SUB, Int 4)) in
+  let x = Fun ("x", Bop (Ident "x", SUB, Int 4)) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_tree |> pp_tree_result
   |> print_string;
   [%expect {|Ok(int -> int)|}]
@@ -49,8 +49,8 @@ let%expect_test "function variable shadowing" =
       ( "x",
         Tuple
           [
-            Fun ("x", Oper (Int 3, ADD, Ident "x"));
-            Oper (Ident "x", AND, Bool true);
+            Fun ("x", Bop (Int 3, ADD, Ident "x"));
+            Bop (Ident "x", AND, Bool true);
           ] )
   in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_tree |> pp_tree_result
@@ -64,8 +64,8 @@ let%expect_test "function variable shadowing - reversed" =
       ( "x",
         Tuple
           [
-            Oper (Ident "x", AND, Bool true);
-            Fun ("x", Oper (Int 3, ADD, Ident "x"));
+            Bop (Ident "x", AND, Bool true);
+            Fun ("x", Bop (Int 3, ADD, Ident "x"));
           ] )
   in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_tree |> pp_tree_result
@@ -109,7 +109,7 @@ let%expect_test "test shadowing binding match" =
       ( "x",
         Tuple
           [
-            Oper (Ident "x", AND, Bool true);
+            Bop (Ident "x", AND, Bool true);
             Match (Int 3, [ (Pat_Ident "x", Ident "x") ]);
           ] )
   in

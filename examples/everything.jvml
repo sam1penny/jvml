@@ -11,7 +11,7 @@ val fact = fun x -> match x with
 
 val iszero = fun x -> match x with
     | 0 -> true
-    |_ -> false
+    | _ -> false
 
 val map = fun f -> fun t ->
     match t with

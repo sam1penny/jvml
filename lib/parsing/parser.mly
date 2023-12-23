@@ -63,7 +63,7 @@ expr3:
 
 expr2:
  | e = expr3 {e}
- | e1 = expr2; op = infix_op; e2 = expr2 { Parsed_ast.Oper($sloc, e1, op, e2) }
+ | e1 = expr2; op = infix_op; e2 = expr2 { Parsed_ast.Bop($sloc, e1, op, e2) }
 
 expr:
  | e = expr2 { e }

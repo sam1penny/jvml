@@ -3,7 +3,7 @@ type expr =
   | Ident of type_expr * string
   | Bool of bool
   | Unit
-  | Oper of type_expr * expr * Common.oper * expr
+  | Bop of type_expr * expr * Common.bop * expr
   | If of type_expr * expr * expr * expr
   | Fun of type_expr * string * expr
   | App of type_expr * expr * expr
@@ -46,14 +46,14 @@ let rec ty_repr = function
       ^ " -> "
       ^ match c with TyFun _ -> "" ^ ty_repr c ^ "" | _ -> ty_repr c)
 
-let oper_arg_type =
+let bop_arg_type =
   let open Common in
   function
   | ADD | SUB | MUL | DIV | LT | GT -> TyInt
   | AND | OR -> TyBool
   | EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
 
-let oper_return_type =
+let bop_return_type =
   let open Common in
   function
   | ADD | SUB | MUL | DIV -> TyInt

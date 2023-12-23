@@ -8,7 +8,7 @@ type expr =
   | Constr of loc * string
   | Bool of loc * bool
   | Unit of loc
-  | Oper of loc * expr * oper * expr
+  | Bop of loc * expr * bop * expr
   | If of loc * expr * expr * expr
   | Fun of loc * string * expr
   | App of loc * expr * expr
@@ -49,7 +49,7 @@ let string_of_expr_node =
   | Ident (_, ident) -> sprintf "Ident %s" ident
   | Unit _ -> "()"
   | Constr (_, n) -> sprintf "Constructor %s" n
-  | Oper (_, _, op, _) -> sprintf "Oper: %s" (show_oper op)
+  | Bop (_, _, op, _) -> sprintf "Bop: %s" (show_bop op)
   | If _ -> "If"
   | Fun (_, x, _) -> sprintf "Fun %s" x
   | App _ -> "App"
@@ -91,7 +91,7 @@ let rec pp_expr ?(indent = "") expr =
   let pp_rec_expr = pp_expr ~indent:(indent ^ "   ") in
   match expr with
   | Int _ | Bool _ | Ident _ | Unit _ | Constr _ -> pp_node expr
-  | Oper (_, e0, _, e1) ->
+  | Bop (_, e0, _, e1) ->
       pp_node expr;
       pp_rec_expr e0;
       pp_rec_expr e1
@@ -184,8 +184,8 @@ and pp_expr = function
   | Ident (_, ident) -> ident
   | Unit _ -> "()"
   | Constr (_, n) -> n
-  | Oper (_, e1, op, e2) ->
-      Printf.sprintf "{%s %s %s}" (pp_expr e1) (string_of_oper op) (pp_expr e2)
+  | Bop (_, e1, op, e2) ->
+      Printf.sprintf "{%s %s %s}" (pp_expr e1) (string_of_bop op) (pp_expr e2)
   | If (_, e1, e2, e3) ->
       Printf.sprintf "[if %s then %s else %s]" (pp_expr e1) (pp_expr e2)
         (pp_expr e3)

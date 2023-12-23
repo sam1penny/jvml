@@ -8,7 +8,7 @@ let get_type = function
   | Ident (t, _) -> t
   | Bool _ -> TyBool
   | Unit -> TyUnit
-  | Oper (t, _, _, _) -> t
+  | Bop (t, _, _, _) -> t
   | If (t, _, _, _) -> t
   | Fun (t, _, _) -> t
   | App (t, _, _) -> t
@@ -163,12 +163,12 @@ let rec infer unifications nt env expr =
       | Some (t, bound) ->
           let instantiated = instantiate nt bound t in
           Ok (Typed_ast.Ident (find_unified_type unifications instantiated, v)))
-  | Parsed_ast.Oper (_, e0, op, e1) ->
+  | Parsed_ast.Bop (_, e0, op, e1) ->
       infer unifications nt env e0 >>=? fun e0node ->
-      unify unifications (get_type e0node) (oper_arg_type op) >>=? fun _ ->
+      unify unifications (get_type e0node) (bop_arg_type op) >>=? fun _ ->
       infer unifications nt env e1 >>=? fun e1node ->
-      unify unifications (get_type e1node) (oper_arg_type op) >>=? fun _ ->
-      Ok (Typed_ast.Oper (oper_return_type op, e0node, op, e1node))
+      unify unifications (get_type e1node) (bop_arg_type op) >>=? fun _ ->
+      Ok (Typed_ast.Bop (bop_return_type op, e0node, op, e1node))
   | Parsed_ast.If (_, e0, e1, e2) ->
       infer unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_type e0node) TyBool >>=? fun _ ->

@@ -6,7 +6,7 @@ type expr =
   | Constr of string
   | Bool of bool
   | Unit
-  | Oper of expr * oper * expr
+  | Bop of expr * bop * expr
   | If of expr * expr * expr
   | Fun of string * expr
   | App of expr * expr
@@ -51,8 +51,8 @@ let rec add_dummy_loc_expr =
   | Constr c -> Parsed_ast.Constr (dummy, c)
   | Bool b -> Parsed_ast.Bool (dummy, b)
   | Unit -> Parsed_ast.Unit dummy
-  | Oper (e0, op, e1) ->
-      Parsed_ast.Oper (dummy, add_dummy_loc_expr e0, op, add_dummy_loc_expr e1)
+  | Bop (e0, op, e1) ->
+      Parsed_ast.Bop (dummy, add_dummy_loc_expr e0, op, add_dummy_loc_expr e1)
   | If (e0, e1, e2) ->
       Parsed_ast.If
         ( dummy,
