@@ -30,7 +30,7 @@ and type_expr =
   | TyInt
   | TyBool
   | TyUnit
-  | TyCustom of string
+  | TyCustom of type_expr list * string
   | TyVar of string
   | TyTuple of type_expr list
   | TyFun of type_expr * type_expr
@@ -130,7 +130,12 @@ let rec pp_texpr = function
   | TyInt -> "int"
   | TyBool -> "bool"
   | TyUnit -> "unit"
-  | TyVar v | TyCustom v -> v
+  | TyVar v -> v
+  | TyCustom ([], v) -> v
+  | TyCustom (t :: ts, v) ->
+      Printf.sprintf "(%s) %s"
+        (List.map pp_texpr (t :: ts) |> String.concat ",")
+        v
   | TyTuple ts ->
       List.map
         (fun t ->
@@ -159,7 +164,8 @@ let pp_decl ?(indent = "") =
   | Type (_, params, t, constructors) ->
       print_with_indent indent ("Type " ^ t);
       print_with_indent (indent ^ "   ")
-        (sprintf "params = [%s]" (String.concat "," params));
+        (List.map (fun x -> "'" ^ x) params
+        |> String.concat "," |> sprintf "params = [%s]");
       print_with_indent (indent ^ "   ") "constructors";
       List.iter (pp_tconstr ~indent:(indent ^ "      ")) constructors
 

@@ -28,7 +28,7 @@ and type_expr =
   | TyInt
   | TyBool
   | TyUnit
-  | TyCustom of string
+  | TyCustom of type_expr option * string
   | TyVar of string
   | TyTuple of type_expr list
   | TyFun of type_expr * type_expr

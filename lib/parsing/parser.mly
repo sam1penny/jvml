@@ -16,7 +16,9 @@
 
 %left BAR
 %left ADD, SUB
-%left MUL, DIV, AND, OR, EQ, LT, GT, ARROW
+%left MUL, DIV, AND, OR, EQ, LT, GT
+
+%right ARROW
 
 (*
 %nonassoc THEN
@@ -93,7 +95,7 @@ case:
   | p = pattern; ARROW; e = expr2 {(p, e)}
 
 decl:
-  | TYPE; tparams = loption(type_params) tname = LOWERCASE_IDENT; EQ; option(BAR); cl = separated_nonempty_list(BAR, type_constr) {Parsed_ast.Type($sloc, tparams, tname, cl)}
+  | TYPE; tparams = loption(type_params); tname = LOWERCASE_IDENT; EQ; option(BAR); cl = separated_nonempty_list(BAR, type_constr) {Parsed_ast.Type($sloc, tparams, tname, cl)}
   | VAL; vname = LOWERCASE_IDENT; EQ; e = expr {Parsed_ast.Val ($sloc, vname, e)}
 
 type_constr:
@@ -109,11 +111,19 @@ type_params:
   | tp = type_param { [tp] }
   | LPAREN; tps = tuple_sep(COMMA, type_param) RPAREN { tps }
 
-type_expr:
+(* two levels handles int -> int tree ambiguity *)
+
+type_expr2:
   | TINT { Parsed_ast.TyInt }
   | TBOOL { Parsed_ast.TyBool }
   | TUNIT { Parsed_ast.TyUnit }
-  | APOSTROPHE; tparam = LOWERCASE_IDENT { Parsed_ast.TyVar tparam}
-  | tname = LOWERCASE_IDENT { Parsed_ast.TyCustom tname }
-  | LPAREN; texprs = tuple_sep(MUL, type_expr) RPAREN { Parsed_ast.TyTuple texprs }
+  | tparam = type_param { Parsed_ast.TyVar tparam}
+  | tname = LOWERCASE_IDENT { Parsed_ast.TyCustom ([], tname) }
+  | texpr = type_expr2; tname = LOWERCASE_IDENT { Parsed_ast.TyCustom ([texpr], tname) }
+  | LPAREN; texprs = tuple_sep(COMMA, type_expr); RPAREN; tname = LOWERCASE_IDENT {Parsed_ast.TyCustom (texprs, tname) }
+  | LPAREN; texprs = tuple_sep(MUL, type_expr); RPAREN { Parsed_ast.TyTuple texprs }
+  | LPAREN; texpr = type_expr; RPAREN { texpr }
+
+type_expr:
+  | texpr = type_expr2 { texpr }
   | t1 = type_expr; ARROW; t2 = type_expr {Parsed_ast.TyFun (t1, t2)}

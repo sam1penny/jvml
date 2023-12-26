@@ -1,6 +1,7 @@
 (* tests for inferring standalone expression types *)
 open Common
-open Utils
+open Test_utils.Utils
+open Test_utils
 
 let pp_tree_result = function
   | Ok ty -> "Ok(" ^ Typing.Typed_ast.ty_repr ty ^ ")"

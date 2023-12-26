@@ -1,6 +1,6 @@
 (library
- (name test_typing)
+ (name test_utils)
  (inline_tests)
  (preprocess
   (pps ppx_expect))
- (libraries jvml test_utils))
+ (libraries jvml))

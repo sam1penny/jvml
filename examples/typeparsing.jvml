@@ -1,0 +1,6 @@
+type data = X of int -> int tree
+type data2 = Y of (int -> int) tree
+
+type intlist = N | C of (int * intlist)
+type 'a list = N | C of ('a * 'a list)
+type ('k, 'v) dict = N | C of ('a * 'b * ('a, 'b) list)

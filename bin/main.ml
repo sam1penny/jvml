@@ -1,5 +1,5 @@
 let () =
-  Parsing.Driver.parse_file "examples/everything.Jvml"
+  Parsing.Driver.parse_file "examples/typeparsing.jvml"
   |> List.iter Parsing.Parsed_ast.pp_decl
 (*
   Run_frontend.run_frontend "examples/everything.jvml"
