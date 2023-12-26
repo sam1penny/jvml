@@ -1,15 +1,18 @@
+open Common
+type loc = Lexing.position * Lexing.position
+
 type expr =
-  | Int of int
-  | Ident of type_expr * string
-  | Bool of bool
-  | Unit
-  | Bop of type_expr * expr * Common.bop * expr
-  | If of type_expr * expr * expr * expr
-  | Fun of type_expr * string * expr
-  | App of type_expr * expr * expr
-  | Match of type_expr * expr * (Parsing.Parsed_ast.pattern * expr) list
-  | Tuple of type_expr * expr list
-  | Let of type_expr * string * expr * expr
+  | Int of loc * int
+  | Ident of loc * type_expr * string
+  | Bool of loc * bool
+  | Unit of loc
+  | Bop of loc * type_expr * expr * Common.bop * expr
+  | If of loc * type_expr * expr * expr * expr
+  | Fun of loc * type_expr * string * expr
+  | App of loc * type_expr * expr * expr
+  | Match of loc * type_expr * expr * (Parsing.Parsed_ast.pattern * expr) list
+  | Tuple of loc * type_expr * expr list
+  | Let of loc * type_expr * string * expr * expr
 
 (*
 and pattern =
@@ -22,6 +25,7 @@ and pattern =
   | Pat_Tuple of type_expr * pattern list
   | Pat_Constr of type_expr * string * pattern option
 *)
+
 and type_expr =
   | TyInt
   | TyBool
@@ -29,6 +33,12 @@ and type_expr =
   | TyVar of string
   | TyTuple of type_expr list
   | TyFun of type_expr * type_expr
+
+and type_constr = DeclConstr of loc * string * type_expr option
+
+and decl =
+  | Val of loc * type_expr * string * expr
+  | Type of loc * string list * string * type_constr list
 
 let rec ty_repr = function
   | TyInt -> "int"
@@ -59,3 +69,110 @@ let bop_return_type =
   | ADD | SUB | MUL | DIV -> TyInt
   | AND | OR | LT | GT -> TyBool
   | EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
+
+
+(* printing *)
+let string_of_expr_node =
+  let open Printf in
+  function
+  | Int (_, i) -> sprintf "Int %i" i
+  | Bool (_, b) -> sprintf "Bool %b" b
+  | Ident (_, _, ident) -> sprintf "Ident %s" ident
+  | Unit _ -> "()"
+  (*| Constr (_, _, _, n) -> sprintf "Constructor %s" n *)
+  | Bop (_, _, _, op, _) -> sprintf "Bop: %s" (show_bop op)
+  | If _ -> "If"
+  | Fun (_, _, x, _) -> sprintf "Fun %s" x
+  | App _ -> "App"
+  | Match _ -> "Match"
+  | Tuple _ -> "Tuple"
+  | Let (_, _, x, _, _) -> sprintf "Let %s" x
+
+let string_of_pat_node = Parsing.Parsed_ast.string_of_pat_node
+
+let pp_pattern = Parsing.Parsed_ast.pp_pattern
+
+let rec pp_expr ?(indent = "") expr =
+  let open Printf in
+  let pp_node n = printf "%s└──%s\n" indent (string_of_expr_node n) in
+  let pp_rec_expr = pp_expr ~indent:(indent ^ "   ") in
+  match expr with
+  | Int _ | Bool _ | Ident _ | Unit _ (*| Constr _ *) -> pp_node expr
+  | Bop (_, _, e0, _, e1) ->
+      pp_node expr;
+      pp_rec_expr e0;
+      pp_rec_expr e1
+  | If (_, _, e0, e1, e2) ->
+      pp_node expr;
+      pp_rec_expr e0;
+      pp_rec_expr e1;
+      pp_rec_expr e2
+  | Fun (_, _, _, e) ->
+      pp_node expr;
+      pp_rec_expr e
+  | App (_, _, e0, e1) ->
+      pp_node expr;
+      pp_rec_expr e0;
+      pp_rec_expr e1
+  | Match (_, _, e0, cases) ->
+      pp_node expr;
+      pp_rec_expr e0;
+      List.iter (pp_case (indent ^ "   ")) cases
+  | Tuple (_, _, es) ->
+      pp_node expr;
+      List.iter pp_rec_expr es
+  | Let (_, _, _, e0, e1) ->
+      pp_node expr;
+      pp_rec_expr e0;
+      pp_rec_expr e1
+
+and pp_case indent (pattern, expr) =
+  let open Printf in
+  printf "%s└── <case>\n" indent;
+  let indent' = indent ^ "   " in
+  pp_pattern ~indent:indent' pattern;
+  pp_expr ~indent:indent' expr
+
+let rec pp_texpr = function
+  | TyInt -> "int"
+  | TyBool -> "bool"
+  | TyUnit -> "unit"
+  | TyVar v -> v
+  (*| TyCustom ([], v) -> v
+  | TyCustom (t :: ts, v) ->
+      Printf.sprintf "(%s) %s"
+        (List.map pp_texpr (t :: ts) |> String.concat ",")
+        v
+  *)
+  | TyTuple ts ->
+      List.map
+        (fun t ->
+          match t with TyFun _ -> "(" ^ pp_texpr t ^ ")" | _ -> pp_texpr t)
+        ts
+      |> String.concat " * " |> Printf.sprintf "(%s)"
+  | TyFun (f, c) -> (
+      (match f with TyFun _ -> "(" ^ pp_texpr f ^ ")" | _ -> pp_texpr f)
+      ^ " -> "
+      ^ match c with TyFun _ -> "" ^ pp_texpr c ^ "" | _ -> pp_texpr c)
+
+let pp_tconstr ?(indent = "") =
+  let open Printf in
+  function
+  | DeclConstr (_, cname, None) -> printf "%s└──%s\n" indent cname
+  | DeclConstr (_, cname, Some texpr) ->
+      printf "%s└──%s of %s\n" indent cname (pp_texpr texpr)
+
+let pp_decl ?(indent = "") =
+  let open Printf in
+  let print_with_indent = printf "%s└──%s\n" in
+  function
+  | Val (_, _, v, e) ->
+      print_with_indent indent ("Val " ^ v);
+      pp_expr ~indent:(indent ^ "   ") e
+  | Type (_, params, t, constructors) ->
+      print_with_indent indent ("Type " ^ t);
+      print_with_indent (indent ^ "   ")
+        (List.map (fun x -> "'" ^ x) params
+        |> String.concat "," |> sprintf "params = [%s]");
+      print_with_indent (indent ^ "   ") "constructors";
+      List.iter (pp_tconstr ~indent:(indent ^ "      ")) constructors

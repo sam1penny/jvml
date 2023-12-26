@@ -1,9 +1,8 @@
 let () =
-  Parsing.Driver.parse_file "examples/typeparsing.jvml"
-  |> List.iter Parsing.Parsed_ast.pp_decl
-(*
-  Run_frontend.run_frontend "examples/everything.jvml"
-  |> List.iter (fun d -> Parsing.Parsed_ast.pp_decl d |> print_endline) *)
+  match Jvml.Run_frontend.run_frontend "examples/assignments.jvml" with
+    | Ok(typed_decls) -> List.iter Typing.Typed_ast.pp_decl typed_decls
+    | Error(e) -> raise @@ Invalid_argument e
+
 
 (*
 let () = Driver.parse_file "examples/conditionals.jvml"

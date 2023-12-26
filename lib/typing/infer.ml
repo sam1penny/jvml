@@ -5,16 +5,16 @@ open Common
 
 let get_type = function
   | Int _ -> TyInt
-  | Ident (t, _) -> t
+  | Ident (_, t, _) -> t
   | Bool _ -> TyBool
-  | Unit -> TyUnit
-  | Bop (t, _, _, _) -> t
-  | If (t, _, _, _) -> t
-  | Fun (t, _, _) -> t
-  | App (t, _, _) -> t
-  | Match (t, _, _) -> t
-  | Tuple (t, _) -> t
-  | Let (t, _, _, _) -> t
+  | Unit _ -> TyUnit
+  | Bop (_, t, _, _, _) -> t
+  | If (_, t, _, _, _) -> t
+  | Fun (_, t, _, _) -> t
+  | App (_, t, _, _) -> t
+  | Match (_, t, _, _) -> t
+  | Tuple (_, t, _) -> t
+  | Let (_, t, _, _, _) -> t
 
 module Unifications = Disjoint_set.Make (struct
   type t = type_expr
@@ -154,41 +154,41 @@ let list_all_eq = function [] -> true | x :: xs -> List.for_all (( = ) x) xs
 
 let rec infer unifications nt env expr =
   match expr with
-  | Parsed_ast.Int (_, i) -> Ok (Typed_ast.Int i)
-  | Parsed_ast.Bool (_, b) -> Ok (Typed_ast.Bool b)
-  | Parsed_ast.Unit _ -> Ok Typed_ast.Unit
-  | Parsed_ast.Ident (_, v) -> (
+  | Parsed_ast.Int (loc, i) -> Ok (Typed_ast.Int (loc, i))
+  | Parsed_ast.Bool (loc, b) -> Ok (Typed_ast.Bool (loc, b))
+  | Parsed_ast.Unit loc -> Ok (Typed_ast.Unit loc)
+  | Parsed_ast.Ident (loc, v) -> (
       match StringMap.find_opt v env with
       | None -> Error (sprintf "unbound variable %s" v)
       | Some (t, bound) ->
           let instantiated = instantiate nt bound t in
-          Ok (Typed_ast.Ident (find_unified_type unifications instantiated, v)))
-  | Parsed_ast.Bop (_, e0, op, e1) ->
+          Ok (Typed_ast.Ident (loc, find_unified_type unifications instantiated, v)))
+  | Parsed_ast.Bop (loc, e0, op, e1) ->
       infer unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_type e0node) (bop_arg_type op) >>=? fun _ ->
       infer unifications nt env e1 >>=? fun e1node ->
       unify unifications (get_type e1node) (bop_arg_type op) >>=? fun _ ->
-      Ok (Typed_ast.Bop (bop_return_type op, e0node, op, e1node))
-  | Parsed_ast.If (_, e0, e1, e2) ->
+      Ok (Typed_ast.Bop (loc, bop_return_type op, e0node, op, e1node))
+  | Parsed_ast.If (loc, e0, e1, e2) ->
       infer unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_type e0node) TyBool >>=? fun _ ->
       infer unifications nt env e1 >>=? fun e1node ->
       infer unifications nt env e2 >>=? fun e2node ->
       unify unifications (get_type e1node) (get_type e2node) >>=? fun _ ->
-      Ok (Typed_ast.If (get_type e1node, e0node, e1node, e2node))
-  | Parsed_ast.Fun (_, x, e) ->
+      Ok (Typed_ast.If (loc, get_type e1node, e0node, e1node, e2node))
+  | Parsed_ast.Fun (loc, x, e) ->
       let tau = nt () in
       let env' = StringMap.add x (tau, StringSet.empty) env in
       infer unifications nt env' e >>=? fun enode ->
-      Ok (Typed_ast.Fun (TyFun (tau, get_type enode), x, enode))
-  | Parsed_ast.App (_, e0, e1) ->
+      Ok (Typed_ast.Fun (loc, TyFun (tau, get_type enode), x, enode))
+  | Parsed_ast.App (loc, e0, e1) ->
       let tau' = nt () in
       infer unifications nt env e0 >>=? fun e0node ->
       infer unifications nt env e1 >>=? fun e1node ->
       unify unifications (TyFun (get_type e1node, tau')) (get_type e0node)
-      >>=? fun _ -> Ok (App (tau', e0node, e1node))
+      >>=? fun _ -> Ok (App (loc, tau', e0node, e1node))
   (* ignore the type of the pattern at the moment *)
-  | Parsed_ast.Match (_, e, cases) ->
+  | Parsed_ast.Match (loc, e, cases) ->
       infer unifications nt env e >>=? fun enode ->
       List.map (check_case (get_type enode) unifications nt env) cases
       |> collect_result
@@ -203,13 +203,13 @@ let rec infer unifications nt env expr =
       let typed_cases =
         List.combine (List.map (fun (x, _) -> x) cases) inferred_cases
       in
-      Ok (Typed_ast.Match (get_type first_case, enode, typed_cases))
-  | Parsed_ast.Tuple (_, ts) ->
+      Ok (Typed_ast.Match (loc, get_type first_case, enode, typed_cases))
+  | Parsed_ast.Tuple (loc, ts) ->
       List.map (infer unifications nt env) ts |> collect_result
       >>=? fun enodes ->
       let ty = TyTuple (List.map get_type enodes) in
-      Ok (Typed_ast.Tuple (ty, enodes))
-  | Parsed_ast.Let (_, x, e0, e1) ->
+      Ok (Typed_ast.Tuple (loc, ty, enodes))
+  | Parsed_ast.Let (loc, x, e0, e1) ->
       infer unifications nt env e0 >>=? fun e0node ->
       let env' =
         StringMap.add x
@@ -217,7 +217,7 @@ let rec infer unifications nt env expr =
           env
       in
       infer unifications nt env' e1 >>=? fun e1node ->
-      Ok (Typed_ast.Let (get_type e1node, x, e0node, e1node))
+      Ok (Typed_ast.Let (loc, get_type e1node, x, e0node, e1node))
   | _ -> Error (sprintf "current unsupported expression")
 
 and check_case e_type unifications nt env (pattern, case_expr) =
@@ -263,10 +263,25 @@ let simplify_types ty =
   in
   map_over ty
 
-let infer_expr expr =
+let infer_expr_test expr =
   let u = Unifications.create 10 in
   let env = StringMap.empty in
   let type_gen = make_new_type () in
   infer u type_gen env expr
   |> Result.map (fun tytree ->
          find_unified_type u (get_type tytree) |> simplify_types)
+
+
+
+let infer_decl unifications nt env = function
+  | Parsed_ast.Val(loc, v, expr) -> infer unifications nt env expr >>=? fun exprnode ->
+    let env' = StringMap.add v (get_type exprnode, StringSet.empty) env in
+    Ok((Typed_ast.Val(loc, get_type exprnode, v, exprnode), env'))
+  |_ -> raise @@ Invalid_argument "unsupported declaration type"
+
+let infer_program program =
+  let u = Unifications.create 20 in
+  let env = StringMap.empty in
+  let type_gen = make_new_type () in
+  List.fold_left (fun acc decl -> acc >>=? fun (declnodes, env) -> infer_decl u type_gen env decl >>=? fun (declnode, env') ->  Ok(declnode::declnodes, env')) (Ok([], env)) program
+  >>=? fun (ttree, _) -> Ok(List.rev ttree)

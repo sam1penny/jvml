@@ -1,0 +1,2 @@
+val x = fun z -> 3
+val y = 1 + x 3
