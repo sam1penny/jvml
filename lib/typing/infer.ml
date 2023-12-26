@@ -42,6 +42,9 @@ let rec tyvars_from_type = function
         StringSet.empty ts
   | TyFun (t0, t1) ->
       StringSet.union (tyvars_from_type t0) (tyvars_from_type t1)
+  | TyCustom _ ->
+      raise
+      @@ Invalid_argument "not currently supporting tycustom in type inference!"
 
 let free_vars_ty t bound = StringSet.diff (tyvars_from_type t) bound
 
@@ -113,6 +116,10 @@ let instantiate nt bound t =
     | TyVar v -> Option.value (StringMap.find_opt v remap) ~default:(TyVar v)
     | TyTuple ts -> TyTuple (List.map map_over ts)
     | TyFun (t0, t1) -> TyFun (map_over t0, map_over t1)
+    | TyCustom _ ->
+        raise
+        @@ Invalid_argument
+             "not currently supporting tycustom in type inference!"
   in
   map_over t
 
@@ -126,6 +133,9 @@ let rec find_unified_type u ty =
       if ty = ty' then ty else find_unified_type u ty'
   | TyTuple ts -> TyTuple (List.map (find_unified_type u) ts)
   | TyFun (t1, t2) -> TyFun (find_unified_type u t1, find_unified_type u t2)
+  | TyCustom _ ->
+      raise
+      @@ Invalid_argument "not currently supporting tycustom in type inference!"
 
 let rec unify unifications t1 t2 =
   let t1 = find_unified_type unifications t1 in
@@ -141,7 +151,7 @@ let rec unify unifications t1 t2 =
         Ok ()
     | TyFun (t1a, t1b), TyFun (t2a, t2b) ->
         unify unifications t1a t2a >>=? fun _ -> unify unifications t1b t2b
-    | _ -> Error (sprintf "cannot unify %s with %s" (ty_repr t1) (ty_repr t2))
+    | _ -> Error (sprintf "cannot unify %s with %s" (pp_texpr t1) (pp_texpr t2))
 
 let make_new_type () =
   let t = ref 0 in
@@ -162,7 +172,9 @@ let rec infer unifications nt env expr =
       | None -> Error (sprintf "unbound variable %s" v)
       | Some (t, bound) ->
           let instantiated = instantiate nt bound t in
-          Ok (Typed_ast.Ident (loc, find_unified_type unifications instantiated, v)))
+          Ok
+            (Typed_ast.Ident
+               (loc, find_unified_type unifications instantiated, v)))
   | Parsed_ast.Bop (loc, e0, op, e1) ->
       infer unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_type e0node) (bop_arg_type op) >>=? fun _ ->
@@ -260,6 +272,10 @@ let simplify_types ty =
         let t0' = map_over t0 in
         let t1' = map_over t1 in
         TyFun (t0', t1')
+    | TyCustom _ ->
+        raise
+        @@ Invalid_argument
+             "not currently supporting tycustom in type inference!"
   in
   map_over ty
 
@@ -271,17 +287,41 @@ let infer_expr_test expr =
   |> Result.map (fun tytree ->
          find_unified_type u (get_type tytree) |> simplify_types)
 
+let infer_constructor _ _ env params = function
+  | Parsed_ast.DeclConstr (_, _, None) -> env (* todo: do something here l8r *)
+  | Parsed_ast.DeclConstr (_, name, Some texpr) ->
+      (* todo: verify it is correct l8r *)
+      StringMap.add name (texpr, StringSet.of_list params) env
 
+let to_typed_constr = function
+  | Parsed_ast.DeclConstr (loc, name, maybe_texpr) ->
+      Typed_ast.DeclConstr (loc, name, maybe_texpr)
 
 let infer_decl unifications nt env = function
-  | Parsed_ast.Val(loc, v, expr) -> infer unifications nt env expr >>=? fun exprnode ->
-    let env' = StringMap.add v (get_type exprnode, StringSet.empty) env in
-    Ok((Typed_ast.Val(loc, get_type exprnode, v, exprnode), env'))
-  |_ -> raise @@ Invalid_argument "unsupported declaration type"
+  | Parsed_ast.Val (loc, v, expr) ->
+      infer unifications nt env expr >>=? fun exprnode ->
+      let env' = StringMap.add v (get_type exprnode, StringSet.empty) env in
+      Ok (Typed_ast.Val (loc, get_type exprnode, v, exprnode), env')
+  | Parsed_ast.Type (loc, params, tname, constructors) ->
+      let env' =
+        List.fold_left
+          (fun env c -> infer_constructor unifications nt env params c)
+          env constructors
+      in
+      Ok
+        ( Typed_ast.Type
+            (loc, params, tname, List.map to_typed_constr constructors),
+          env' )
 
 let infer_program program =
   let u = Unifications.create 20 in
   let env = StringMap.empty in
   let type_gen = make_new_type () in
-  List.fold_left (fun acc decl -> acc >>=? fun (declnodes, env) -> infer_decl u type_gen env decl >>=? fun (declnode, env') ->  Ok(declnode::declnodes, env')) (Ok([], env)) program
-  >>=? fun (ttree, _) -> Ok(List.rev ttree)
+  List.fold_left
+    (fun acc decl ->
+      acc >>=? fun (declnodes, env) ->
+      infer_decl u type_gen env decl >>=? fun (declnode, env') ->
+      Ok (declnode :: declnodes, env'))
+    (Ok ([], env))
+    program
+  >>=? fun (ttree, _) -> Ok (List.rev ttree)

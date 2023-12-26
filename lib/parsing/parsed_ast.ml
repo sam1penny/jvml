@@ -26,15 +26,6 @@ and pattern =
   | Pat_Tuple of loc * pattern list
   | Pat_Constr of loc * string * pattern option
 
-and type_expr =
-  | TyInt
-  | TyBool
-  | TyUnit
-  | TyCustom of type_expr list * string
-  | TyVar of string
-  | TyTuple of type_expr list
-  | TyFun of type_expr * type_expr
-
 and type_constr = DeclConstr of loc * string * type_expr option
 
 and decl =
@@ -125,27 +116,6 @@ and pp_case indent (pattern, expr) =
   let indent' = indent ^ "   " in
   pp_pattern ~indent:indent' pattern;
   pp_expr ~indent:indent' expr
-
-let rec pp_texpr = function
-  | TyInt -> "int"
-  | TyBool -> "bool"
-  | TyUnit -> "unit"
-  | TyVar v -> v
-  | TyCustom ([], v) -> v
-  | TyCustom (t :: ts, v) ->
-      Printf.sprintf "(%s) %s"
-        (List.map pp_texpr (t :: ts) |> String.concat ",")
-        v
-  | TyTuple ts ->
-      List.map
-        (fun t ->
-          match t with TyFun _ -> "(" ^ pp_texpr t ^ ")" | _ -> pp_texpr t)
-        ts
-      |> String.concat " * " |> Printf.sprintf "(%s)"
-  | TyFun (f, c) -> (
-      (match f with TyFun _ -> "(" ^ pp_texpr f ^ ")" | _ -> pp_texpr f)
-      ^ " -> "
-      ^ match c with TyFun _ -> "" ^ pp_texpr c ^ "" | _ -> pp_texpr c)
 
 let pp_tconstr ?(indent = "") =
   let open Printf in

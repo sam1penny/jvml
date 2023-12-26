@@ -4,7 +4,7 @@ open Test_utils.Utils
 open Test_utils
 
 let pp_tree_result = function
-  | Ok ty -> "Ok(" ^ Typing.Typed_ast.ty_repr ty ^ ")"
+  | Ok ty -> "Ok(" ^ Common.pp_texpr ty ^ ")"
   | Error _ -> "Error"
 
 let%expect_test "basic int arithmetic" =

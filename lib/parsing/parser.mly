@@ -114,16 +114,16 @@ type_params:
 (* two levels handles int -> int tree ambiguity *)
 
 type_expr2:
-  | TINT { Parsed_ast.TyInt }
-  | TBOOL { Parsed_ast.TyBool }
-  | TUNIT { Parsed_ast.TyUnit }
-  | tparam = type_param { Parsed_ast.TyVar tparam}
-  | tname = LOWERCASE_IDENT { Parsed_ast.TyCustom ([], tname) }
-  | texpr = type_expr2; tname = LOWERCASE_IDENT { Parsed_ast.TyCustom ([texpr], tname) }
-  | LPAREN; texprs = tuple_sep(COMMA, type_expr); RPAREN; tname = LOWERCASE_IDENT {Parsed_ast.TyCustom (texprs, tname) }
-  | LPAREN; texprs = tuple_sep(MUL, type_expr); RPAREN { Parsed_ast.TyTuple texprs }
+  | TINT { Common.TyInt }
+  | TBOOL { Common.TyBool }
+  | TUNIT { Common.TyUnit }
+  | tparam = type_param { Common.TyVar tparam}
+  | tname = LOWERCASE_IDENT { Common.TyCustom ([], tname) }
+  | texpr = type_expr2; tname = LOWERCASE_IDENT { Common.TyCustom ([texpr], tname) }
+  | LPAREN; texprs = tuple_sep(COMMA, type_expr); RPAREN; tname = LOWERCASE_IDENT {Common.TyCustom (texprs, tname) }
+  | LPAREN; texprs = tuple_sep(MUL, type_expr); RPAREN { Common.TyTuple texprs }
   | LPAREN; texpr = type_expr; RPAREN { texpr }
 
 type_expr:
   | texpr = type_expr2 { texpr }
-  | t1 = type_expr; ARROW; t2 = type_expr {Parsed_ast.TyFun (t1, t2)}
+  | t1 = type_expr; ARROW; t2 = type_expr {Common.TyFun (t1, t2)}

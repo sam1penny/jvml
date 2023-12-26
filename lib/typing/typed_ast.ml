@@ -1,4 +1,5 @@
 open Common
+
 type loc = Lexing.position * Lexing.position
 
 type expr =
@@ -25,36 +26,11 @@ and pattern =
   | Pat_Tuple of type_expr * pattern list
   | Pat_Constr of type_expr * string * pattern option
 *)
-
-and type_expr =
-  | TyInt
-  | TyBool
-  | TyUnit
-  | TyVar of string
-  | TyTuple of type_expr list
-  | TyFun of type_expr * type_expr
-
 and type_constr = DeclConstr of loc * string * type_expr option
 
 and decl =
   | Val of loc * type_expr * string * expr
   | Type of loc * string list * string * type_constr list
-
-let rec ty_repr = function
-  | TyInt -> "int"
-  | TyBool -> "bool"
-  | TyUnit -> "unit"
-  | TyVar v -> v
-  | TyTuple ts ->
-      List.map
-        (fun t ->
-          match t with TyFun _ -> "(" ^ ty_repr t ^ ")" | _ -> ty_repr t)
-        ts
-      |> String.concat " * " |> Printf.sprintf "(%s)"
-  | TyFun (f, c) -> (
-      (match f with TyFun _ -> "(" ^ ty_repr f ^ ")" | _ -> ty_repr f)
-      ^ " -> "
-      ^ match c with TyFun _ -> "" ^ ty_repr c ^ "" | _ -> ty_repr c)
 
 let bop_arg_type =
   let open Common in
@@ -69,7 +45,6 @@ let bop_return_type =
   | ADD | SUB | MUL | DIV -> TyInt
   | AND | OR | LT | GT -> TyBool
   | EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
-
 
 (* printing *)
 let string_of_expr_node =
@@ -89,7 +64,6 @@ let string_of_expr_node =
   | Let (_, _, x, _, _) -> sprintf "Let %s" x
 
 let string_of_pat_node = Parsing.Parsed_ast.string_of_pat_node
-
 let pp_pattern = Parsing.Parsed_ast.pp_pattern
 
 let rec pp_expr ?(indent = "") expr =
@@ -132,28 +106,6 @@ and pp_case indent (pattern, expr) =
   let indent' = indent ^ "   " in
   pp_pattern ~indent:indent' pattern;
   pp_expr ~indent:indent' expr
-
-let rec pp_texpr = function
-  | TyInt -> "int"
-  | TyBool -> "bool"
-  | TyUnit -> "unit"
-  | TyVar v -> v
-  (*| TyCustom ([], v) -> v
-  | TyCustom (t :: ts, v) ->
-      Printf.sprintf "(%s) %s"
-        (List.map pp_texpr (t :: ts) |> String.concat ",")
-        v
-  *)
-  | TyTuple ts ->
-      List.map
-        (fun t ->
-          match t with TyFun _ -> "(" ^ pp_texpr t ^ ")" | _ -> pp_texpr t)
-        ts
-      |> String.concat " * " |> Printf.sprintf "(%s)"
-  | TyFun (f, c) -> (
-      (match f with TyFun _ -> "(" ^ pp_texpr f ^ ")" | _ -> pp_texpr f)
-      ^ " -> "
-      ^ match c with TyFun _ -> "" ^ pp_texpr c ^ "" | _ -> pp_texpr c)
 
 let pp_tconstr ?(indent = "") =
   let open Printf in
