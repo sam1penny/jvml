@@ -11,21 +11,21 @@ type expr =
   | If of loc * type_expr * expr * expr * expr
   | Fun of loc * type_expr * string * expr
   | App of loc * type_expr * expr * expr
-  | Match of loc * type_expr * expr * (Parsing.Parsed_ast.pattern * expr) list
+  | Match of loc * type_expr * expr * (pattern * expr) list
   | Tuple of loc * type_expr * expr list
   | Let of loc * type_expr * string * expr * expr
 
-(*
+
 and pattern =
-  | Pat_Int of int
-  | Pat_Ident of string
-  | Pat_Bool of bool
-  | Pat_Unit
-  | Pat_Any
-  | Pat_Or of pattern * pattern
-  | Pat_Tuple of type_expr * pattern list
-  | Pat_Constr of type_expr * string * pattern option
-*)
+  | Pat_Int of loc * int
+  | Pat_Ident of loc * type_expr * string
+  | Pat_Bool of loc * bool
+  | Pat_Unit of loc
+  | Pat_Any of loc * type_expr
+  | Pat_Or of loc * type_expr * pattern * pattern
+  | Pat_Tuple of loc * type_expr * pattern list
+  | Pat_Constr of loc * type_expr * string * pattern option
+
 and type_constr = DeclConstr of loc * string * type_expr option
 
 and decl =
@@ -63,8 +63,32 @@ let string_of_expr_node =
   | Tuple _ -> "Tuple"
   | Let (_, _, x, _, _) -> sprintf "Let %s" x
 
-let string_of_pat_node = Parsing.Parsed_ast.string_of_pat_node
-let pp_pattern = Parsing.Parsed_ast.pp_pattern
+let string_of_pat_node =
+  let open Printf in
+  function
+  | Pat_Int (_, i) -> sprintf "Pat_Int %i" i
+  | Pat_Ident (_, _, ident) -> sprintf "Pat_Ident %s" ident
+  | Pat_Bool (_, b) -> sprintf "Pat_Bool %b" b
+  | Pat_Unit _ -> sprintf "Pat_()"
+  | Pat_Any _ -> "Pat_Any"
+  | Pat_Or _ -> "Pat_Or"
+  | Pat_Tuple _ -> "Pat_Tuple"
+  | Pat_Constr _ -> "Pat_Constr"
+let rec pp_pattern ?(indent = "") pat =
+  let open Printf in
+  let pp_node n = printf "%s└──%s\n" indent (string_of_pat_node n) in
+  let pp_rec_pattern = pp_pattern ~indent:(indent ^ "   ") in
+  match pat with
+  | Pat_Int _ | Pat_Ident _ | Pat_Bool _ | Pat_Unit _ | Pat_Any _ | Pat_Constr _
+    ->
+      pp_node pat
+  | Pat_Or (_, _, p1, p2) ->
+      pp_node pat;
+      pp_rec_pattern p1;
+      pp_rec_pattern p2
+  | Pat_Tuple (_, _, ps) ->
+      pp_node pat;
+      List.iter pp_rec_pattern ps
 
 let rec pp_expr ?(indent = "") expr =
   let open Printf in
