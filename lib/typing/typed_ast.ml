@@ -74,7 +74,7 @@ let string_of_pat_node =
   | Pat_Any _ -> "Pat_Any"
   | Pat_Or _ -> "Pat_Or"
   | Pat_Tuple _ -> "Pat_Tuple"
-  | Pat_Constr _ -> "Pat_Constr"
+  | Pat_Constr (_, _, cname, _) -> sprintf "Pat_Constr %s" cname
 
 let rec pp_pattern ?(indent = "") pat =
   let open Printf in

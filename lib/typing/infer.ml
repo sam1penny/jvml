@@ -71,60 +71,7 @@ let get_pattern_type = function
   | Typed_ast.Pat_Any (_, t) -> t
   | Typed_ast.Pat_Or (_, t, _, _) -> t
   | Typed_ast.Pat_Tuple (_, t, _) -> t
-  | _ -> raise @@ Invalid_argument "unsupported pattern!"
-
-(* return (type, variable bindings, )*)
-let rec validate_pattern nt =
-  let union_maps_if_disjoint maps =
-    List.fold_left
-      (fun acc map ->
-        acc >>=? fun acc ->
-        let intersection =
-          StringMap.merge
-            (fun _ x y ->
-              x >>= fun x ->
-              y >>= fun _ -> Some x)
-            acc map
-        in
-        if StringMap.cardinal intersection > 0 then
-          Error "pattern contains duplicate bindings"
-        else Ok (StringMap.union (fun _ x _ -> Some x) acc map))
-      (Ok StringMap.empty) maps
-  in
-  let open Parsing in
-  function
-  | Parsed_ast.Pat_Int (loc, i) ->
-      Ok (Typed_ast.Pat_Int (loc, i), StringMap.empty)
-  | Parsed_ast.Pat_Ident (loc, v) ->
-      let v_type = nt () in
-      Ok
-        ( Typed_ast.Pat_Ident (loc, v_type, v),
-          StringMap.singleton v (v_type, StringSet.empty) )
-  | Parsed_ast.Pat_Bool (loc, b) ->
-      Ok (Typed_ast.Pat_Bool (loc, b), StringMap.empty)
-  | Parsed_ast.Pat_Unit loc -> Ok (Typed_ast.Pat_Unit loc, StringMap.empty)
-  | Parsed_ast.Pat_Any loc ->
-      Ok (Typed_ast.Pat_Any (loc, nt ()), StringMap.empty)
-      (* think about this more, but seems legit *)
-  | Parsed_ast.Pat_Or (loc, p1, p2) ->
-      validate_pattern nt p1 >>=? fun (p1node, p1bindings) ->
-      validate_pattern nt p2 >>=? fun (p2node, p2bindings) ->
-      union_maps_if_disjoint [ p1bindings; p2bindings ]
-      >>=? fun updated_bindings ->
-      if get_pattern_type p1node <> get_pattern_type p2node then
-        Error "patterns are not of the same type"
-      else
-        Ok
-          ( Typed_ast.Pat_Or (loc, get_pattern_type p1node, p1node, p2node),
-            updated_bindings )
-  | Parsed_ast.Pat_Tuple (loc, ps) ->
-      List.map (validate_pattern nt) ps |> collect_result
-      >>=? fun recursive_calls ->
-      let pnodes = List.map (fun (x, _) -> x) recursive_calls in
-      let t = TyTuple (List.map get_pattern_type pnodes) in
-      union_maps_if_disjoint (List.map (fun (_, y) -> y) recursive_calls)
-      >>=? fun bindings -> Ok (Typed_ast.Pat_Tuple (loc, t, pnodes), bindings)
-  | _ -> raise @@ Invalid_argument "unsupported pattern!"
+  | Typed_ast.Pat_Constr (_, t, _, _) -> t
 
 let rec map_over_texpr_vars f = function
   | (TyInt | TyBool | TyUnit) as ty -> ty
@@ -213,12 +160,92 @@ let rec unify unifications t1 t2 =
         |> List.map (fun (t1, t2) -> unify unifications t1 t2)
         |> collect_result
         >>=? fun _ -> Ok ()
-    | TyCustom (params1, name1), TyCustom (params2, name2) when name1 = name2 ->
-        List.combine params1 params2
-        |> List.map (fun (p1, p2) -> unify unifications p1 p2)
-        |> collect_result
-        >>=? fun _ -> Ok ()
+    | TyCustom (params1, name1), TyCustom (params2, name2)
+      when name1 = name2 (*&& List.length params1 = List.length params2*) ->
+        if List.length params1 <> List.length params2 then
+          Error "illegal state - something went wrong"
+        else
+          List.combine params1 params2
+          |> List.map (fun (p1, p2) -> unify unifications p1 p2)
+          |> collect_result
+          >>=? fun _ -> Ok ()
     | _ -> Error (sprintf "cannot unify %s with %s" (pp_texpr t1) (pp_texpr t2))
+
+(* return (type, variable bindings, )*)
+let rec validate_pattern unifications env nt =
+  (* todo allow overlapping bindings if they unify *)
+  let union_maps_if_disjoint maps =
+    List.fold_left
+      (fun acc map ->
+        acc >>=? fun acc ->
+        let intersection =
+          StringMap.merge
+            (fun _ x y ->
+              x >>= fun x ->
+              y >>= fun _ -> Some x)
+            acc map
+        in
+        if StringMap.cardinal intersection > 0 then
+          Error "pattern contains duplicate bindings"
+        else Ok (StringMap.union (fun _ x _ -> Some x) acc map))
+      (Ok StringMap.empty) maps
+  in
+  let open Parsing in
+  function
+  | Parsed_ast.Pat_Int (loc, i) ->
+      Ok (Typed_ast.Pat_Int (loc, i), StringMap.empty)
+  | Parsed_ast.Pat_Ident (loc, v) ->
+      let v_type = nt () in
+      Ok
+        ( Typed_ast.Pat_Ident (loc, v_type, v),
+          StringMap.singleton v (v_type, StringSet.empty) )
+  | Parsed_ast.Pat_Bool (loc, b) ->
+      Ok (Typed_ast.Pat_Bool (loc, b), StringMap.empty)
+  | Parsed_ast.Pat_Unit loc -> Ok (Typed_ast.Pat_Unit loc, StringMap.empty)
+  | Parsed_ast.Pat_Any loc ->
+      Ok (Typed_ast.Pat_Any (loc, nt ()), StringMap.empty)
+      (* think about this more, but seems legit *)
+  | Parsed_ast.Pat_Or (loc, p1, p2) ->
+      validate_pattern unifications env nt p1 >>=? fun (p1node, p1bindings) ->
+      validate_pattern unifications env nt p2 >>=? fun (p2node, p2bindings) ->
+      union_maps_if_disjoint [ p1bindings; p2bindings ]
+      >>=? fun updated_bindings ->
+      if get_pattern_type p1node <> get_pattern_type p2node then
+        Error "patterns are not of the same type"
+      else
+        Ok
+          ( Typed_ast.Pat_Or (loc, get_pattern_type p1node, p1node, p2node),
+            updated_bindings )
+  | Parsed_ast.Pat_Tuple (loc, ps) ->
+      List.map (validate_pattern unifications env nt) ps |> collect_result
+      >>=? fun recursive_calls ->
+      let pnodes = List.map (fun (x, _) -> x) recursive_calls in
+      let t = TyTuple (List.map get_pattern_type pnodes) in
+      union_maps_if_disjoint (List.map (fun (_, y) -> y) recursive_calls)
+      >>=? fun bindings -> Ok (Typed_ast.Pat_Tuple (loc, t, pnodes), bindings)
+  | Parsed_ast.Pat_Constr (loc, cname, None) -> (
+      match StringMap.find_opt cname env with
+      | None -> Error (sprintf "unbound constructor %s" cname)
+      | Some (t, bound) ->
+          let instantiated = instantiate nt bound t in
+          Ok
+            ( Typed_ast.Pat_Constr
+                (loc, find_unified_type unifications instantiated, cname, None),
+              StringMap.empty ))
+  | Parsed_ast.Pat_Constr (loc, cname, Some pat) -> (
+      match StringMap.find_opt cname env with
+      | None -> Error (sprintf "unbound constructor %s" cname)
+      | Some (t, bound) -> (
+          validate_pattern unifications env nt pat >>=? fun (pat, bindings) ->
+          let instantiated = instantiate nt bound t in
+          match instantiated with
+          | TyFun (args, tname) ->
+              unify unifications (get_pattern_type pat) args >>=? fun _ ->
+              Ok (Typed_ast.Pat_Constr (loc, tname, cname, Some pat), bindings)
+          | _ ->
+              raise
+              @@ Invalid_argument
+                   "illegal state - should be impossible to get here"))
 
 let make_new_type () =
   let t = ref 0 in
@@ -311,7 +338,8 @@ let rec type_expr unifications nt env expr =
                (loc, find_unified_type unifications instantiated, cname)))
 
 and check_case e_type unifications nt env (pattern, case_expr) =
-  validate_pattern nt pattern >>=? fun (pattern_node, new_bindings) ->
+  validate_pattern unifications env nt pattern
+  >>=? fun (pattern_node, new_bindings) ->
   (* todo : give better error than 'cannot unify' *)
   unify unifications e_type (get_pattern_type pattern_node) >>=? fun _ ->
   let env' =

@@ -1,5 +1,5 @@
 let () =
-  match Jvml.Run_frontend.run_frontend "examples/typeparsing.jvml" with
+  match Jvml.Run_frontend.run_frontend "examples/everything.jvml" with
   | Ok typed_decls ->
       List.iter Typing.Typed_ast.pp_decl typed_decls;
       List.map Typing.Infer.get_decl_type typed_decls

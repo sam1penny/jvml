@@ -1,0 +1,5 @@
+type 'a tree = Leaf | Branch of ('a tree * 'a * 'a tree)
+
+val sum = fun t -> match t with
+    | Leaf -> 0
+    | Branch(l, v, r) -> sum l + v + sum r
