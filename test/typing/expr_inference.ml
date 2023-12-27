@@ -138,3 +138,15 @@ let%expect_test "test pattern with duplicate bindings" =
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
   |> print_string;
   [%expect {|Error|}]
+
+let%expect_test "test valid polymorphic equals" =
+  let x = Tuple [ Bop (Int 3, EQ, Int 3); Bop (Bool true, EQ, Bool false) ] in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
+  |> print_string;
+  [%expect {|Ok((bool * bool))|}]
+
+let%expect_test "test invalid polymorphic equals" =
+  let x = Bop (Int 3, EQ, Bool true) in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
+  |> print_string;
+  [%expect {|Error|}]

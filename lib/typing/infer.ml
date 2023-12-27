@@ -233,10 +233,11 @@ let rec infer unifications nt env expr =
             (Typed_ast.Ident
                (loc, find_unified_type unifications instantiated, v)))
   | Parsed_ast.Bop (loc, e0, op, e1) ->
+      let arg_type = bop_arg_type nt op in
       infer unifications nt env e0 >>=? fun e0node ->
-      unify unifications (get_expr_type e0node) (bop_arg_type op) >>=? fun _ ->
+      unify unifications (get_expr_type e0node) arg_type >>=? fun _ ->
       infer unifications nt env e1 >>=? fun e1node ->
-      unify unifications (get_expr_type e1node) (bop_arg_type op) >>=? fun _ ->
+      unify unifications (get_expr_type e1node) arg_type >>=? fun _ ->
       Ok (Typed_ast.Bop (loc, bop_return_type op, e0node, op, e1node))
   | Parsed_ast.If (loc, e0, e1, e2) ->
       infer unifications nt env e0 >>=? fun e0node ->

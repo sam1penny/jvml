@@ -31,19 +31,19 @@ and decl =
   | Val of loc * type_expr * string * expr
   | Type of loc * string list * string * type_constr list
 
-let bop_arg_type =
+(** important - call only *once* for a particularly operator. EQ is polymorphic *)
+let bop_arg_type nt ty =
   let open Common in
-  function
+  match ty with
   | ADD | SUB | MUL | DIV | LT | GT -> TyInt
   | AND | OR -> TyBool
-  | EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
+  | EQ -> nt ()
 
-let bop_return_type =
+let bop_return_type ty =
   let open Common in
-  function
+  match ty with
   | ADD | SUB | MUL | DIV -> TyInt
-  | AND | OR | LT | GT -> TyBool
-  | EQ -> raise (Invalid_argument "idk about eq yet - polymorphic?")
+  | AND | OR | LT | GT | EQ -> TyBool
 
 (* printing *)
 let string_of_expr_node =
