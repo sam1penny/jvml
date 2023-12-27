@@ -15,7 +15,6 @@ type expr =
   | Tuple of loc * type_expr * expr list
   | Let of loc * type_expr * string * expr * expr
 
-
 and pattern =
   | Pat_Int of loc * int
   | Pat_Ident of loc * type_expr * string
@@ -74,6 +73,7 @@ let string_of_pat_node =
   | Pat_Or _ -> "Pat_Or"
   | Pat_Tuple _ -> "Pat_Tuple"
   | Pat_Constr _ -> "Pat_Constr"
+
 let rec pp_pattern ?(indent = "") pat =
   let open Printf in
   let pp_node n = printf "%s└──%s\n" indent (string_of_pat_node n) in

@@ -16,6 +16,10 @@ let get_expr_type = function
   | Tuple (_, t, _) -> t
   | Let (_, t, _, _, _) -> t
 
+let get_decl_type = function
+  | Val (_, t, _, _) -> t
+  | _ -> raise @@ Invalid_argument "todo"
+
 module Unifications = Disjoint_set.Make (struct
   type t = type_expr
 
@@ -66,7 +70,7 @@ let get_pattern_type = function
   | Typed_ast.Pat_Unit _ -> TyUnit
   | Typed_ast.Pat_Any (_, t) -> t
   | Typed_ast.Pat_Or (_, t, _, _) -> t
-  | Typed_ast.Pat_Tuple(_, t, _) -> t
+  | Typed_ast.Pat_Tuple (_, t, _) -> t
   | _ -> raise @@ Invalid_argument "unsupported pattern!"
 
 (* return (type, variable bindings, )*)
@@ -89,28 +93,81 @@ let rec validate_pattern nt =
   in
   let open Parsing in
   function
-  | Parsed_ast.Pat_Int (loc, i) -> Ok (Typed_ast.Pat_Int (loc, i), StringMap.empty)
+  | Parsed_ast.Pat_Int (loc, i) ->
+      Ok (Typed_ast.Pat_Int (loc, i), StringMap.empty)
   | Parsed_ast.Pat_Ident (loc, v) ->
       let v_type = nt () in
-      Ok (Typed_ast.Pat_Ident(loc, v_type, v), StringMap.singleton v (v_type, StringSet.empty))
-  | Parsed_ast.Pat_Bool (loc, b) -> Ok (Typed_ast.Pat_Bool(loc, b), StringMap.empty)
+      Ok
+        ( Typed_ast.Pat_Ident (loc, v_type, v),
+          StringMap.singleton v (v_type, StringSet.empty) )
+  | Parsed_ast.Pat_Bool (loc, b) ->
+      Ok (Typed_ast.Pat_Bool (loc, b), StringMap.empty)
   | Parsed_ast.Pat_Unit loc -> Ok (Typed_ast.Pat_Unit loc, StringMap.empty)
   | Parsed_ast.Pat_Any loc ->
-      Ok (Typed_ast.Pat_Any (loc, nt ()), StringMap.empty) (* think about this more, but seems legit *)
+      Ok (Typed_ast.Pat_Any (loc, nt ()), StringMap.empty)
+      (* think about this more, but seems legit *)
   | Parsed_ast.Pat_Or (loc, p1, p2) ->
       validate_pattern nt p1 >>=? fun (p1node, p1bindings) ->
       validate_pattern nt p2 >>=? fun (p2node, p2bindings) ->
       union_maps_if_disjoint [ p1bindings; p2bindings ]
       >>=? fun updated_bindings ->
-      if (get_pattern_type p1node) <> (get_pattern_type p2node) then Error "patterns are not of the same type"
-      else Ok (Typed_ast.Pat_Or(loc, get_pattern_type p1node, p1node, p2node), updated_bindings)
+      if get_pattern_type p1node <> get_pattern_type p2node then
+        Error "patterns are not of the same type"
+      else
+        Ok
+          ( Typed_ast.Pat_Or (loc, get_pattern_type p1node, p1node, p2node),
+            updated_bindings )
   | Parsed_ast.Pat_Tuple (loc, ps) ->
-      List.map (validate_pattern nt) ps |> collect_result >>=? fun recursive_calls ->
+      List.map (validate_pattern nt) ps |> collect_result
+      >>=? fun recursive_calls ->
       let pnodes = List.map (fun (x, _) -> x) recursive_calls in
       let t = TyTuple (List.map get_pattern_type pnodes) in
       union_maps_if_disjoint (List.map (fun (_, y) -> y) recursive_calls)
-      >>=? fun bindings -> Ok (Typed_ast.Pat_Tuple(loc, t, pnodes), bindings)
+      >>=? fun bindings -> Ok (Typed_ast.Pat_Tuple (loc, t, pnodes), bindings)
   | _ -> raise @@ Invalid_argument "unsupported pattern!"
+
+let rec map_over_texpr_vars f = function
+  | (TyInt | TyBool | TyUnit) as ty -> ty
+  | TyVar v -> f v
+  | TyTuple ts -> TyTuple (List.map (map_over_texpr_vars f) ts)
+  | TyFun (t0, t1) ->
+      let t0' = map_over_texpr_vars f t0 in
+      let t1' = map_over_texpr_vars f t1 in
+      TyFun (t0', t1')
+  | TyCustom _ ->
+      raise
+      @@ Invalid_argument "not currently supporting tycustom in type inference!"
+
+let rec map_over_expr_texprs f expr =
+  match expr with
+  | Int _ | Bool _ | Unit _ -> expr
+  | Ident (loc, ty, x) -> Ident (loc, f ty, x)
+  | Bop (loc, ty, e0, op, e1) ->
+      Bop (loc, f ty, map_over_expr_texprs f e0, op, map_over_expr_texprs f e1)
+  | If (loc, ty, e0, e1, e2) ->
+      If
+        ( loc,
+          f ty,
+          map_over_expr_texprs f e0,
+          map_over_expr_texprs f e1,
+          map_over_expr_texprs f e2 )
+  | Fun (loc, ty, x, e) -> Fun (loc, f ty, x, map_over_expr_texprs f e)
+  | App (loc, ty, e0, e1) -> App (loc, f ty, e0, e1)
+  | Match (loc, ty, e, cases) ->
+      Match
+        ( loc,
+          f ty,
+          map_over_expr_texprs f e,
+          List.map (fun (p, e) -> (p, map_over_expr_texprs f e)) cases )
+  | Tuple (loc, ty, es) ->
+      Tuple (loc, f ty, List.map (map_over_expr_texprs f) es)
+  | Let (loc, ty, x, e0, e1) ->
+      Let (loc, f ty, x, map_over_expr_texprs f e0, map_over_expr_texprs f e1)
+
+let map_over_decl_texprs f decl =
+  match decl with
+  | Val (loc, ty, x, e) -> Val (loc, f ty, x, map_over_expr_texprs f e)
+  | Type _ -> decl (* todo: verify this is correct *)
 
 let instantiate nt bound t =
   let remap =
@@ -118,17 +175,10 @@ let instantiate nt bound t =
       (fun bounded_var acc -> StringMap.add bounded_var (nt ()) acc)
       bound StringMap.empty
   in
-  let rec map_over = function
-    | (TyInt | TyBool | TyUnit) as ty -> ty
-    | TyVar v -> Option.value (StringMap.find_opt v remap) ~default:(TyVar v)
-    | TyTuple ts -> TyTuple (List.map map_over ts)
-    | TyFun (t0, t1) -> TyFun (map_over t0, map_over t1)
-    | TyCustom _ ->
-        raise
-        @@ Invalid_argument
-             "not currently supporting tycustom in type inference!"
+  let remap_if_bound v =
+    Option.value (StringMap.find_opt v remap) ~default:(TyVar v)
   in
-  map_over t
+  map_over_texpr_vars remap_if_bound t
 
 let occurs_in v1 t = StringSet.mem v1 (tyvars_from_type t)
 
@@ -193,7 +243,8 @@ let rec infer unifications nt env expr =
       unify unifications (get_expr_type e0node) TyBool >>=? fun _ ->
       infer unifications nt env e1 >>=? fun e1node ->
       infer unifications nt env e2 >>=? fun e2node ->
-      unify unifications (get_expr_type e1node) (get_expr_type e2node) >>=? fun _ ->
+      unify unifications (get_expr_type e1node) (get_expr_type e2node)
+      >>=? fun _ ->
       Ok (Typed_ast.If (loc, get_expr_type e1node, e0node, e1node, e2node))
   | Parsed_ast.Fun (loc, x, e) ->
       let tau = nt () in
@@ -204,7 +255,9 @@ let rec infer unifications nt env expr =
       let tau' = nt () in
       infer unifications nt env e0 >>=? fun e0node ->
       infer unifications nt env e1 >>=? fun e1node ->
-      unify unifications (TyFun (get_expr_type e1node, tau')) (get_expr_type e0node)
+      unify unifications
+        (TyFun (get_expr_type e1node, tau'))
+        (get_expr_type e0node)
       >>=? fun _ -> Ok (App (loc, tau', e0node, e1node))
   (* ignore the type of the pattern at the moment *)
   | Parsed_ast.Match (loc, e, cases) ->
@@ -212,14 +265,18 @@ let rec infer unifications nt env expr =
       List.map (check_case (get_expr_type enode) unifications nt env) cases
       |> collect_result
       >>=? fun inferred_cases ->
-      let first_case_expr = (List.hd inferred_cases) |> fun (_, e) -> e in
-      let other_case_exprs = (List.tl inferred_cases) |> List.map (fun (_, e) -> e) in
+      let first_case_expr = List.hd inferred_cases |> fun (_, e) -> e in
+      let other_case_exprs =
+        List.tl inferred_cases |> List.map (fun (_, e) -> e)
+      in
       List.map
         (unify unifications (get_expr_type first_case_expr))
         (List.map get_expr_type other_case_exprs)
       |> collect_result
       >>=? fun _ ->
-      Ok (Typed_ast.Match (loc, get_expr_type first_case_expr, enode, inferred_cases))
+      Ok
+        (Typed_ast.Match
+           (loc, get_expr_type first_case_expr, enode, inferred_cases))
   | Parsed_ast.Tuple (loc, ts) ->
       List.map (infer unifications nt env) ts |> collect_result
       >>=? fun enodes ->
@@ -229,7 +286,8 @@ let rec infer unifications nt env expr =
       infer unifications nt env e0 >>=? fun e0node ->
       let env' =
         StringMap.add x
-          (generalize env (find_unified_type unifications (get_expr_type e0node)))
+          (generalize env
+             (find_unified_type unifications (get_expr_type e0node)))
           env
       in
       infer unifications nt env' e1 >>=? fun e1node ->
@@ -263,25 +321,21 @@ module StringTbl = Hashtbl.Make (struct
   let hash = Hashtbl.hash
 end)
 
-let simplify_types ty =
+let simplify_texpr ty =
   let nc = make_new_char () in
   let remap = StringTbl.create 10 in
-  let rec map_over = function
-    | (TyInt | TyBool | TyUnit) as ty -> ty
-    | TyVar v ->
-        if not @@ StringTbl.mem remap v then StringTbl.add remap v (nc ());
-        TyVar (StringTbl.find remap v)
-    | TyTuple ts -> TyTuple (List.map map_over ts)
-    | TyFun (t0, t1) ->
-        let t0' = map_over t0 in
-        let t1' = map_over t1 in
-        TyFun (t0', t1')
-    | TyCustom _ ->
-        raise
-        @@ Invalid_argument
-             "not currently supporting tycustom in type inference!"
+  let simplify_tvar v =
+    if not @@ StringTbl.mem remap v then StringTbl.add remap v (nc ());
+    TyVar (StringTbl.find remap v)
   in
-  map_over ty
+  map_over_texpr_vars simplify_tvar ty
+
+let simplify_texpr_state () =
+  let nc = make_new_char () in
+  let remap = StringTbl.create 10 in
+  fun v ->
+    if not @@ StringTbl.mem remap v then StringTbl.add remap v (nc ()) else ();
+    TyVar (StringTbl.find remap v)
 
 let infer_expr_test expr =
   let u = Unifications.create 10 in
@@ -289,7 +343,7 @@ let infer_expr_test expr =
   let type_gen = make_new_type () in
   infer u type_gen env expr
   |> Result.map (fun tytree ->
-         find_unified_type u (get_expr_type tytree) |> simplify_types)
+         find_unified_type u (get_expr_type tytree) |> simplify_texpr)
 
 let infer_constructor _ _ env params = function
   | Parsed_ast.DeclConstr (_, _, None) -> env (* todo: do something here l8r *)
@@ -303,8 +357,11 @@ let to_typed_constr = function
 
 let infer_decl unifications nt env = function
   | Parsed_ast.Val (loc, v, expr) ->
-      infer unifications nt env expr >>=? fun exprnode ->
-      let env' = StringMap.add v (get_expr_type exprnode, StringSet.empty) env in
+      (* support recursion *)
+      let v_type = nt () in
+      let env' = StringMap.add v (v_type, StringSet.empty) env in
+      infer unifications nt env' expr >>=? fun exprnode ->
+      unify unifications v_type (get_expr_type exprnode) >>=? fun _ ->
       Ok (Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode), env')
   | Parsed_ast.Type (loc, params, tname, constructors) ->
       let env' =
@@ -316,6 +373,17 @@ let infer_decl unifications nt env = function
         ( Typed_ast.Type
             (loc, params, tname, List.map to_typed_constr constructors),
           env' )
+
+let type_decl decl =
+  let u = Unifications.create 20 in
+  let env = StringMap.empty in
+  let type_gen = make_new_type () in
+  infer_decl u type_gen env decl >>=? fun (declnode, _) ->
+  let state = simplify_texpr_state () in
+  let simplify_texpr texpr =
+    find_unified_type u texpr |> map_over_texpr_vars state
+  in
+  Ok (map_over_decl_texprs simplify_texpr declnode)
 
 let infer_program program =
   let u = Unifications.create 20 in

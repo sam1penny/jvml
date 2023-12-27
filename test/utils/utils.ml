@@ -87,3 +87,13 @@ and add_dummy_loc_pat =
   | Pat_Constr (c, None) -> Parsed_ast.Pat_Constr (dummy, c, None)
   | Pat_Constr (c, Some p) ->
       Parsed_ast.Pat_Constr (dummy, c, Some (add_dummy_loc_pat p))
+
+let add_dummy_loc_decl =
+  let open Parsing in
+  function
+  | Val (x, e) -> Parsed_ast.Val (dummy, x, add_dummy_loc_expr e)
+  | _ -> raise @@ Invalid_argument "not yet supported"
+
+let pp_tree_result = function
+  | Ok ty -> "Ok(" ^ Common.pp_texpr ty ^ ")"
+  | Error _ -> "Error"

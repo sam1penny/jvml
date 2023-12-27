@@ -3,10 +3,6 @@ open Common
 open Test_utils.Utils
 open Test_utils
 
-let pp_tree_result = function
-  | Ok ty -> "Ok(" ^ Common.pp_texpr ty ^ ")"
-  | Error _ -> "Error"
-
 let%expect_test "basic int arithmetic" =
   let x = Bop (Int 6, MUL, Bop (Int 3, ADD, Int 4)) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
