@@ -62,4 +62,4 @@ let%expect_test "test type definitions" =
        └──params = ['a,'b]
        └──constructors
           └──Lf
-          └──Br of (a * b * (a,b) tree * (a,b) tree) |}]
+          └──Br of (a * b * (a, b) tree * (a, b) tree) |}]

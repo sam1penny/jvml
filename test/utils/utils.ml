@@ -24,15 +24,6 @@ and pattern =
   | Pat_Tuple of pattern list
   | Pat_Constr of string * pattern option
 
-and type_expr =
-  | TyInt
-  | TyBool
-  | TyUnit
-  | TyCustom of type_expr option * string
-  | TyVar of string
-  | TyTuple of type_expr list
-  | TyFun of type_expr * type_expr
-
 and type_constr = DeclConstr of string * type_expr option
 
 and decl =
@@ -88,11 +79,19 @@ and add_dummy_loc_pat =
   | Pat_Constr (c, Some p) ->
       Parsed_ast.Pat_Constr (dummy, c, Some (add_dummy_loc_pat p))
 
+let add_dummy_loc_constr =
+  let open Parsing in
+  function
+  | DeclConstr (name, maybe_texpr) ->
+      Parsed_ast.DeclConstr (dummy, name, maybe_texpr)
+
 let add_dummy_loc_decl =
   let open Parsing in
   function
   | Val (x, e) -> Parsed_ast.Val (dummy, x, add_dummy_loc_expr e)
-  | _ -> raise @@ Invalid_argument "not yet supported"
+  | Type (params, tname, constructors) ->
+      Parsed_ast.Type
+        (dummy, params, tname, List.map add_dummy_loc_constr constructors)
 
 let pp_tree_result = function
   | Ok ty -> "Ok(" ^ Common.pp_texpr ty ^ ")"

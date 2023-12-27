@@ -28,9 +28,10 @@ let rec pp_texpr = function
   | TyUnit -> "unit"
   | TyVar v -> v
   | TyCustom ([], v) -> v
+  | TyCustom ([ t ], v) -> Printf.sprintf "%s %s" (pp_texpr t) v
   | TyCustom (t :: ts, v) ->
       Printf.sprintf "(%s) %s"
-        (List.map pp_texpr (t :: ts) |> String.concat ",")
+        (List.map pp_texpr (t :: ts) |> String.concat ", ")
         v
   | TyTuple ts ->
       List.map

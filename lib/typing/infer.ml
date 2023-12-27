@@ -227,8 +227,6 @@ let make_new_type () =
     let _ = t := !t + 1 in
     TyVar ("t" ^ string_of_int n)
 
-let list_all_eq = function [] -> true | x :: xs -> List.for_all (( = ) x) xs
-
 let rec type_expr unifications nt env expr =
   match expr with
   | Parsed_ast.Int (loc, i) -> Ok (Typed_ast.Int (loc, i))
@@ -365,7 +363,7 @@ let type_expr_from_scratch expr =
 
 let infer_constructor _ _ env type_constructor params = function
   | Parsed_ast.DeclConstr (_, cname, None) ->
-      StringMap.add cname (type_constructor, StringSet.empty) env
+      StringMap.add cname (type_constructor, StringSet.of_list params) env
   | Parsed_ast.DeclConstr (_, cname, Some texpr) ->
       (* todo : check if need to validate texpr *)
       StringMap.add cname
