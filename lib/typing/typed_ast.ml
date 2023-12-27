@@ -14,6 +14,7 @@ type expr =
   | Match of loc * type_expr * expr * (pattern * expr) list
   | Tuple of loc * type_expr * expr list
   | Let of loc * type_expr * string * expr * expr
+  | Constr of loc * type_expr * string
 
 and pattern =
   | Pat_Int of loc * int
@@ -29,7 +30,7 @@ and type_constr = DeclConstr of loc * string * type_expr option
 
 and decl =
   | Val of loc * type_expr * string * expr
-  | Type of loc * string list * string * type_constr list
+  | Type of loc * type_expr * string list * string * type_constr list
 
 (** important - call only *once* for a particularly operator. EQ is polymorphic *)
 let bop_arg_type nt ty =
@@ -61,6 +62,7 @@ let string_of_expr_node =
   | Match _ -> "Match"
   | Tuple _ -> "Tuple"
   | Let (_, _, x, _, _) -> sprintf "Let %s" x
+  | Constr (_, _, cname) -> sprintf "Constructor %s" cname
 
 let string_of_pat_node =
   let open Printf in
@@ -95,7 +97,7 @@ let rec pp_expr ?(indent = "") expr =
   let pp_node n = printf "%s└──%s\n" indent (string_of_expr_node n) in
   let pp_rec_expr = pp_expr ~indent:(indent ^ "   ") in
   match expr with
-  | Int _ | Bool _ | Ident _ | Unit _ (*| Constr _ *) -> pp_node expr
+  | Int _ | Bool _ | Ident _ | Unit _ | Constr _ -> pp_node expr
   | Bop (_, _, e0, _, e1) ->
       pp_node expr;
       pp_rec_expr e0;
@@ -145,7 +147,7 @@ let pp_decl ?(indent = "") =
   | Val (_, _, v, e) ->
       print_with_indent indent ("Val " ^ v);
       pp_expr ~indent:(indent ^ "   ") e
-  | Type (_, params, t, constructors) ->
+  | Type (_, _, params, t, constructors) ->
       print_with_indent indent ("Type " ^ t);
       print_with_indent (indent ^ "   ")
         (List.map (fun x -> "'" ^ x) params

@@ -2,5 +2,8 @@ type data = X of int -> int tree
 type data2 = Y of (int -> int) tree
 
 type intlist = N | C of (int * intlist)
-type 'a list = N | C of ('a * 'a list)
-type ('k, 'v) dict = N | C of ('a * 'b * ('a, 'b) list)
+type 'a list = N1 | C1 of ('a * 'a list)
+type ('k, 'v) dict = N2 | C2 of ('a * 'b * ('a, 'b) list)
+
+val x = N
+val x = C1 (((0, true), C1 (((2,false), N1))))

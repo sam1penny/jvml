@@ -133,7 +133,7 @@ let%expect_test "test pattern with duplicate bindings" =
   let x =
     Match
       ( Tuple [ Int 0; Int 1 ],
-        [ (Pat_Tuple [ Pat_Ident "x"; Pat_Ident "y" ], Int 3) ] )
+        [ (Pat_Tuple [ Pat_Ident "x"; Pat_Ident "x" ], Int 3) ] )
   in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
   |> print_string;
