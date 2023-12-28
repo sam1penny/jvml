@@ -58,6 +58,7 @@ expr4:
   | FALSE { Parsed_ast.Bool ($sloc, false)}
   | UNIT { Parsed_ast.Unit $sloc }
   | LPAREN; e = expr; RPAREN { e }
+  | LPAREN; exprs = tuple_sep(COMMA, expr); RPAREN {Parsed_ast.Tuple ($sloc, exprs)}
 
 expr3:
   | e = expr4 { e }
@@ -72,7 +73,6 @@ expr:
  | IF; e1 = expr; THEN; e2 = expr; ELSE; e3 = expr {Parsed_ast.If($sloc, e1, e2, e3)}
  | FUN; i = LOWERCASE_IDENT; ARROW; e = expr; {Parsed_ast.Fun($sloc, i, e)}
  | MATCH; e = expr; WITH ; option(BAR); cl = separated_nonempty_list(BAR, case) {Parsed_ast.Match($sloc, e, cl)}
- | LPAREN; exprs = tuple_sep(COMMA, expr); RPAREN {Parsed_ast.Tuple ($sloc, exprs)}
  | LET; i = LOWERCASE_IDENT; EQ; e1 = expr; IN; e2 = expr; {Parsed_ast.Let ($sloc, i, e1, e2)}
 
 pattern1:
@@ -101,6 +101,8 @@ decl:
 type_constr:
   | tconstr = UPPERCASE_IDENT; {Parsed_ast.DeclConstr ($sloc, tconstr, None) }
   | tconstr = UPPERCASE_IDENT; OF; texpr = type_expr { Parsed_ast.DeclConstr ($sloc, tconstr, Some(texpr))}
+  (* special case to avoid parenthesis for tuple type *)
+  | tconstr = UPPERCASE_IDENT; OF; texprs = tuple_sep(MUL, type_expr) { Parsed_ast.DeclConstr ($sloc, tconstr, Some(TyTuple(texprs)))}
 
 (* do not require parenthesis when only one type parameter present *)
 

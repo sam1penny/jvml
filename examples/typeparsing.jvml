@@ -6,4 +6,4 @@ type 'a list = N1 | C1 of ('a * 'a list)
 type ('k, 'v) dict = N2 | C2 of ('a * 'b * ('a, 'b) list)
 
 val x = N
-val x = C1 (((0, true), C1 (((2,false), N1))))
+val x = C1 ((0, true), C1 ((2,false), N1))
