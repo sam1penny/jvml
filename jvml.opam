@@ -11,6 +11,7 @@ depends: [
   "ppx_expect" {>= "0.16.0"}
   "menhir" {>= "20220210"}
   "ocamlformat" {>= "0.26.1"}
+  "pp_loc" {>= "2.1.0"}
   "odoc" {with-doc}
 ]
 build: [

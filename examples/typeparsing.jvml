@@ -7,3 +7,7 @@ type ('k, 'v) dict = N2 | C2 of ('a * 'b * ('a, 'b) list)
 
 val x = N
 val x = C1 ((0, true), C1 ((2,false), N1))
+
+val y = fun x ->
+    match 1 with
+        | x -> true && x

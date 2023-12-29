@@ -141,7 +141,8 @@ let rec find_unified_type u ty =
   | TyCustom (targs, tname) ->
       TyCustom (List.map (find_unified_type u) targs, tname)
 
-let rec unify unifications t1 t2 =
+(** loc_on_fail should be the location of t2, although this is not enforced. *)
+let rec unify unifications t1 t2 loc_on_fail =
   let t1 = find_unified_type unifications t1 in
   let t2 = find_unified_type unifications t2 in
   if t1 = t2 then Ok ()
@@ -154,27 +155,35 @@ let rec unify unifications t1 t2 =
         Unifications.union unifications t2 t1;
         Ok ()
     | TyFun (t1a, t1b), TyFun (t2a, t2b) ->
-        unify unifications t1a t2a >>=? fun _ -> unify unifications t1b t2b
+        unify unifications t1a t2a loc_on_fail >>=? fun _ ->
+        unify unifications t1b t2b loc_on_fail
     | TyTuple t1s, TyTuple t2s when List.length t1s = List.length t2s ->
         List.combine t1s t2s
-        |> List.map (fun (t1, t2) -> unify unifications t1 t2)
+        |> List.map (fun (t1, t2) -> unify unifications t1 t2 loc_on_fail)
         |> collect_result
         >>=? fun _ -> Ok ()
     | TyCustom (params1, name1), TyCustom (params2, name2)
       when name1 = name2 (*&& List.length params1 = List.length params2*) ->
         if List.length params1 <> List.length params2 then
-          Error "illegal state - something went wrong"
+          Error (loc_on_fail, "illegal state - something went wrong")
         else
           List.combine params1 params2
-          |> List.map (fun (p1, p2) -> unify unifications p1 p2)
+          |> List.map (fun (p1, p2) -> unify unifications p1 p2 loc_on_fail)
           |> collect_result
           >>=? fun _ -> Ok ()
-    | _ -> Error (sprintf "cannot unify %s with %s" (pp_texpr t1) (pp_texpr t2))
+    | _ ->
+        (* Error (loc_on_fail, sprintf "cannot unify %s with %s" (pp_texpr t1) (pp_texpr t2)) *)
+        Error
+          ( loc_on_fail,
+            sprintf
+              "this expression has type %s but was expected to have type %s"
+              (pp_texpr t1) (pp_texpr t2) )
 
 (* return (type, variable bindings, )*)
 let rec validate_pattern unifications env nt =
   (* todo allow overlapping bindings if they unify *)
-  let union_maps_if_disjoint maps =
+  (* todo : more refine location complaints *)
+  let union_maps_if_disjoint loc maps =
     List.fold_left
       (fun acc map ->
         acc >>=? fun acc ->
@@ -186,7 +195,7 @@ let rec validate_pattern unifications env nt =
             acc map
         in
         if StringMap.cardinal intersection > 0 then
-          Error "pattern contains duplicate bindings"
+          Error (loc, "pattern contains duplicate bindings")
         else Ok (StringMap.union (fun _ x _ -> Some x) acc map))
       (Ok StringMap.empty) maps
   in
@@ -208,10 +217,10 @@ let rec validate_pattern unifications env nt =
   | Parsed_ast.Pat_Or (loc, p1, p2) ->
       validate_pattern unifications env nt p1 >>=? fun (p1node, p1bindings) ->
       validate_pattern unifications env nt p2 >>=? fun (p2node, p2bindings) ->
-      union_maps_if_disjoint [ p1bindings; p2bindings ]
+      union_maps_if_disjoint loc [ p1bindings; p2bindings ]
       >>=? fun updated_bindings ->
       if get_pattern_type p1node <> get_pattern_type p2node then
-        Error "patterns are not of the same type"
+        Error (loc, "patterns are not of the same type")
       else
         Ok
           ( Typed_ast.Pat_Or (loc, get_pattern_type p1node, p1node, p2node),
@@ -221,11 +230,11 @@ let rec validate_pattern unifications env nt =
       >>=? fun recursive_calls ->
       let pnodes = List.map (fun (x, _) -> x) recursive_calls in
       let t = TyTuple (List.map get_pattern_type pnodes) in
-      union_maps_if_disjoint (List.map (fun (_, y) -> y) recursive_calls)
+      union_maps_if_disjoint loc (List.map (fun (_, y) -> y) recursive_calls)
       >>=? fun bindings -> Ok (Typed_ast.Pat_Tuple (loc, t, pnodes), bindings)
   | Parsed_ast.Pat_Constr (loc, cname, None) -> (
       match StringMap.find_opt cname env with
-      | None -> Error (sprintf "unbound constructor %s" cname)
+      | None -> Error (loc, sprintf "unbound constructor %s" cname)
       | Some (t, bound) ->
           let instantiated = instantiate nt bound t in
           Ok
@@ -234,13 +243,13 @@ let rec validate_pattern unifications env nt =
               StringMap.empty ))
   | Parsed_ast.Pat_Constr (loc, cname, Some pat) -> (
       match StringMap.find_opt cname env with
-      | None -> Error (sprintf "unbound constructor %s" cname)
+      | None -> Error (loc, sprintf "unbound constructor %s" cname)
       | Some (t, bound) -> (
           validate_pattern unifications env nt pat >>=? fun (pat, bindings) ->
           let instantiated = instantiate nt bound t in
           match instantiated with
           | TyFun (args, tname) ->
-              unify unifications (get_pattern_type pat) args >>=? fun _ ->
+              unify unifications (get_pattern_type pat) args loc >>=? fun _ ->
               Ok (Typed_ast.Pat_Constr (loc, tname, cname, Some pat), bindings)
           | _ ->
               raise
@@ -261,7 +270,7 @@ let rec type_expr unifications nt env expr =
   | Parsed_ast.Unit loc -> Ok (Typed_ast.Unit loc)
   | Parsed_ast.Ident (loc, v) -> (
       match StringMap.find_opt v env with
-      | None -> Error (sprintf "unbound variable %s" v)
+      | None -> Error (loc, sprintf "unbound variable %s" v)
       | Some (t, bound) ->
           let instantiated = instantiate nt bound t in
           Ok
@@ -270,16 +279,23 @@ let rec type_expr unifications nt env expr =
   | Parsed_ast.Bop (loc, e0, op, e1) ->
       let arg_type = bop_arg_type nt op in
       type_expr unifications nt env e0 >>=? fun e0node ->
-      unify unifications (get_expr_type e0node) arg_type >>=? fun _ ->
+      unify unifications (get_expr_type e0node) arg_type
+        (Parsed_ast.get_expr_loc e0)
+      >>=? fun _ ->
       type_expr unifications nt env e1 >>=? fun e1node ->
-      unify unifications (get_expr_type e1node) arg_type >>=? fun _ ->
+      unify unifications (get_expr_type e1node) arg_type
+        (Parsed_ast.get_expr_loc e1)
+      >>=? fun _ ->
       Ok (Typed_ast.Bop (loc, bop_return_type op, e0node, op, e1node))
   | Parsed_ast.If (loc, e0, e1, e2) ->
       type_expr unifications nt env e0 >>=? fun e0node ->
-      unify unifications (get_expr_type e0node) TyBool >>=? fun _ ->
+      unify unifications (get_expr_type e0node) TyBool
+        (Parsed_ast.get_expr_loc e0)
+      >>=? fun _ ->
       type_expr unifications nt env e1 >>=? fun e1node ->
       type_expr unifications nt env e2 >>=? fun e2node ->
       unify unifications (get_expr_type e1node) (get_expr_type e2node)
+        (Parsed_ast.get_expr_loc e2)
       >>=? fun _ ->
       Ok (Typed_ast.If (loc, get_expr_type e1node, e0node, e1node, e2node))
   | Parsed_ast.Fun (loc, x, e) ->
@@ -294,6 +310,7 @@ let rec type_expr unifications nt env expr =
       unify unifications
         (TyFun (get_expr_type e1node, tau'))
         (get_expr_type e0node)
+        (Parsed_ast.get_expr_loc e1)
       >>=? fun _ -> Ok (App (loc, tau', e0node, e1node))
   (* ignore the type of the pattern at the moment *)
   | Parsed_ast.Match (loc, e, cases) ->
@@ -306,7 +323,7 @@ let rec type_expr unifications nt env expr =
         List.tl inferred_cases |> List.map (fun (_, e) -> e)
       in
       List.map
-        (unify unifications (get_expr_type first_case_expr))
+        (fun ty -> unify unifications (get_expr_type first_case_expr) ty loc)
         (List.map get_expr_type other_case_exprs)
       |> collect_result
       >>=? fun _ ->
@@ -330,7 +347,7 @@ let rec type_expr unifications nt env expr =
       Ok (Typed_ast.Let (loc, get_expr_type e1node, x, e0node, e1node))
   | Parsed_ast.Constr (loc, cname) -> (
       match StringMap.find_opt cname env with
-      | None -> Error (sprintf "unbound constructor %s" cname)
+      | None -> Error (loc, sprintf "unbound constructor %s" cname)
       | Some (t, bound) ->
           let instantiated = instantiate nt bound t in
           Ok
@@ -341,7 +358,10 @@ and check_case e_type unifications nt env (pattern, case_expr) =
   validate_pattern unifications env nt pattern
   >>=? fun (pattern_node, new_bindings) ->
   (* todo : give better error than 'cannot unify' *)
-  unify unifications e_type (get_pattern_type pattern_node) >>=? fun _ ->
+  unify unifications e_type
+    (get_pattern_type pattern_node)
+    (Parsed_ast.get_pattern_loc pattern)
+  >>=? fun _ ->
   let env' =
     StringMap.union
       (fun _ _ shadow_binding -> Some shadow_binding)
@@ -408,7 +428,7 @@ let type_decl unifications nt env = function
       let v_type = nt () in
       let env' = StringMap.add v (v_type, StringSet.empty) env in
       type_expr unifications nt env' expr >>=? fun exprnode ->
-      unify unifications v_type (get_expr_type exprnode) >>=? fun _ ->
+      unify unifications v_type (get_expr_type exprnode) loc >>=? fun _ ->
       Ok (Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode), env')
   | Parsed_ast.Type (loc, params, tname, constructors) ->
       let type_constructor =
@@ -464,3 +484,16 @@ let type_program program =
         Type (loc, simplify_texpr texpr, params, tname, constructors)
   in
   Ok (List.map simplify_decl ttree)
+
+let type_program_exn program =
+  match type_program program with
+  | Ok typed_program -> typed_program
+  | Error (loc, message) ->
+      let to_internal_loc (x, y) =
+        (Pp_loc.Position.of_lexing x, Pp_loc.Position.of_lexing y)
+      in
+      let input = Pp_loc.Input.file "examples/typeparsing.jvml" in
+      Pp_loc.pp ~input Format.std_formatter [ to_internal_loc loc ];
+      (* todo install exception printers and raise exception *)
+      Format.printf "Error: %s\n" message;
+      raise (Failure "")

@@ -32,6 +32,30 @@ and decl =
   | Val of loc * string * expr
   | Type of loc * string list * string * type_constr list
 
+let get_expr_loc = function
+  | Int (loc, _) -> loc
+  | Ident (loc, _) -> loc
+  | Bool (loc, _) -> loc
+  | Unit loc -> loc
+  | Bop (loc, _, _, _) -> loc
+  | If (loc, _, _, _) -> loc
+  | Fun (loc, _, _) -> loc
+  | App (loc, _, _) -> loc
+  | Match (loc, _, _) -> loc
+  | Tuple (loc, _) -> loc
+  | Let (loc, _, _, _) -> loc
+  | Constr (loc, _) -> loc
+
+let get_pattern_loc = function
+  | Pat_Int (loc, _) -> loc
+  | Pat_Ident (loc, _) -> loc
+  | Pat_Bool (loc, _) -> loc
+  | Pat_Unit loc -> loc
+  | Pat_Any loc -> loc
+  | Pat_Or (loc, _, _) -> loc
+  | Pat_Tuple (loc, _) -> loc
+  | Pat_Constr (loc, _, _) -> loc
+
 let string_of_expr_node =
   let open Printf in
   function
