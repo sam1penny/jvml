@@ -409,7 +409,18 @@ let type_expr_from_scratch expr =
   |> Result.map (fun tytree ->
          find_unified_type u (get_expr_type tytree) |> simplify_texpr)
 
-let infer_constructor _ _ env type_constructor params = function
+let rec validate_texpr type_env params = function
+  | TyInt | TyBool | TyUnit -> true
+  | TyVar p -> List.mem p params
+  | TyCustom (parameterised_by, tname) ->
+      List.for_all (validate_texpr type_env params) parameterised_by
+      && List.length parameterised_by
+         = Option.value ~default:(-1) (StringMap.find_opt tname type_env)
+  | TyTuple ts -> List.for_all (validate_texpr type_env params) ts
+  | TyFun (t0, t1) ->
+      validate_texpr type_env params t0 && validate_texpr type_env params t1
+
+let infer_constructor _ _ env type_env type_constructor params = function
   | Parsed_ast.DeclConstr (loc, cname, None) ->
       if StringMap.mem cname env then
         Error (loc, sprintf "Duplicate definition of constructor %s" cname)
@@ -419,8 +430,9 @@ let infer_constructor _ _ env type_constructor params = function
   | Parsed_ast.DeclConstr (loc, cname, Some texpr) ->
       if StringMap.mem cname env then
         Error (loc, sprintf "Duplicate definition of constructor %s" cname)
+      else if not @@ validate_texpr type_env params texpr then
+        Error (loc, "Invalid texpr")
       else
-        (* todo : check if need to validate texpr *)
         Ok
           (StringMap.add cname
              (TyFun (texpr, type_constructor), StringSet.of_list params)
@@ -430,7 +442,10 @@ let to_typed_constr = function
   | Parsed_ast.DeclConstr (loc, name, maybe_texpr) ->
       Typed_ast.DeclConstr (loc, name, maybe_texpr)
 
-let type_decl unifications nt env = function
+let list_contains_distinct_elements l =
+  StringSet.cardinal (StringSet.of_list l) = List.length l
+
+let type_decl unifications nt env type_env = function
   | Parsed_ast.Val (loc, v, expr) ->
       if StringMap.mem v env then
         Error (loc, sprintf "Duplicate definition of binding %s" v)
@@ -440,19 +455,26 @@ let type_decl unifications nt env = function
         let env' = StringMap.add v (v_type, StringSet.empty) env in
         type_expr unifications nt env' expr >>=? fun exprnode ->
         unify unifications v_type (get_expr_type exprnode) loc >>=? fun _ ->
-        Ok (Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode), env')
+        Ok
+          ( Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode),
+            env',
+            type_env )
   | Parsed_ast.Type (loc, params, tname, constructors) ->
       if StringMap.mem tname env then
         Error (loc, sprintf "Duplicate definition of type %s" tname)
+      else if not @@ list_contains_distinct_elements params then
+        Error (loc, "A type parameter occurs several times")
       else
         let type_constructor =
           TyCustom (List.map (fun p -> TyVar p) params, tname)
         in
+        let type_env' = StringMap.add tname (List.length params) type_env in
         let env' =
           List.fold_left
             (fun env c ->
               env >>=? fun env ->
-              infer_constructor unifications nt env type_constructor params c)
+              infer_constructor unifications nt env type_env' type_constructor
+                params c)
             (Ok env) constructors
         in
         env' >>=? fun env' ->
@@ -463,13 +485,15 @@ let type_decl unifications nt env = function
                 params,
                 tname,
                 List.map to_typed_constr constructors ),
-            env' )
+            env',
+            type_env' )
 
 let type_decl_from_scratch decl =
   let u = Unifications.create 20 in
   let env = StringMap.empty in
+  let type_env = StringMap.empty in
   let type_gen = make_new_type () in
-  type_decl u type_gen env decl >>=? fun (declnode, _) ->
+  type_decl u type_gen env type_env decl >>=? fun (declnode, _, _) ->
   let state = simplify_texpr_state () in
   let simplify_texpr texpr =
     find_unified_type u texpr |> map_over_texpr_vars state
@@ -479,15 +503,17 @@ let type_decl_from_scratch decl =
 let type_program program =
   let u = Unifications.create 20 in
   let env = StringMap.empty in
+  let type_env = StringMap.empty in
   let type_gen = make_new_type () in
   List.fold_left
     (fun acc decl ->
-      acc >>=? fun (declnodes, env) ->
-      type_decl u type_gen env decl >>=? fun (declnode, env') ->
-      Ok (declnode :: declnodes, env'))
-    (Ok ([], env))
+      acc >>=? fun (declnodes, env, type_env) ->
+      type_decl u type_gen env type_env decl
+      >>=? fun (declnode, env', type_env') ->
+      Ok (declnode :: declnodes, env', type_env'))
+    (Ok ([], env, type_env))
     program
-  >>=? fun (reversed_ttree, _) ->
+  >>=? fun (reversed_ttree, _, _) ->
   let ttree = List.rev reversed_ttree in
   let state = simplify_texpr_state () in
   let simplify_texpr texpr =
