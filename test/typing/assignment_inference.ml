@@ -3,13 +3,15 @@ open Test_utils.Utils
 open Test_utils
 
 let pp_decl_result = function
-  | Ok ty -> "Ok(" ^ pp_texpr ty ^ ")"
+  | Ok ty -> "Ok(" ^ Typing.Typed_ast.pp_texpr ty ^ ")"
   | Error _ -> "Error"
 
 let pp_decls_result = function
   | Ok decls ->
       "Ok(\n"
-      ^ (List.map (fun d -> pp_texpr (Typing.Infer.get_decl_type d)) decls
+      ^ (List.map
+           (fun d -> Typing.Typed_ast.pp_texpr (Typing.Infer.get_decl_type d))
+           decls
         |> String.concat "\n")
       ^ "\n)"
   | Error _ -> "Error"

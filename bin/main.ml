@@ -4,7 +4,7 @@ let () =
   in
   List.iter Typing.Typed_ast.pp_decl typed_decls;
   List.map Typing.Infer.get_decl_type typed_decls
-  |> List.iter (fun t -> print_endline (Common.pp_texpr t))
+  |> List.iter (fun t -> print_endline (Typing.Typed_ast.pp_texpr t))
 (*
   match Jvml.Run_frontend.run_frontend "examples/typeparsing.jvml" with
   | Ok typed_decls ->

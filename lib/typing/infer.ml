@@ -1,9 +1,10 @@
-open Typed_ast
 open Printf
 open Parsing
 open Common
 
-let get_expr_type = function
+let get_expr_type =
+  let open Typed_ast in
+  function
   | Int _ -> TyInt
   | Ident (_, t, _) -> t
   | Bool _ -> TyBool
@@ -17,18 +18,20 @@ let get_expr_type = function
   | Let (_, t, _, _, _) -> t
   | Constr (_, t, _) -> t
 
-let get_decl_type = function Val (_, t, _, _) -> t | Type (_, t, _, _, _) -> t
+let get_decl_type =
+  let open Typed_ast in
+  function Val (_, t, _, _) -> t | Type (_, t, _, _, _) -> t
 
 module Unifications = Disjoint_set.Make (struct
-  type t = type_expr
+  type t = Typed_ast.type_expr
 
   let equal = ( = )
   let hash x = Hashtbl.hash x
 
   let should_be_rep x y =
     match (x, y) with
-    | _, TyVar _ -> true
-    | TyVar _, _ -> false
+    | _, Typed_ast.TyVar _ -> true
+    | Typed_ast.TyVar _, _ -> false
     | _, _ -> true (* arbitrary tie-breaking *)
 end)
 
@@ -36,7 +39,9 @@ module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
 (* environment stuff *)
-let rec tyvars_from_type = function
+let rec tyvars_from_type ty =
+  let open Typed_ast in
+  match ty with
   | TyInt | TyBool | TyUnit -> StringSet.empty
   | TyVar v -> StringSet.singleton v
   | TyTuple ts ->
@@ -64,16 +69,18 @@ let generalize env ty =
 (* end environment stuff *)
 
 let get_pattern_type = function
-  | Typed_ast.Pat_Int _ -> TyInt
+  | Typed_ast.Pat_Int _ -> Typed_ast.TyInt
   | Typed_ast.Pat_Ident (_, t, _) -> t
-  | Typed_ast.Pat_Bool _ -> TyBool
-  | Typed_ast.Pat_Unit _ -> TyUnit
+  | Typed_ast.Pat_Bool _ -> Typed_ast.TyBool
+  | Typed_ast.Pat_Unit _ -> Typed_ast.TyUnit
   | Typed_ast.Pat_Any (_, t) -> t
   | Typed_ast.Pat_Or (_, t, _, _) -> t
   | Typed_ast.Pat_Tuple (_, t, _) -> t
   | Typed_ast.Pat_Constr (_, t, _, _) -> t
 
-let rec map_over_texpr_vars f = function
+let rec map_over_texpr_vars f =
+  let open Typed_ast in
+  function
   | (TyInt | TyBool | TyUnit) as ty -> ty
   | TyVar v -> f v
   | TyTuple ts -> TyTuple (List.map (map_over_texpr_vars f) ts)
@@ -85,6 +92,7 @@ let rec map_over_texpr_vars f = function
       TyCustom (List.map (map_over_texpr_vars f) targs, tname)
 
 let rec map_over_expr_texprs f expr =
+  let open Typed_ast in
   match expr with
   | Int _ | Bool _ | Unit _ -> expr
   | Ident (loc, ty, x) -> Ident (loc, f ty, x)
@@ -112,6 +120,7 @@ let rec map_over_expr_texprs f expr =
   | Constr (loc, ty, cname) -> Constr (loc, f ty, cname)
 
 let map_over_decl_texprs f decl =
+  let open Typed_ast in
   match decl with
   | Val (loc, ty, x, e) -> Val (loc, f ty, x, map_over_expr_texprs f e)
   | Type _ -> decl (* todo: verify this is correct *)
@@ -123,7 +132,7 @@ let instantiate nt bound t =
       bound StringMap.empty
   in
   let remap_if_bound v =
-    Option.value (StringMap.find_opt v remap) ~default:(TyVar v)
+    Option.value (StringMap.find_opt v remap) ~default:(Typed_ast.TyVar v)
   in
   map_over_texpr_vars remap_if_bound t
 
@@ -131,6 +140,7 @@ let occurs_in v1 t = StringSet.mem v1 (tyvars_from_type t)
 
 (* todo - change this to use map_over_texpr_vars *)
 let rec find_unified_type u ty =
+  let open Typed_ast in
   match ty with
   | TyInt | TyBool | TyUnit -> ty
   | TyVar _ ->
@@ -177,7 +187,7 @@ let rec unify unifications t1 t2 loc_on_fail =
           ( loc_on_fail,
             sprintf
               "this expression has type %s but was expected to have type %s"
-              (pp_texpr t1) (pp_texpr t2) )
+              (Typed_ast.pp_texpr t1) (Typed_ast.pp_texpr t2) )
 
 (* return (type, variable bindings, )*)
 let rec validate_pattern unifications env nt =
@@ -229,7 +239,7 @@ let rec validate_pattern unifications env nt =
       List.map (validate_pattern unifications env nt) ps |> collect_result
       >>=? fun recursive_calls ->
       let pnodes = List.map (fun (x, _) -> x) recursive_calls in
-      let t = TyTuple (List.map get_pattern_type pnodes) in
+      let t = Typed_ast.TyTuple (List.map get_pattern_type pnodes) in
       union_maps_if_disjoint loc (List.map (fun (_, y) -> y) recursive_calls)
       >>=? fun bindings -> Ok (Typed_ast.Pat_Tuple (loc, t, pnodes), bindings)
   | Parsed_ast.Pat_Constr (loc, cname, None) -> (
@@ -261,7 +271,7 @@ let make_new_type () =
   fun () ->
     let n = !t in
     let _ = t := !t + 1 in
-    TyVar ("t" ^ string_of_int n)
+    Typed_ast.TyVar ("t" ^ string_of_int n)
 
 let rec type_expr unifications nt env expr =
   match expr with
@@ -277,7 +287,7 @@ let rec type_expr unifications nt env expr =
             (Typed_ast.Ident
                (loc, find_unified_type unifications instantiated, v)))
   | Parsed_ast.Bop (loc, e0, op, e1) ->
-      let arg_type = bop_arg_type nt op in
+      let arg_type = Typed_ast.bop_arg_type nt op in
       type_expr unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_expr_type e0node) arg_type
         (Parsed_ast.get_expr_loc e0)
@@ -286,7 +296,7 @@ let rec type_expr unifications nt env expr =
       unify unifications (get_expr_type e1node) arg_type
         (Parsed_ast.get_expr_loc e1)
       >>=? fun _ ->
-      Ok (Typed_ast.Bop (loc, bop_return_type op, e0node, op, e1node))
+      Ok (Typed_ast.Bop (loc, Typed_ast.bop_return_type op, e0node, op, e1node))
   | Parsed_ast.If (loc, e0, e1, e2) ->
       type_expr unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_expr_type e0node) TyBool
@@ -311,7 +321,7 @@ let rec type_expr unifications nt env expr =
         (TyFun (get_expr_type e1node, tau'))
         (get_expr_type e0node)
         (Parsed_ast.get_expr_loc e1)
-      >>=? fun _ -> Ok (App (loc, tau', e0node, e1node))
+      >>=? fun _ -> Ok (Typed_ast.App (loc, tau', e0node, e1node))
   (* ignore the type of the pattern at the moment *)
   | Parsed_ast.Match (loc, e, cases) ->
       type_expr unifications nt env e >>=? fun enode ->
@@ -333,7 +343,7 @@ let rec type_expr unifications nt env expr =
   | Parsed_ast.Tuple (loc, ts) ->
       List.map (type_expr unifications nt env) ts |> collect_result
       >>=? fun enodes ->
-      let ty = TyTuple (List.map get_expr_type enodes) in
+      let ty = Typed_ast.TyTuple (List.map get_expr_type enodes) in
       Ok (Typed_ast.Tuple (loc, ty, enodes))
   | Parsed_ast.Let (loc, x, e0, e1) ->
       type_expr unifications nt env e0 >>=? fun e0node ->
@@ -390,7 +400,7 @@ let simplify_texpr ty =
   let remap = StringTbl.create 10 in
   let simplify_tvar v =
     if not @@ StringTbl.mem remap v then StringTbl.add remap v (nc ());
-    TyVar (StringTbl.find remap v)
+    Typed_ast.TyVar (StringTbl.find remap v)
   in
   map_over_texpr_vars simplify_tvar ty
 
@@ -399,7 +409,7 @@ let simplify_texpr_state () =
   let remap = StringTbl.create 10 in
   fun v ->
     if not @@ StringTbl.mem remap v then StringTbl.add remap v (nc ()) else ();
-    TyVar (StringTbl.find remap v)
+    Typed_ast.TyVar (StringTbl.find remap v)
 
 let type_expr_from_scratch expr =
   let u = Unifications.create 10 in
@@ -410,15 +420,36 @@ let type_expr_from_scratch expr =
          find_unified_type u (get_expr_type tytree) |> simplify_texpr)
 
 let rec validate_texpr type_env params = function
-  | TyInt | TyBool | TyUnit -> true
-  | TyVar p -> List.mem p params
-  | TyCustom (parameterised_by, tname) ->
-      List.for_all (validate_texpr type_env params) parameterised_by
-      && List.length parameterised_by
-         = Option.value ~default:(-1) (StringMap.find_opt tname type_env)
-  | TyTuple ts -> List.for_all (validate_texpr type_env params) ts
-  | TyFun (t0, t1) ->
-      validate_texpr type_env params t0 && validate_texpr type_env params t1
+  | Parsed_ast.TyInt _ -> Ok Typed_ast.TyInt
+  | Parsed_ast.TyBool _ -> Ok Typed_ast.TyBool
+  | Parsed_ast.TyUnit _ -> Ok Typed_ast.TyUnit
+  | Parsed_ast.TyVar (loc, p) ->
+      if List.mem p params then Ok (Typed_ast.TyVar p)
+      else Error (loc, sprintf "Unbound type variable '%s" p)
+  | Parsed_ast.TyCustom (loc, parameterised_by, tname) -> (
+      List.map (validate_texpr type_env params) parameterised_by
+      |> collect_result
+      >>=? fun validated_parameterised_by ->
+      match StringMap.find_opt tname type_env with
+      | None -> Error (loc, sprintf "Unknown type constructor %s" tname)
+      | Some n ->
+          let expected_num_args = List.length parameterised_by in
+          if n = expected_num_args then
+            Ok (Typed_ast.TyCustom (validated_parameterised_by, tname))
+          else
+            Error
+              ( loc,
+                sprintf
+                  "This type constructor expected %i argument(s), but received \
+                   %i argument(s)"
+                  expected_num_args n ))
+  | Parsed_ast.TyTuple (_, ts) ->
+      List.map (validate_texpr type_env params) ts |> collect_result
+      >>=? fun ts' -> Ok (Typed_ast.TyTuple ts')
+  | Parsed_ast.TyFun (_, t0, t1) ->
+      validate_texpr type_env params t0 >>=? fun t0' ->
+      validate_texpr type_env params t1 >>=? fun t1' ->
+      Ok (Typed_ast.TyFun (t0', t1'))
 
 let infer_constructor _ _ env type_env type_constructor params = function
   | Parsed_ast.DeclConstr (loc, cname, None) ->
@@ -426,21 +457,20 @@ let infer_constructor _ _ env type_env type_constructor params = function
         Error (loc, sprintf "Duplicate definition of constructor %s" cname)
       else
         Ok
-          (StringMap.add cname (type_constructor, StringSet.of_list params) env)
+          ( Typed_ast.DeclConstr (loc, cname, None),
+            StringMap.add cname (type_constructor, StringSet.of_list params) env
+          )
   | Parsed_ast.DeclConstr (loc, cname, Some texpr) ->
       if StringMap.mem cname env then
         Error (loc, sprintf "Duplicate definition of constructor %s" cname)
-      else if not @@ validate_texpr type_env params texpr then
-        Error (loc, "Invalid texpr")
       else
+        validate_texpr type_env params texpr >>=? fun validated_texpr ->
         Ok
-          (StringMap.add cname
-             (TyFun (texpr, type_constructor), StringSet.of_list params)
-             env)
-
-let to_typed_constr = function
-  | Parsed_ast.DeclConstr (loc, name, maybe_texpr) ->
-      Typed_ast.DeclConstr (loc, name, maybe_texpr)
+          ( Typed_ast.DeclConstr (loc, cname, Some validated_texpr),
+            StringMap.add cname
+              ( Typed_ast.TyFun (validated_texpr, type_constructor),
+                StringSet.of_list params )
+              env )
 
 let list_contains_distinct_elements l =
   StringSet.cardinal (StringSet.of_list l) = List.length l
@@ -466,25 +496,24 @@ let type_decl unifications nt env type_env = function
         Error (loc, "A type parameter occurs several times")
       else
         let type_constructor =
-          TyCustom (List.map (fun p -> TyVar p) params, tname)
+          Typed_ast.TyCustom
+            (List.map (fun p -> Typed_ast.TyVar p) params, tname)
         in
         let type_env' = StringMap.add tname (List.length params) type_env in
-        let env' =
+        let acc =
           List.fold_left
-            (fun env c ->
-              env >>=? fun env ->
+            (fun acc c ->
+              acc >>=? fun (typed_cs, env) ->
               infer_constructor unifications nt env type_env' type_constructor
-                params c)
-            (Ok env) constructors
+                params c
+              >>=? fun (typed_c, env') -> Ok (typed_c :: typed_cs, env'))
+            (Ok ([], env))
+            constructors
         in
-        env' >>=? fun env' ->
+        acc >>=? fun (typed_constructors, env') ->
         Ok
           ( Typed_ast.Type
-              ( loc,
-                type_constructor,
-                params,
-                tname,
-                List.map to_typed_constr constructors ),
+              (loc, type_constructor, params, tname, typed_constructors),
             env',
             type_env' )
 
@@ -521,9 +550,10 @@ let type_program program =
   in
   let simplify_decl decl =
     match decl with
-    | Val (loc, texpr, x, e) -> Val (loc, simplify_texpr texpr, x, e)
-    | Type (loc, texpr, params, tname, constructors) ->
-        Type (loc, simplify_texpr texpr, params, tname, constructors)
+    | Typed_ast.Val (loc, texpr, x, e) ->
+        Typed_ast.Val (loc, simplify_texpr texpr, x, e)
+    | Typed_ast.Type (loc, texpr, params, tname, constructors) ->
+        Typed_ast.Type (loc, simplify_texpr texpr, params, tname, constructors)
   in
   Ok (List.map simplify_decl ttree)
 

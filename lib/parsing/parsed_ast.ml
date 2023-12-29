@@ -26,9 +26,18 @@ and pattern =
   | Pat_Tuple of loc * pattern list
   | Pat_Constr of loc * string * pattern option
 
-and type_constr = DeclConstr of loc * string * type_expr option
+type type_expr =
+  | TyInt of loc
+  | TyBool of loc
+  | TyUnit of loc
+  | TyCustom of loc * type_expr list * string
+  | TyVar of loc * string
+  | TyTuple of loc * type_expr list
+  | TyFun of loc * type_expr * type_expr
 
-and decl =
+type type_constr = DeclConstr of loc * string * type_expr option
+
+type decl =
   | Val of loc * string * expr
   | Type of loc * string list * string * type_constr list
 
@@ -83,6 +92,28 @@ let string_of_pat_node =
   | Pat_Or _ -> "Pat_Or"
   | Pat_Tuple _ -> "Pat_Tuple"
   | Pat_Constr _ -> "Pat_Constr"
+
+let rec pp_texpr = function
+  | TyInt _ -> "int"
+  | TyBool _ -> "bool"
+  | TyUnit _ -> "unit"
+  | TyVar (_, v) -> v
+  | TyCustom (_, [], v) -> v
+  | TyCustom (_, [ t ], v) -> Printf.sprintf "%s %s" (pp_texpr t) v
+  | TyCustom (_, t :: ts, v) ->
+      Printf.sprintf "(%s) %s"
+        (List.map pp_texpr (t :: ts) |> String.concat ", ")
+        v
+  | TyTuple (_, ts) ->
+      List.map
+        (fun t ->
+          match t with TyFun _ -> "(" ^ pp_texpr t ^ ")" | _ -> pp_texpr t)
+        ts
+      |> String.concat " * " |> Printf.sprintf "(%s)"
+  | TyFun (_, f, c) -> (
+      (match f with TyFun _ -> "(" ^ pp_texpr f ^ ")" | _ -> pp_texpr f)
+      ^ " -> "
+      ^ match c with TyFun _ -> "" ^ pp_texpr c ^ "" | _ -> pp_texpr c)
 
 let rec pp_pattern ?(indent = "") pat =
   let open Printf in

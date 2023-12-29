@@ -102,7 +102,7 @@ type_constr:
   | tconstr = UPPERCASE_IDENT; {Parsed_ast.DeclConstr ($sloc, tconstr, None) }
   | tconstr = UPPERCASE_IDENT; OF; texpr = type_expr { Parsed_ast.DeclConstr ($sloc, tconstr, Some(texpr))}
   (* special case to avoid parenthesis for tuple type *)
-  | tconstr = UPPERCASE_IDENT; OF; texprs = tuple_sep(MUL, type_expr) { Parsed_ast.DeclConstr ($sloc, tconstr, Some(TyTuple(texprs)))}
+  | tconstr = UPPERCASE_IDENT; OF; texprs = tuple_sep(MUL, type_expr) { Parsed_ast.DeclConstr ($sloc, tconstr, Some(TyTuple($sloc, texprs)))}
 
 (* do not require parenthesis when only one type parameter present *)
 
@@ -116,16 +116,16 @@ type_params:
 (* two levels handles int -> int tree ambiguity *)
 
 type_expr2:
-  | TINT { Common.TyInt }
-  | TBOOL { Common.TyBool }
-  | TUNIT { Common.TyUnit }
-  | tparam = type_param { Common.TyVar tparam}
-  | tname = LOWERCASE_IDENT { Common.TyCustom ([], tname) }
-  | texpr = type_expr2; tname = LOWERCASE_IDENT { Common.TyCustom ([texpr], tname) }
-  | LPAREN; texprs = tuple_sep(COMMA, type_expr); RPAREN; tname = LOWERCASE_IDENT {Common.TyCustom (texprs, tname) }
-  | LPAREN; texprs = tuple_sep(MUL, type_expr); RPAREN { Common.TyTuple texprs }
+  | TINT { Parsed_ast.TyInt ($sloc) }
+  | TBOOL { Parsed_ast.TyBool ($sloc) }
+  | TUNIT { Parsed_ast.TyUnit ($sloc) }
+  | tparam = type_param { Parsed_ast.TyVar ($sloc, tparam)}
+  | tname = LOWERCASE_IDENT { Parsed_ast.TyCustom ($sloc, [], tname) }
+  | texpr = type_expr2; tname = LOWERCASE_IDENT { Parsed_ast.TyCustom ($sloc, [texpr], tname) }
+  | LPAREN; texprs = tuple_sep(COMMA, type_expr); RPAREN; tname = LOWERCASE_IDENT {Parsed_ast.TyCustom ($sloc, texprs, tname) }
+  | LPAREN; texprs = tuple_sep(MUL, type_expr); RPAREN { Parsed_ast.TyTuple ($sloc, texprs) }
   | LPAREN; texpr = type_expr; RPAREN { texpr }
 
 type_expr:
   | texpr = type_expr2 { texpr }
-  | t1 = type_expr; ARROW; t2 = type_expr {Common.TyFun (t1, t2)}
+  | t1 = type_expr; ARROW; t2 = type_expr {Parsed_ast.TyFun ($sloc, t1, t2)}

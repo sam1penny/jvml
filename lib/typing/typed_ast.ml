@@ -2,6 +2,15 @@ open Common
 
 type loc = Lexing.position * Lexing.position
 
+type type_expr =
+  | TyInt
+  | TyBool
+  | TyUnit
+  | TyCustom of type_expr list * string
+  | TyVar of string
+  | TyTuple of type_expr list
+  | TyFun of type_expr * type_expr
+
 type expr =
   | Int of loc * int
   | Ident of loc * type_expr * string
@@ -26,9 +35,9 @@ and pattern =
   | Pat_Tuple of loc * type_expr * pattern list
   | Pat_Constr of loc * type_expr * string * pattern option
 
-and type_constr = DeclConstr of loc * string * type_expr option
+type type_constr = DeclConstr of loc * string * type_expr option
 
-and decl =
+type decl =
   | Val of loc * type_expr * string * expr
   | Type of loc * type_expr * string list * string * type_constr list
 
@@ -47,6 +56,28 @@ let bop_return_type ty =
   | AND | OR | LT | GT | EQ -> TyBool
 
 (* printing *)
+let rec pp_texpr = function
+  | TyInt -> "int"
+  | TyBool -> "bool"
+  | TyUnit -> "unit"
+  | TyVar v -> v
+  | TyCustom ([], v) -> v
+  | TyCustom ([ t ], v) -> Printf.sprintf "%s %s" (pp_texpr t) v
+  | TyCustom (t :: ts, v) ->
+      Printf.sprintf "(%s) %s"
+        (List.map pp_texpr (t :: ts) |> String.concat ", ")
+        v
+  | TyTuple ts ->
+      List.map
+        (fun t ->
+          match t with TyFun _ -> "(" ^ pp_texpr t ^ ")" | _ -> pp_texpr t)
+        ts
+      |> String.concat " * " |> Printf.sprintf "(%s)"
+  | TyFun (f, c) -> (
+      (match f with TyFun _ -> "(" ^ pp_texpr f ^ ")" | _ -> pp_texpr f)
+      ^ " -> "
+      ^ match c with TyFun _ -> "" ^ pp_texpr c ^ "" | _ -> pp_texpr c)
+
 let string_of_expr_node =
   let open Printf in
   function

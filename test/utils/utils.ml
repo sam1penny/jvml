@@ -1,5 +1,14 @@
 open Common
 
+type type_expr =
+  | TyInt
+  | TyBool
+  | TyUnit
+  | TyCustom of type_expr list * string
+  | TyVar of string
+  | TyTuple of type_expr list
+  | TyFun of type_expr * type_expr
+
 type expr =
   | Int of int
   | Ident of string
@@ -24,15 +33,28 @@ and pattern =
   | Pat_Tuple of pattern list
   | Pat_Constr of string * pattern option
 
-and type_constr = DeclConstr of string * type_expr option
+type type_constr = DeclConstr of string * type_expr option
 
-and decl =
+type decl =
   | Val of string * expr
   | Type of string list * string * type_constr list
 
 (* simplify dummy location for testing *)
 
 let dummy = (Lexing.dummy_pos, Lexing.dummy_pos)
+
+let rec add_dummy_loc_texpr =
+  let open Parsing in
+  function
+  | TyInt -> Parsed_ast.TyInt dummy
+  | TyBool -> Parsed_ast.TyBool dummy
+  | TyUnit -> Parsed_ast.TyUnit dummy
+  | TyCustom (texprs, tname) ->
+      Parsed_ast.TyCustom (dummy, List.map add_dummy_loc_texpr texprs, tname)
+  | TyVar v -> Parsed_ast.TyVar (dummy, v)
+  | TyTuple ts -> Parsed_ast.TyTuple (dummy, List.map add_dummy_loc_texpr ts)
+  | TyFun (t0, t1) ->
+      Parsed_ast.TyFun (dummy, add_dummy_loc_texpr t0, add_dummy_loc_texpr t1)
 
 let rec add_dummy_loc_expr =
   let open Parsing in
@@ -82,8 +104,9 @@ and add_dummy_loc_pat =
 let add_dummy_loc_constr =
   let open Parsing in
   function
-  | DeclConstr (name, maybe_texpr) ->
-      Parsed_ast.DeclConstr (dummy, name, maybe_texpr)
+  | DeclConstr (name, None) -> Parsed_ast.DeclConstr (dummy, name, None)
+  | DeclConstr (name, Some texpr) ->
+      Parsed_ast.DeclConstr (dummy, name, Some (add_dummy_loc_texpr texpr))
 
 let add_dummy_loc_decl =
   let open Parsing in
@@ -94,5 +117,5 @@ let add_dummy_loc_decl =
         (dummy, params, tname, List.map add_dummy_loc_constr constructors)
 
 let pp_tree_result = function
-  | Ok ty -> "Ok(" ^ Common.pp_texpr ty ^ ")"
+  | Ok ty -> "Ok(" ^ Typing.Typed_ast.pp_texpr ty ^ ")"
   | Error _ -> "Error"
