@@ -410,13 +410,21 @@ let type_expr_from_scratch expr =
          find_unified_type u (get_expr_type tytree) |> simplify_texpr)
 
 let infer_constructor _ _ env type_constructor params = function
-  | Parsed_ast.DeclConstr (_, cname, None) ->
-      StringMap.add cname (type_constructor, StringSet.of_list params) env
-  | Parsed_ast.DeclConstr (_, cname, Some texpr) ->
-      (* todo : check if need to validate texpr *)
-      StringMap.add cname
-        (TyFun (texpr, type_constructor), StringSet.of_list params)
-        env
+  | Parsed_ast.DeclConstr (loc, cname, None) ->
+      if StringMap.mem cname env then
+        Error (loc, sprintf "Duplicate definition of constructor %s" cname)
+      else
+        Ok
+          (StringMap.add cname (type_constructor, StringSet.of_list params) env)
+  | Parsed_ast.DeclConstr (loc, cname, Some texpr) ->
+      if StringMap.mem cname env then
+        Error (loc, sprintf "Duplicate definition of constructor %s" cname)
+      else
+        (* todo : check if need to validate texpr *)
+        Ok
+          (StringMap.add cname
+             (TyFun (texpr, type_constructor), StringSet.of_list params)
+             env)
 
 let to_typed_constr = function
   | Parsed_ast.DeclConstr (loc, name, maybe_texpr) ->
@@ -424,30 +432,38 @@ let to_typed_constr = function
 
 let type_decl unifications nt env = function
   | Parsed_ast.Val (loc, v, expr) ->
-      (* support recursion *)
-      let v_type = nt () in
-      let env' = StringMap.add v (v_type, StringSet.empty) env in
-      type_expr unifications nt env' expr >>=? fun exprnode ->
-      unify unifications v_type (get_expr_type exprnode) loc >>=? fun _ ->
-      Ok (Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode), env')
+      if StringMap.mem v env then
+        Error (loc, sprintf "Duplicate definition of binding %s" v)
+      else
+        (* support recursion *)
+        let v_type = nt () in
+        let env' = StringMap.add v (v_type, StringSet.empty) env in
+        type_expr unifications nt env' expr >>=? fun exprnode ->
+        unify unifications v_type (get_expr_type exprnode) loc >>=? fun _ ->
+        Ok (Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode), env')
   | Parsed_ast.Type (loc, params, tname, constructors) ->
-      let type_constructor =
-        TyCustom (List.map (fun p -> TyVar p) params, tname)
-      in
-      let env' =
-        List.fold_left
-          (fun env c ->
-            infer_constructor unifications nt env type_constructor params c)
-          env constructors
-      in
-      Ok
-        ( Typed_ast.Type
-            ( loc,
-              type_constructor,
-              params,
-              tname,
-              List.map to_typed_constr constructors ),
-          env' )
+      if StringMap.mem tname env then
+        Error (loc, sprintf "Duplicate definition of type %s" tname)
+      else
+        let type_constructor =
+          TyCustom (List.map (fun p -> TyVar p) params, tname)
+        in
+        let env' =
+          List.fold_left
+            (fun env c ->
+              env >>=? fun env ->
+              infer_constructor unifications nt env type_constructor params c)
+            (Ok env) constructors
+        in
+        env' >>=? fun env' ->
+        Ok
+          ( Typed_ast.Type
+              ( loc,
+                type_constructor,
+                params,
+                tname,
+                List.map to_typed_constr constructors ),
+            env' )
 
 let type_decl_from_scratch decl =
   let u = Unifications.create 20 in
