@@ -490,7 +490,7 @@ let type_decl unifications nt env type_env = function
             env',
             type_env )
   | Parsed_ast.Type (loc, params, tname, constructors) ->
-      if StringMap.mem tname env then
+      if StringMap.mem tname type_env then
         Error (loc, sprintf "Duplicate definition of type %s" tname)
       else if not @@ list_contains_distinct_elements params then
         Error (loc, "A type parameter occurs several times")
