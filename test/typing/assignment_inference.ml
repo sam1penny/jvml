@@ -125,3 +125,19 @@ let%expect_test "multiple usages of polymorphic function" =
   bool
   )
   |}]
+
+let%expect_test "use multiple top-level values" =
+  let x =
+    [
+      Val ("apply", Fun ("f", Fun ("x", App (Ident "f", Ident "x"))));
+      Val ("double", Fun ("x", Bop (Ident "x", MUL, Int 2)));
+      Val ("v", App (App (Ident "apply", Ident "double"), Int 3));
+    ]
+  in
+  type_progam_and_pp x;
+  [%expect {|
+  Ok(
+  ('a -> 'b) -> 'a -> 'b
+  int -> int
+  int
+  )|}]

@@ -1,3 +1,2 @@
-val f = fun x -> x
-val a = f 3
-val b = f true
+val apply = fun f -> f 3
+val y = apply 3

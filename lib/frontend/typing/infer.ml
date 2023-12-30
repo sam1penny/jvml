@@ -97,32 +97,48 @@ let rec map_over_expr_texprs f expr =
   | Int _ | Bool _ | Unit _ -> expr
   | Ident (loc, ty, x) -> Ident (loc, f ty, x)
   | Bop (loc, ty, e0, op, e1) ->
-      Bop (loc, f ty, map_over_expr_texprs f e0, op, map_over_expr_texprs f e1)
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      Bop (loc, ty', e0', op, e1')
   | If (loc, ty, e0, e1, e2) ->
-      If
-        ( loc,
-          f ty,
-          map_over_expr_texprs f e0,
-          map_over_expr_texprs f e1,
-          map_over_expr_texprs f e2 )
-  | Fun (loc, ty, x, e) -> Fun (loc, f ty, x, map_over_expr_texprs f e)
-  | App (loc, ty, e0, e1) -> App (loc, f ty, e0, e1)
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      let e2' = map_over_expr_texprs f e2 in
+      If (loc, ty', e0', e1', e2')
+  | Fun (loc, ty, x, e) ->
+      let ty' = f ty in
+      Fun (loc, ty', x, map_over_expr_texprs f e)
+  | App (loc, ty, e0, e1) ->
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      App (loc, ty', e0', e1')
   | Match (loc, ty, e, cases) ->
+      let ty' = f ty in
+      let e' = map_over_expr_texprs f e in
       Match
         ( loc,
-          f ty,
-          map_over_expr_texprs f e,
+          ty',
+          e',
           List.map (fun (p, e) -> (p, map_over_expr_texprs f e)) cases )
   | Tuple (loc, ty, es) ->
-      Tuple (loc, f ty, List.map (map_over_expr_texprs f) es)
+      let ty' = f ty in
+      Tuple (loc, ty', List.map (map_over_expr_texprs f) es)
   | Let (loc, ty, x, e0, e1) ->
-      Let (loc, f ty, x, map_over_expr_texprs f e0, map_over_expr_texprs f e1)
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      Let (loc, ty', x, e0', e1')
   | Constr (loc, ty, cname) -> Constr (loc, f ty, cname)
 
 let map_over_decl_texprs f decl =
   let open Typed_ast in
   match decl with
-  | Val (loc, ty, x, e) -> Val (loc, f ty, x, map_over_expr_texprs f e)
+  | Val (loc, ty, x, e) ->
+      let ty' = f ty in
+      Val (loc, ty', x, map_over_expr_texprs f e)
   | Type _ -> decl (* todo: verify this is correct *)
 
 let instantiate nt bound t =
@@ -172,8 +188,7 @@ let rec unify unifications t1 t2 loc_on_fail =
         |> List.map (fun (t1, t2) -> unify unifications t1 t2 loc_on_fail)
         |> collect_result
         >>=? fun _ -> Ok ()
-    | TyCustom (params1, name1), TyCustom (params2, name2)
-      when name1 = name2 (*&& List.length params1 = List.length params2*) ->
+    | TyCustom (params1, name1), TyCustom (params2, name2) when name1 = name2 ->
         if List.length params1 <> List.length params2 then
           Error (loc_on_fail, "illegal state - something went wrong")
         else
@@ -282,10 +297,10 @@ let rec type_expr unifications nt env expr =
       match StringMap.find_opt v env with
       | None -> Error (loc, sprintf "unbound variable %s" v)
       | Some (t, bound) ->
-          let instantiated = instantiate nt bound t in
-          Ok
-            (Typed_ast.Ident
-               (loc, find_unified_type unifications instantiated, v)))
+          let instantiated =
+            find_unified_type unifications t |> instantiate nt bound
+          in
+          Ok (Typed_ast.Ident (loc, instantiated, v)))
   | Parsed_ast.Bop (loc, e0, op, e1) ->
       let arg_type = Typed_ast.bop_arg_type nt op in
       type_expr unifications nt env e0 >>=? fun e0node ->
@@ -542,15 +557,22 @@ let type_program program =
       acc >>=? fun (declnodes, env, type_env) ->
       type_decl u type_gen env type_env decl
       >>=? fun (declnode, env', type_env') ->
-      let state = simplify_texpr_state () in
-      let simplify_texpr texpr =
-        find_unified_type u texpr |> map_over_texpr_vars state
-      in
-      let declnode' = map_over_decl_texprs simplify_texpr declnode in
-      Ok (declnode' :: declnodes, env', type_env'))
+      Ok (declnode :: declnodes, env', type_env'))
     (Ok ([], env, type_env))
     program
-  >>=? fun (reversed_ttree, _, _) -> Ok (List.rev reversed_ttree)
+  >>=? fun (reversed_tdecls, _, _) ->
+  let tdecls = List.rev reversed_tdecls in
+  let remapped =
+    List.map
+      (fun tdecl ->
+        let state = simplify_texpr_state () in
+        let simplify_texpr texpr =
+          find_unified_type u texpr |> map_over_texpr_vars state
+        in
+        map_over_decl_texprs simplify_texpr tdecl)
+      tdecls
+  in
+  Ok remapped
 
 let type_program_exn filename program =
   match type_program program with
