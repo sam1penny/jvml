@@ -68,9 +68,9 @@ let%expect_test "use generic list" =
   [%expect {|
   Ok(
   'a list
-  'b list
+  'a list
   int list
-  'c -> 'c list
+  'a -> 'a list
   )
 |}]
 
@@ -101,7 +101,7 @@ let%expect_test "use generic dict" =
   [%expect {|
   Ok(
   ('a, 'b) dict
-  ('c, 'd) dict
+  ('a, 'b) dict
   (int, bool) dict
   )
 |}]

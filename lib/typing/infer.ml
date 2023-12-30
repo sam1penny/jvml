@@ -539,23 +539,15 @@ let type_program program =
       acc >>=? fun (declnodes, env, type_env) ->
       type_decl u type_gen env type_env decl
       >>=? fun (declnode, env', type_env') ->
-      Ok (declnode :: declnodes, env', type_env'))
+      let state = simplify_texpr_state () in
+      let simplify_texpr texpr =
+        find_unified_type u texpr |> map_over_texpr_vars state
+      in
+      let declnode' = map_over_decl_texprs simplify_texpr declnode in
+      Ok (declnode' :: declnodes, env', type_env'))
     (Ok ([], env, type_env))
     program
-  >>=? fun (reversed_ttree, _, _) ->
-  let ttree = List.rev reversed_ttree in
-  let state = simplify_texpr_state () in
-  let simplify_texpr texpr =
-    find_unified_type u texpr |> map_over_texpr_vars state
-  in
-  let simplify_decl decl =
-    match decl with
-    | Typed_ast.Val (loc, texpr, x, e) ->
-        Typed_ast.Val (loc, simplify_texpr texpr, x, e)
-    | Typed_ast.Type (loc, texpr, params, tname, constructors) ->
-        Typed_ast.Type (loc, simplify_texpr texpr, params, tname, constructors)
-  in
-  Ok (List.map simplify_decl ttree)
+  >>=? fun (reversed_ttree, _, _) -> Ok (List.rev reversed_ttree)
 
 let type_program_exn program =
   match type_program program with

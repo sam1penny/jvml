@@ -189,7 +189,6 @@ let pp_decl ?(indent = "") =
   | Type (_, params, t, constructors) ->
       print_with_indent indent ("Type " ^ t);
       print_with_indent (indent ^ "   ")
-        (List.map (fun x -> "'" ^ x) params
-        |> String.concat "," |> sprintf "params = [%s]");
+        (String.concat "," params |> sprintf "params = [%s]");
       print_with_indent (indent ^ "   ") "constructors";
       List.iter (pp_tconstr ~indent:(indent ^ "      ")) constructors

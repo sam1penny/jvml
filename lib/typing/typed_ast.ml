@@ -85,7 +85,6 @@ let string_of_expr_node =
   | Bool (_, b) -> sprintf "Bool %b" b
   | Ident (_, _, ident) -> sprintf "Ident %s" ident
   | Unit _ -> "()"
-  (*| Constr (_, _, _, n) -> sprintf "Constructor %s" n *)
   | Bop (_, _, _, op, _) -> sprintf "Bop: %s" (show_bop op)
   | If _ -> "If"
   | Fun (_, _, x, _) -> sprintf "Fun %s" x
@@ -181,7 +180,6 @@ let pp_decl ?(indent = "") =
   | Type (_, _, params, t, constructors) ->
       print_with_indent indent ("Type " ^ t);
       print_with_indent (indent ^ "   ")
-        (List.map (fun x -> "'" ^ x) params
-        |> String.concat "," |> sprintf "params = [%s]");
+        (String.concat "," params |> sprintf "params = [%s]");
       print_with_indent (indent ^ "   ") "constructors";
       List.iter (pp_tconstr ~indent:(indent ^ "      ")) constructors

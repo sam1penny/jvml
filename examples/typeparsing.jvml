@@ -10,3 +10,4 @@ val x = N
 val z = C1 ((0, true), C1 ((2,false), N1))
 
 type 'a l = P | Q of 'a l
+val q = P

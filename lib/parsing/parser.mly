@@ -107,7 +107,7 @@ type_constr:
 (* do not require parenthesis when only one type parameter present *)
 
 type_param:
-  | APOSTROPHE; tparam = LOWERCASE_IDENT { tparam }
+  | APOSTROPHE; tparam = LOWERCASE_IDENT { ("'" ^ tparam) }
 
 type_params:
   | tp = type_param { [tp] }
