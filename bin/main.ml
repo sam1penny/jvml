@@ -1,7 +1,5 @@
 let () =
-  let typed_decls =
-    Jvml.Run_frontend.run_frontend_exn "examples/typeparsing.jvml"
-  in
+  let typed_decls = Jvml.Run_frontend.run_frontend_exn "examples/test.jvml" in
   List.iter Typing.Typed_ast.pp_decl typed_decls;
   List.map Typing.Infer.get_decl_type typed_decls
   |> List.iter (fun t -> print_endline (Typing.Typed_ast.pp_texpr t))

@@ -16,11 +16,18 @@ let pp_decls_result = function
       ^ "\n)"
   | Error _ -> "Error"
 
+let type_decl_and_pp d =
+  Utils.add_dummy_loc_decl d |> Typing.Driver.type_decl
+  >>=? (fun decl -> Ok (Typing.Infer.get_decl_type decl))
+  |> pp_decl_result |> print_string
+
+let type_progam_and_pp p =
+  List.map Utils.add_dummy_loc_decl p
+  |> Typing.Driver.type_program |> pp_decls_result |> print_string
+
 let%expect_test "basic assignment" =
   let x = Val ("f", Fun ("x", Bop (Ident "x", ADD, Int 3))) in
-  Utils.add_dummy_loc_decl x |> Typing.Driver.type_decl
-  >>=? (fun decl -> Ok (Typing.Infer.get_decl_type decl))
-  |> pp_decl_result |> print_string;
+  type_decl_and_pp x;
   [%expect {|Ok(int -> int)|}]
 
 let%expect_test "recursive function" =
@@ -40,9 +47,7 @@ let%expect_test "recursive function" =
                         App (Ident "fact", Bop (Ident "x", SUB, Int 1)) ) );
                 ] ) ) )
   in
-  Utils.add_dummy_loc_decl x |> Typing.Driver.type_decl
-  >>=? (fun decl -> Ok (Typing.Infer.get_decl_type decl))
-  |> pp_decl_result |> print_string;
+  type_decl_and_pp x;
   [%expect {|Ok(int -> int)|}]
 
 let%expect_test "use generic list" =
@@ -63,8 +68,7 @@ let%expect_test "use generic list" =
       Val ("z", Fun ("x", App (Constr "C", Tuple [ Ident "x"; Constr "N" ])));
     ]
   in
-  List.map Utils.add_dummy_loc_decl x
-  |> Typing.Driver.type_program |> pp_decls_result |> print_string;
+  type_progam_and_pp x;
   [%expect {|
   Ok(
   'a list
@@ -96,8 +100,7 @@ let%expect_test "use generic dict" =
       Val ("y", App (Constr "C", Tuple [ Int 3; Bool true; Constr "N" ]));
     ]
   in
-  List.map Utils.add_dummy_loc_decl x
-  |> Typing.Driver.type_program |> pp_decls_result |> print_string;
+  type_progam_and_pp x;
   [%expect {|
   Ok(
   ('a, 'b) dict
@@ -105,3 +108,20 @@ let%expect_test "use generic dict" =
   (int, bool) dict
   )
 |}]
+
+let%expect_test "multiple usages of polymorphic function" =
+  let x =
+    [
+      Val ("f", Fun ("x", Ident "x"));
+      Val ("a", App (Ident "f", Int 3));
+      Val ("b", App (Ident "f", Bool true));
+    ]
+  in
+  type_progam_and_pp x;
+  [%expect {|
+  Ok(
+  'a -> 'a
+  int
+  bool
+  )
+  |}]

@@ -484,6 +484,9 @@ let type_decl unifications nt env type_env = function
         let v_type = nt () in
         let env' = StringMap.add v (v_type, StringSet.empty) env in
         type_expr unifications nt env' expr >>=? fun exprnode ->
+        let env' =
+          StringMap.add v (generalize env (get_expr_type exprnode)) env'
+        in
         unify unifications v_type (get_expr_type exprnode) loc >>=? fun _ ->
         Ok
           ( Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode),
@@ -549,14 +552,14 @@ let type_program program =
     program
   >>=? fun (reversed_ttree, _, _) -> Ok (List.rev reversed_ttree)
 
-let type_program_exn program =
+let type_program_exn filename program =
   match type_program program with
   | Ok typed_program -> typed_program
   | Error (loc, message) ->
       let to_internal_loc (x, y) =
         (Pp_loc.Position.of_lexing x, Pp_loc.Position.of_lexing y)
       in
-      let input = Pp_loc.Input.file "examples/typeparsing.jvml" in
+      let input = Pp_loc.Input.file filename in
       Pp_loc.pp ~input Format.std_formatter [ to_internal_loc loc ];
       (* todo install exception printers and raise exception *)
       Format.printf "Error: %s\n" message;

@@ -1,0 +1,3 @@
+val f = fun x -> x
+val a = f 3
+val b = f true
