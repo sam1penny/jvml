@@ -150,3 +150,9 @@ let%expect_test "test invalid polymorphic equals" =
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
   |> print_string;
   [%expect {|Error|}]
+
+let%expect_test "test ored pattern" =
+  let x = Match (Int 3, [ (Pat_Or (Pat_Int 0, Pat_Int 1), Int 1) ]) in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
+  |> print_string;
+  [%expect {|Ok(int)|}]

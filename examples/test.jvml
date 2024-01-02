@@ -1,2 +1,1 @@
-val apply = fun f -> f 3
-val y = apply 3
+val x = fun x -> fun y -> fun z -> x + y * z

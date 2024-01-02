@@ -111,9 +111,7 @@ let rec pp_pattern ?(indent = "") pat =
   let pp_node n = printf "%s└──%s\n" indent (string_of_pat_node n) in
   let pp_rec_pattern = pp_pattern ~indent:(indent ^ "   ") in
   match pat with
-  | Pat_Int _ | Pat_Ident _ | Pat_Bool _ | Pat_Unit _ | Pat_Any _ | Pat_Constr _
-    ->
-      pp_node pat
+  | Pat_Int _ | Pat_Ident _ | Pat_Bool _ | Pat_Unit _ | Pat_Any _ -> pp_node pat
   | Pat_Or (_, _, p1, p2) ->
       pp_node pat;
       pp_rec_pattern p1;
@@ -121,6 +119,10 @@ let rec pp_pattern ?(indent = "") pat =
   | Pat_Tuple (_, _, ps) ->
       pp_node pat;
       List.iter pp_rec_pattern ps
+  | Pat_Constr (_, _, _, None) -> pp_node pat
+  | Pat_Constr (_, _, _, Some p) ->
+      pp_node pat;
+      pp_rec_pattern p
 
 let rec pp_expr ?(indent = "") expr =
   let open Printf in

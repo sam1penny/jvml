@@ -63,3 +63,65 @@ let%expect_test "test type definitions" =
        └──constructors
           └──Lf
           └──Br of ('a * 'b * ('a, 'b) tree * ('a, 'b) tree) |}]
+
+let%expect_test "test function application associativity" =
+  let x = "val y = (fun f -> fun x -> f x) (fun x -> x * 2) 3" in
+  Parsing.Driver.parse_string x |> List.hd |> Parsing.Parsed_ast.pp_decl;
+  [%expect
+    {|
+    └──Val y
+       └──App
+          └──App
+             └──Fun f
+                └──Fun x
+                   └──App
+                      └──Ident f
+                      └──Ident x
+             └──Fun x
+                └──Bop: *
+                   └──Ident x
+                   └──Int 2
+          └──Int 3|}]
+
+let%expect_test "test nested patterns" =
+  let x =
+    "type 'a list = N | C of 'a * 'a list\n\
+    \  val length_minus_one = fun x -> match x with\n\
+    \  | N | C (_, N) -> 0\n\
+    \  | C(_, y) -> 1 + length_minus_one y\n\
+    \   "
+  in
+  Parsing.Driver.parse_string x
+  |> List.iter (fun x ->
+         Parsing.Parsed_ast.pp_decl x;
+         print_newline ());
+  [%expect
+    {|
+  └──Type list
+     └──params = ['a]
+     └──constructors
+        └──N
+        └──C of ('a * 'a list)
+
+  └──Val length_minus_one
+     └──Fun x
+        └──Match
+           └──Ident x
+           └── <case>
+              └──Pat_Or
+                 └──Pat_Constr N
+                 └──Pat_Constr C
+                    └──Pat_Tuple
+                       └──Pat_Any
+                       └──Pat_Constr N
+              └──Int 0
+           └── <case>
+              └──Pat_Constr C
+                 └──Pat_Tuple
+                    └──Pat_Any
+                    └──Pat_Ident y
+              └──Bop: +
+                 └──Int 1
+                 └──App
+                    └──Ident length_minus_one
+                    └──Ident y|}]

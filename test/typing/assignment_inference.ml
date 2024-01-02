@@ -78,6 +78,32 @@ let%expect_test "use generic list" =
   )
 |}]
 
+let%expect_test "incorrectly use generic list" =
+  let x =
+    [
+      Type
+        ( [ "'a" ],
+          "list",
+          [
+            DeclConstr ("N", None);
+            DeclConstr
+              ( "C",
+                Some (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "list") ])
+              );
+          ] );
+      Val
+        ( "x",
+          App
+            ( Constr "C",
+              Tuple [ Int 3; App (Constr "C", Tuple [ Bool true; Constr "N" ]) ]
+            ) );
+    ]
+  in
+  type_progam_and_pp x;
+  [%expect {|
+  Error
+  |}]
+
 let%expect_test "use generic dict" =
   let x =
     [
@@ -141,3 +167,84 @@ let%expect_test "use multiple top-level values" =
   int -> int
   int
   )|}]
+
+let%expect_test "test pattern matching constructor" =
+  let x =
+    [
+      Type
+        ( [ "'a" ],
+          "list",
+          [
+            DeclConstr ("N", None);
+            DeclConstr
+              ( "C",
+                Some (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "list") ])
+              );
+          ] );
+      Val
+        ( "map",
+          Fun
+            ( "f",
+              Fun
+                ( "x",
+                  Match
+                    ( Ident "x",
+                      [
+                        (Pat_Constr ("N", None), Constr "N");
+                        ( Pat_Constr
+                            ( "C",
+                              Some
+                                (Pat_Tuple [ Pat_Ident "hd"; Pat_Ident "tl" ])
+                            ),
+                          App
+                            ( Constr "C",
+                              Tuple
+                                [
+                                  App (Ident "f", Ident "hd");
+                                  App (App (Ident "map", Ident "f"), Ident "tl");
+                                ] ) );
+                      ] ) ) ) );
+    ]
+  in
+  type_progam_and_pp x;
+  [%expect {|
+    Ok(
+    'a list
+    ('a -> 'b) -> 'a list -> 'b list
+    ) |}]
+
+let%expect_test "variable escaping toplevel scope" =
+  let x = [ Val ("x", Let ("y", Int 3, Ident "y")); Val ("z", Ident "y") ] in
+  type_progam_and_pp x;
+  [%expect {|
+Error
+|}]
+
+let%expect_test "test type definition with all types" =
+  let x =
+    [
+      Type
+        ( [],
+          "data",
+          [
+            DeclConstr ("X", Some (TyFun (TyInt, TyInt)));
+            DeclConstr ("Y", Some TyUnit);
+            DeclConstr ("Z", Some TyBool);
+            DeclConstr ("A", Some TyInt);
+          ] );
+      Val ("m", App (Constr "X", Fun ("x", Ident "x")));
+      Val ("n", App (Constr "Y", Unit));
+      Val ("o", App (Constr "Z", Bool true));
+      Val ("p", App (Constr "A", Int 3));
+    ]
+  in
+  type_progam_and_pp x;
+  [%expect {|
+  Ok(
+  data
+  data
+  data
+  data
+  data
+  )
+  |}]
