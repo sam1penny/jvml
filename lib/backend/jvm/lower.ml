@@ -1,5 +1,6 @@
 open Linear.Instruction
 open Printf
+open Common
 
 let lower_type =
   let open Typing.Typed_ast in
@@ -10,12 +11,21 @@ let lower_type =
   | TyVar _ -> "java/lang/Object"
   | _ -> raise @@ Failure "attempted to lower unsupported type"
 
+let lower_bop = function
+  | ADD -> "iadd"
+  | SUB -> "isub"
+  | MUL -> "imul"
+  | DIV -> "idiv"
+  | AND -> "iand"
+  | OR -> "ior"
+  | _ -> "attempted to lower unsupported binary operator"
+
 let lower_instruction = function
   | PUSH_INT i -> [ sprintf "ldc %s" (string_of_int i) ]
   | BOX_INT ->
       [ "invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;" ]
   | UNBOX_INT -> [ "invokevirtual Method java/lang/Integer intValue ()I" ]
-  | ADD_INT -> [ "iadd" ]
+  | BOP bop -> [ lower_bop bop ]
   | STORE_REF r -> [ sprintf "astore %s" r ]
   | LOAD_REF r -> [ sprintf "aload %s" r ]
   | IFZERO l -> [ sprintf "ifeq %s" l ]

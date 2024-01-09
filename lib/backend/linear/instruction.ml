@@ -2,13 +2,12 @@ type instruction =
   | PUSH_INT of int
   | BOX_INT
   | UNBOX_INT
-  | ADD_INT
   | STORE_REF of string
   | LOAD_REF of string
   | IFZERO of string
   | GOTO of string
   | LABEL of string
-  | EQ
+  | BOP of Common.bop
   | LOAD_FIELD of string
   | STORE_FIELD of string
   | ALLOC_CLOSURE of string

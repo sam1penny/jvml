@@ -116,16 +116,16 @@ let rec compile_expr label_gen env e =
       @@ Invalid_argument "Attempted to lower unsupported expr to linear_ir"
 
 and compile_bop label_gen env e0 e1 = function
-  | ADD ->
+  | (ADD | SUB | MUL | DIV | LT | GT) as intop ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
       ( defs0 @ defs1,
-        c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ ADD_INT; BOX_INT ] )
+        c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP intop; BOX_INT ] )
   (* polymorphic eq *)
   | EQ ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
-      (defs0 @ defs1, c0 @ c1 @ [ EQ ])
+      (defs0 @ defs1, c0 @ c1 @ [ BOP EQ ])
   | _ ->
       raise
       @@ Invalid_argument
