@@ -1,17 +1,10 @@
 let () =
-  let typed_decls = Jvml.Run_frontend.run_frontend_exn "examples/test.jvml" in
-  List.iter Typing.Typed_ast.pp_decl typed_decls;
-  List.map Typing.Infer.get_decl_type typed_decls
-  |> List.iter (fun t -> print_endline (Typing.Typed_ast.pp_texpr t))
-(*
-  match Jvml.Run_frontend.run_frontend "examples/typeparsing.jvml" with
-  | Ok typed_decls ->
-      List.iter Typing.Typed_ast.pp_decl typed_decls;
-      List.map Typing.Infer.get_decl_type typed_decls
-      |> List.iter (fun t -> print_endline (Common.pp_texpr t))
-  | Error (_, e) -> raise @@ Invalid_argument e
-  *)
-
+  let defs, linear_ir =
+    Linear.Driver.compile_single_decl "val x = let y = 3 in (fun x -> x + y) 4"
+  in
+  List.iter (fun c -> Linear.Instruction.show_closure c |> print_endline) defs;
+  Linear.Instruction.show_program linear_ir |> print_endline
+(*Jvm.Lower.produce_bytecode linear_ir |> print_endline *)
 (*
 let () = Driver.parse_file "examples/conditionals.jvml"
 |> Interp.interp

@@ -10,6 +10,7 @@ type type_expr =
   | TyVar of string
   | TyTuple of type_expr list
   | TyFun of type_expr * type_expr
+[@@deriving show]
 
 type expr =
   | Int of loc * int
@@ -77,6 +78,7 @@ let rec pp_texpr = function
       (match f with TyFun _ -> "(" ^ pp_texpr f ^ ")" | _ -> pp_texpr f)
       ^ " -> "
       ^ match c with TyFun _ -> "" ^ pp_texpr c ^ "" | _ -> pp_texpr c)
+[@@deriving show]
 
 let string_of_expr_node =
   let open Printf in

@@ -1,4 +1,4 @@
-(executable
- (public_name main)
- (name main)
- (libraries jvml))
+(executables
+ (public_names main compile)
+ (names main compile)
+ (libraries jvml linear jvm))
