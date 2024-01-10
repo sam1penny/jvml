@@ -1,4 +1,4 @@
 (executables
- (public_names main compile)
- (names main compile)
+ (public_names main compile type)
+ (names main compile type)
  (libraries jvml linear jvm))

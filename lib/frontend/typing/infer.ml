@@ -155,7 +155,6 @@ let instantiate nt bound t =
 
 let occurs_in v1 t = StringSet.mem v1 (tyvars_from_type t)
 
-(* todo - change this to use map_over_texpr_vars *)
 let rec find_unified_type u ty =
   let open Typed_ast in
   map_over_texpr_vars
@@ -205,7 +204,11 @@ let rec unify unifications t1 t2 loc_on_fail =
 (* return (type, variable bindings, )*)
 let rec validate_pattern unifications env nt =
   (* todo allow overlapping bindings if they unify *)
-  (* todo : more refine location complaints *)
+  (* todo :
+     -- report more refine location complaints --
+     to achieve this i should could pass the maps down to recursive calls,
+     so that I can fail when matching a pat_ident case rather than when unioning maps
+  *)
   let union_maps_if_disjoint loc maps =
     List.fold_left
       (fun acc map ->
@@ -391,7 +394,6 @@ and check_case e_type unifications nt env (pattern, case_expr) =
       env new_bindings
   in
   type_expr unifications nt env' case_expr >>=? fun case_node ->
-  (*Ok (pattern_type, case_node)*)
   Ok (pattern_node, case_node)
 
 let make_new_char () =
@@ -572,15 +574,20 @@ let type_program program =
   in
   Ok remapped
 
-let type_program_exn filename program =
+let type_program_exn input program =
   match type_program program with
   | Ok typed_program -> typed_program
   | Error (loc, message) ->
       let to_internal_loc (x, y) =
         (Pp_loc.Position.of_lexing x, Pp_loc.Position.of_lexing y)
       in
-      let input = Pp_loc.Input.file filename in
       Pp_loc.pp ~input Format.std_formatter [ to_internal_loc loc ];
       (* todo install exception printers and raise exception *)
       Format.printf "Error: %s\n" message;
       raise (Failure "")
+
+let type_program_exn_from_file filename program =
+  type_program_exn (Pp_loc.Input.file filename) program
+
+let type_program_exn_from_string string program =
+  type_program_exn (Pp_loc.Input.string string) program
