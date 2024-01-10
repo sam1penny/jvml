@@ -158,15 +158,12 @@ let occurs_in v1 t = StringSet.mem v1 (tyvars_from_type t)
 (* todo - change this to use map_over_texpr_vars *)
 let rec find_unified_type u ty =
   let open Typed_ast in
-  match ty with
-  | TyInt | TyBool | TyUnit -> ty
-  | TyVar _ ->
+  map_over_texpr_vars
+    (fun v ->
+      let ty = TyVar v in
       let ty' = Unifications.find u ty in
-      if ty = ty' then ty else find_unified_type u ty'
-  | TyTuple ts -> TyTuple (List.map (find_unified_type u) ts)
-  | TyFun (t1, t2) -> TyFun (find_unified_type u t1, find_unified_type u t2)
-  | TyCustom (targs, tname) ->
-      TyCustom (List.map (find_unified_type u) targs, tname)
+      if ty = ty' then ty else find_unified_type u ty')
+    ty
 
 (** loc_on_fail should be the location of t2, although this is not enforced. *)
 let rec unify unifications t1 t2 loc_on_fail =
