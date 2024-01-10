@@ -101,10 +101,10 @@ let rec compile_expr label_gen env e =
         @ [ GOTO after_label; LABEL else_label ]
         @ c2 @ [ LABEL after_label ] )
   | Fun (_, t0, t1, x, e) -> compile_lambda label_gen env (t0, t1, x, e)
-  | App (_, _, e0, e1) ->
+  | App (_, ty, e0, e1) ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
-      (defs0 @ defs1, c0 @ c1 @ [ APPLY ])
+      (defs0 @ defs1, c0 @ c1 @ [ APPLY ty ])
   | Let (_, _, x, e0, e1) ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let x_label = label_gen.ref_label () in

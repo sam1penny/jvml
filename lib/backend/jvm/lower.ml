@@ -31,18 +31,17 @@ let lower_instruction clazz = function
   | IFZERO l -> [ sprintf "ifeq %s" l ]
   | GOTO l -> [ sprintf "goto %s" l ]
   | LABEL l -> [ sprintf "%s:" l ]
-  (* todo - encode closure class name and field types *)
   | LOAD_FIELD (f, ty) ->
       [ sprintf "getfield Field %s %s L%s;" clazz f (lower_type ty) ]
   | ALLOC_CLOSURE name -> [ sprintf "new %s" name; "dup" ]
   (* todo - link to actual closure arguments *)
   | CONSTRUCT_CLOSURE (name, _) ->
       [ sprintf "invokespecial Method %s <init> (Ljava/lang/Integer;)V" name ]
-  (* todo - cast result? *)
-  | APPLY ->
+  | APPLY ty ->
       [
         "invokeinterface InterfaceMethod java/util/function/Function apply \
          (Ljava/lang/Object;)Ljava/lang/Object; 2";
+        sprintf "checkcast %s" (lower_type ty);
       ]
   (* todo - add support for remaining instructions EQ, STORE_FIELD *)
   | _ -> raise @@ Invalid_argument "Unsupported instruction"

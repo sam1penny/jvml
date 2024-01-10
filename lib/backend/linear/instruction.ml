@@ -13,7 +13,8 @@ type instruction =
   | ALLOC_CLOSURE of string
   (* closure label, nargs *)
   | CONSTRUCT_CLOSURE of string * int
-  | APPLY
+  (* save return type in order to cast *)
+  | APPLY of Typing.Typed_ast.type_expr
 [@@deriving show]
 
 type closure =
