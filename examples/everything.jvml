@@ -1,5 +1,5 @@
 type 'a tree = Leaf | Branch of ('a tree * 'a * 'a tree)
-type ('a, 'b) dict = Lf | Br of (('a, 'b) dict * 'a * 'b * ('a, 'b) tree)
+type ('a, 'b) dict = Lf | Br of (('a, 'b) dict * 'a * 'b * ('a, 'b) dict)
 
 val sum = fun t -> match t with
     | Leaf -> 0

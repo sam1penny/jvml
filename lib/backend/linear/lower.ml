@@ -174,3 +174,12 @@ let compile_decl_from_scratch d =
   let generators = make_generators () in
   let defs, code, _ = compile_decl generators Value_env.empty d in
   (defs, code)
+
+let compile_program_from_scratch p =
+  let generators = make_generators () in
+  List.fold_left
+    (fun (defsacc, codeacc, envacc) d ->
+      let defs, code, env = compile_decl generators envacc d in
+      (defsacc @ defs, codeacc @ code, env))
+    ([], [], Value_env.empty) p
+  |> fun (defs, code, _) -> (defs, code)
