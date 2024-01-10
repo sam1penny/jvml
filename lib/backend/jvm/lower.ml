@@ -11,6 +11,9 @@ let lower_type =
   | TyVar _ -> "java/lang/Object"
   | _ -> raise @@ Failure "attempted to lower unsupported type"
 
+let lower_type_list tys =
+  List.map (fun t -> "L" ^ lower_type t ^ ";") tys |> String.concat ""
+
 let lower_bop = function
   | ADD -> "iadd"
   | SUB -> "isub"
@@ -37,8 +40,11 @@ let lower_instruction clazz = function
       [ sprintf "putfield Field %s %s L%s;" clazz f (lower_type ty) ]
   | ALLOC_CLOSURE name -> [ sprintf "new %s" name; "dup" ]
   (* todo - link to actual closure arguments *)
-  | CONSTRUCT_CLOSURE (name, _) ->
-      [ sprintf "invokespecial Method %s <init> (Ljava/lang/Integer;)V" name ]
+  | CONSTRUCT_CLOSURE (name, tys) ->
+      [
+        sprintf "invokespecial Method %s <init> (%s)V" name
+          (lower_type_list tys);
+      ]
   | APPLY ty ->
       [
         "invokeinterface InterfaceMethod java/util/function/Function apply \
@@ -105,13 +111,12 @@ let lower_closure = function
     |}
         name
         (lower_constructor_args constructor_args)
-        (List.map (fun (_, ty) -> ty) constructor_args
-        |> List.map (fun t -> "L" ^ lower_type t ^ ";")
-        |> String.concat "")
+        (List.map (fun (_, ty) -> ty) constructor_args |> lower_type_list)
         (lower_constructor_body indent name constructor_args)
         (lower_type arg)
         (lower_body "    " name body)
 
+(* todo - remove printing bodge, add print statement to the language *)
 let produce_instruction_bytecode p =
   sprintf
     {|

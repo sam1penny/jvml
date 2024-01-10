@@ -11,8 +11,8 @@ type instruction =
   | LOAD_FIELD of string * Typing.Typed_ast.type_expr
   | STORE_FIELD of string * Typing.Typed_ast.type_expr
   | ALLOC_CLOSURE of string
-  (* closure label, nargs *)
-  | CONSTRUCT_CLOSURE of string * int
+  (* closure label, arg_types *)
+  | CONSTRUCT_CLOSURE of string * Typing.Typed_ast.type_expr list
   (* save return type in order to cast *)
   | APPLY of Typing.Typed_ast.type_expr
 [@@deriving show]

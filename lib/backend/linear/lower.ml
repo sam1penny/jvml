@@ -137,6 +137,7 @@ and compile_lambda label_gen env (arg_type, return_type, x, e) =
     |> StringMap.to_seq |> List.of_seq
   in
   let fvars = List.map (fun (x, _) -> x) fvars_with_types in
+  let fvar_types = List.map (fun (_, y) -> y) fvars_with_types in
   let fetch_fvars = List.map (fun x -> Value_env.lookup x env) fvars in
 
   let closure_label = label_gen.lambda_label () in
@@ -157,7 +158,7 @@ and compile_lambda label_gen env (arg_type, return_type, x, e) =
   ( defs @ [ closure ],
     [ ALLOC_CLOSURE closure_label ]
     @ (List.rev fetch_fvars |> List.flatten)
-    @ [ CONSTRUCT_CLOSURE (closure_label, List.length fetch_fvars) ] )
+    @ [ CONSTRUCT_CLOSURE (closure_label, List.rev fvar_types) ] )
 
 let compile_decl label_gen env = function
   | Val (_, _, x, e) ->
