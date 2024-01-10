@@ -56,7 +56,7 @@ let free_vars_with_types_expr bound e =
     | If (_, _, e0, e1, e2) ->
         StringMap.union takeleft (aux bound free e0) (aux bound free e1)
         |> StringMap.union takeleft (aux bound free e2)
-    | Fun (_, _, x, e) ->
+    | Fun (_, _, _, x, e) ->
         let bound' = StringSet.add x bound in
         aux bound' free e
     | App (_, _, e0, e1) ->
@@ -100,7 +100,7 @@ let rec compile_expr label_gen env e =
         @ c1
         @ [ GOTO after_label; LABEL else_label ]
         @ c2 @ [ LABEL after_label ] )
-  | Fun (_, ty, x, e) -> compile_lambda label_gen env (ty, x, e)
+  | Fun (_, t0, t1, x, e) -> compile_lambda label_gen env (t0, t1, x, e)
   | App (_, _, e0, e1) ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
@@ -131,7 +131,7 @@ and compile_bop label_gen env e0 e1 = function
       @@ Invalid_argument
            "Attempted to lower unsupported binary operator to linear_ir"
 
-and compile_lambda label_gen env (ty, x, e) =
+and compile_lambda label_gen env (arg_type, return_type, x, e) =
   let fvars_with_types =
     free_vars_with_types_expr (StringSet.singleton x) e
     |> StringMap.to_seq |> List.of_seq
@@ -149,11 +149,6 @@ and compile_lambda label_gen env (ty, x, e) =
     List.fold_left (fun acc x -> Value_env.add_field x x acc) body_env fvars
   in
   let defs, ecode = compile_expr body_label_gen body_env e in
-  let arg_type, return_type =
-    match ty with
-    | TyFun (t0, t1) -> (t0, t1)
-    | _ -> raise @@ Failure "Illegal state"
-  in
   let closure =
     CLOSURE (closure_label, fvars_with_types, arg_type, return_type, ecode)
   in

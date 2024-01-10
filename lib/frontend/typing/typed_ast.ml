@@ -19,7 +19,7 @@ type expr =
   | Unit of loc
   | Bop of loc * type_expr * expr * Common.bop * expr
   | If of loc * type_expr * expr * expr * expr
-  | Fun of loc * type_expr * string * expr
+  | Fun of loc * type_expr * type_expr * string * expr
   | App of loc * type_expr * expr * expr
   | Match of loc * type_expr * expr * (pattern * expr) list
   | Tuple of loc * type_expr * expr list
@@ -89,7 +89,7 @@ let string_of_expr_node =
   | Unit _ -> "()"
   | Bop (_, _, _, op, _) -> sprintf "Bop: %s" (show_bop op)
   | If _ -> "If"
-  | Fun (_, _, x, _) -> sprintf "Fun %s" x
+  | Fun (_, _, _, x, _) -> sprintf "Fun %s" x
   | App _ -> "App"
   | Match _ -> "Match"
   | Tuple _ -> "Tuple"
@@ -141,7 +141,7 @@ let rec pp_expr ?(indent = "") expr =
       pp_rec_expr e0;
       pp_rec_expr e1;
       pp_rec_expr e2
-  | Fun (_, _, _, e) ->
+  | Fun (_, _, _, _, e) ->
       pp_node expr;
       pp_rec_expr e
   | App (_, _, e0, e1) ->

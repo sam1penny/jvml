@@ -11,7 +11,7 @@ let get_expr_type =
   | Unit _ -> TyUnit
   | Bop (_, t, _, _, _) -> t
   | If (_, t, _, _, _) -> t
-  | Fun (_, t, _, _) -> t
+  | Fun (_, t0, t1, _, _) -> TyFun (t0, t1)
   | App (_, t, _, _) -> t
   | Match (_, t, _, _) -> t
   | Tuple (_, t, _) -> t
@@ -107,9 +107,10 @@ let rec map_over_expr_texprs f expr =
       let e1' = map_over_expr_texprs f e1 in
       let e2' = map_over_expr_texprs f e2 in
       If (loc, ty', e0', e1', e2')
-  | Fun (loc, ty, x, e) ->
-      let ty' = f ty in
-      Fun (loc, ty', x, map_over_expr_texprs f e)
+  | Fun (loc, t0, t1, x, e) ->
+      let t0' = f t0 in
+      let t1' = f t1 in
+      Fun (loc, t0', t1', x, map_over_expr_texprs f e)
   | App (loc, ty, e0, e1) ->
       let ty' = f ty in
       let e0' = map_over_expr_texprs f e0 in
@@ -327,7 +328,7 @@ let rec type_expr unifications nt env expr =
       let tau = nt () in
       let env' = StringMap.add x (tau, StringSet.empty) env in
       type_expr unifications nt env' e >>=? fun enode ->
-      Ok (Typed_ast.Fun (loc, TyFun (tau, get_expr_type enode), x, enode))
+      Ok (Typed_ast.Fun (loc, tau, get_expr_type enode, x, enode))
   | Parsed_ast.App (loc, e0, e1) ->
       let tau' = nt () in
       type_expr unifications nt env e0 >>=? fun e0node ->
