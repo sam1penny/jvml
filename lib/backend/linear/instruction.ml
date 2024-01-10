@@ -8,8 +8,8 @@ type instruction =
   | GOTO of string
   | LABEL of string
   | BOP of Common.bop
-  | LOAD_FIELD of string
-  | STORE_FIELD of string
+  | LOAD_FIELD of string * Typing.Typed_ast.type_expr
+  | STORE_FIELD of string * Typing.Typed_ast.type_expr
   | ALLOC_CLOSURE of string
   (* closure label, nargs *)
   | CONSTRUCT_CLOSURE of string * int

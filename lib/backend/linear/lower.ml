@@ -146,7 +146,9 @@ and compile_lambda label_gen env (arg_type, return_type, x, e) =
     Value_env.empty |> Value_env.add_local_var x (body_label_gen.ref_label ())
   in
   let body_env =
-    List.fold_left (fun acc x -> Value_env.add_field x x acc) body_env fvars
+    List.fold_left
+      (fun acc (name, ty) -> Value_env.add_field name (name, ty) acc)
+      body_env fvars_with_types
   in
   let defs, ecode = compile_expr body_label_gen body_env e in
   let closure =

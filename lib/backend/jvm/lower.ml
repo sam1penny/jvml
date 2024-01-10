@@ -20,7 +20,7 @@ let lower_bop = function
   | OR -> "ior"
   | _ -> "attempted to lower unsupported binary operator"
 
-let lower_instruction = function
+let lower_instruction clazz = function
   | PUSH_INT i -> [ sprintf "ldc %s" (string_of_int i) ]
   | BOX_INT ->
       [ "invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;" ]
@@ -32,8 +32,8 @@ let lower_instruction = function
   | GOTO l -> [ sprintf "goto %s" l ]
   | LABEL l -> [ sprintf "%s:" l ]
   (* todo - encode closure class name and field types *)
-  | LOAD_FIELD f ->
-      [ sprintf "getfield Field Lambda$1 %s Ljava/lang/Integer;" f ]
+  | LOAD_FIELD (f, ty) ->
+      [ sprintf "getfield Field %s %s L%s;" clazz f (lower_type ty) ]
   | ALLOC_CLOSURE name -> [ sprintf "new %s" name; "dup" ]
   (* todo - link to actual closure arguments *)
   | CONSTRUCT_CLOSURE (name, _) ->
@@ -47,8 +47,8 @@ let lower_instruction = function
   (* todo - add support for remaining instructions EQ, STORE_FIELD *)
   | _ -> raise @@ Invalid_argument "Unsupported instruction"
 
-let lower_body indent b =
-  List.map lower_instruction b
+let lower_body indent clazz b =
+  List.map (lower_instruction clazz) b
   |> List.flatten
   |> List.map (fun x -> indent ^ x)
   |> String.concat "\n"
@@ -110,7 +110,8 @@ let lower_closure = function
         |> List.map (fun t -> "L" ^ lower_type t ^ ";")
         |> String.concat "")
         (lower_constructor_body indent name constructor_args)
-        (lower_type arg) (lower_body "    " body)
+        (lower_type arg)
+        (lower_body "    " name body)
 
 let produce_instruction_bytecode p =
   sprintf
@@ -128,7 +129,7 @@ let produce_instruction_bytecode p =
 .end method
 .end class
 |}
-    (lower_body "        " p)
+    (lower_body "        " "Foo" p)
 
 (*
 --- MAIN METHOD FOR USING GENERATED CLOSURE ---

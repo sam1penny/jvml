@@ -1,7 +1,11 @@
 open Instruction
+open Typing.Typed_ast
 module StringMap = Map.Make (String)
 
-type env = { local_vars : string StringMap.t; fields : string StringMap.t }
+type env = {
+  local_vars : string StringMap.t;
+  fields : (string * type_expr) StringMap.t;
+}
 
 let empty = { local_vars = StringMap.empty; fields = StringMap.empty }
 
@@ -14,4 +18,8 @@ let lookup k env =
   match StringMap.find_opt k env.local_vars with
   | Some b -> [ LOAD_REF b ]
   (* put 'this' on stack, then load field *)
-  | None -> [ LOAD_REF "0"; LOAD_FIELD (StringMap.find k env.fields) ]
+  | None ->
+      [
+        LOAD_REF "0";
+        (StringMap.find k env.fields |> fun (x, y) -> LOAD_FIELD (x, y));
+      ]
