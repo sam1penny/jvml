@@ -33,6 +33,8 @@ let lower_instruction clazz = function
   | LABEL l -> [ sprintf "%s:" l ]
   | LOAD_FIELD (f, ty) ->
       [ sprintf "getfield Field %s %s L%s;" clazz f (lower_type ty) ]
+  | STORE_FIELD (f, ty) ->
+      [ sprintf "putfield Field %s %s L%s;" clazz f (lower_type ty) ]
   | ALLOC_CLOSURE name -> [ sprintf "new %s" name; "dup" ]
   (* todo - link to actual closure arguments *)
   | CONSTRUCT_CLOSURE (name, _) ->
@@ -43,8 +45,6 @@ let lower_instruction clazz = function
          (Ljava/lang/Object;)Ljava/lang/Object; 2";
         sprintf "checkcast %s" (lower_type ty);
       ]
-  (* todo - add support for remaining instructions EQ, STORE_FIELD *)
-  | _ -> raise @@ Invalid_argument "Unsupported instruction"
 
 let lower_body indent clazz b =
   List.map (lower_instruction clazz) b
