@@ -1,6 +1,5 @@
 open Linear.Instruction
 open Printf
-open Common
 
 let lower_type =
   let open Typing.Typed_ast in
@@ -15,16 +14,31 @@ let lower_type =
 let lower_type_list tys =
   List.map (fun t -> "L" ^ lower_type t ^ ";") tys |> String.concat ""
 
-let lower_bop = function
-  | ADD -> "iadd"
-  | SUB -> "isub"
-  | MUL -> "imul"
-  | DIV -> "idiv"
-  | AND -> "iand"
-  | OR -> "ior"
-  | _ -> "attempted to lower unsupported binary operator"
+let make_jvm_ctrl_gen () =
+  let cnt = Linear.Lower.make_counter () in
+  fun () -> "Ljvm" ^ cnt ()
 
-let lower_instruction clazz = function
+let lower_bop ctrl_gen = function
+  | Linear.Instruction.ADD -> [ "iadd" ]
+  | SUB -> [ "isub" ]
+  | MUL -> [ "imul" ]
+  | DIV -> [ "idiv" ]
+  | EQ ->
+      [ "invokevirtual Method java/lang/Boolean equals (Ljava/lang/Object;)Z" ]
+  | (LT | GT) as bop ->
+      let false_label = ctrl_gen () in
+      let after_label = ctrl_gen () in
+      let comparison = if bop = LT then "if_icmpge" else "if_icmple" in
+      [
+        comparison ^ " " ^ false_label;
+        "iconst_1";
+        "goto " ^ after_label;
+        false_label ^ ":";
+        "iconst_0";
+        after_label ^ ":";
+      ]
+
+let lower_instruction ctrl_gen clazz = function
   | PUSH_INT i -> [ sprintf "ldc %s" (string_of_int i) ]
   | BOX_INT ->
       [ "invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;" ]
@@ -33,7 +47,7 @@ let lower_instruction clazz = function
       [ "invokestatic Method java/lang/Boolean valueOf (Z)Ljava/lang/Boolean;" ]
   | UNBOX_BOOL -> [ "invokevirtual Method java/lang/Boolean booleanValue ()Z" ]
   | PUSH_UNIT -> [ "getstatic Field Unit INSTANCE LUnit;" ]
-  | BOP bop -> [ lower_bop bop ]
+  | BOP bop -> lower_bop ctrl_gen bop
   | STORE_REF r -> [ sprintf "astore %s" r ]
   | LOAD_REF r -> [ sprintf "aload %s" r ]
   | IFZERO l -> [ sprintf "ifeq %s" l ]
@@ -64,13 +78,13 @@ let lower_instruction clazz = function
 let should_indent = function LABEL _ -> false | _ -> true
 
 let lower_body indent clazz b =
-  let apply_indent = List.map (fun i -> indent ^ i) in
-  List.map
-    (fun i ->
-      let lowered = lower_instruction clazz i in
-      if should_indent i then apply_indent lowered else lowered)
-    b
-  |> List.flatten |> String.concat "\n"
+  let ctrl_gen = make_jvm_ctrl_gen () in
+  List.map (lower_instruction ctrl_gen clazz) b
+  |> List.flatten
+  (* slightly dodgy bodge to only apply indent to labels *)
+  |> List.map (fun i ->
+         if String.starts_with ~prefix:"L" i then i else indent ^ i)
+  |> String.concat "\n"
 
 let lower_constructor_args args =
   List.map

@@ -123,11 +123,28 @@ let rec compile_expr label_gen env e =
       @@ Invalid_argument "Attempted to lower unsupported expr to linear_ir"
 
 and compile_bop label_gen env e0 e1 = function
-  | (ADD | SUB | MUL | DIV | LT | GT) as intop ->
+  | (ADD | SUB | MUL | DIV) as int_to_int_op ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
+      let standardise_bop = function
+        | Common.ADD -> Instruction.ADD
+        | SUB -> SUB
+        | MUL -> MUL
+        | DIV -> DIV
+        | _ -> assert false
+      in
       ( defs0 @ defs1,
-        c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP intop; BOX_INT ] )
+        c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ]
+        @ [ BOP (standardise_bop int_to_int_op); BOX_INT ] )
+  | (LT | GT) as int_to_bool_op ->
+      let defs0, c0 = compile_expr label_gen env e0 in
+      let defs1, c1 = compile_expr label_gen env e1 in
+      let standard_bop =
+        if int_to_bool_op = LT then Instruction.LT else Instruction.GT
+      in
+      ( defs0 @ defs1,
+        c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP standard_bop; BOX_BOOL ]
+      )
   | AND ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in

@@ -1,3 +1,6 @@
+(* standard binary op - not a short circuiting operator *)
+type standard_bop = ADD | SUB | MUL | DIV | EQ | LT | GT [@@deriving show]
+
 type instruction =
   | PUSH_INT of int
   | BOX_INT
@@ -11,7 +14,7 @@ type instruction =
   | IFNONZERO of string
   | GOTO of string
   | LABEL of string
-  | BOP of Common.bop
+  | BOP of standard_bop
   | LOAD_FIELD of string * Typing.Typed_ast.type_expr
   | STORE_FIELD of string * Typing.Typed_ast.type_expr
   | ALLOC_CLOSURE of string
