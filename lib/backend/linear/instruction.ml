@@ -16,8 +16,9 @@ type instruction =
   | CONSTRUCT_CLOSURE of string * Typing.Typed_ast.type_expr list
   (* save return type in order to cast *)
   | APPLY of Typing.Typed_ast.type_expr
-  (* load a static field from stdlib *)
-  | LOAD_STD of string * Typing.Typed_ast.type_expr
+  (* class, field, type *)
+  | LOAD_STATIC of string * string * Typing.Typed_ast.type_expr
+  | STORE_STATIC of string * string * Typing.Typed_ast.type_expr
 [@@deriving show]
 
 type closure =

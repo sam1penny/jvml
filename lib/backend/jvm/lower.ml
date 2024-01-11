@@ -53,8 +53,10 @@ let lower_instruction clazz = function
          (Ljava/lang/Object;)Ljava/lang/Object; 2";
         sprintf "checkcast %s" (lower_type ty);
       ]
-  | LOAD_STD (f, ty) ->
-      [ sprintf "getstatic Field Std %s L%s;" f (lower_type ty) ]
+  | LOAD_STATIC (clazz, f, ty) ->
+      [ sprintf "getstatic Field %s %s L%s;" clazz f (lower_type ty) ]
+  | STORE_STATIC (clazz, f, ty) ->
+      [ sprintf "putstatic Field %s %s L%s;" clazz f (lower_type ty) ]
 
 let lower_body indent clazz b =
   List.map (lower_instruction clazz) b
@@ -120,12 +122,20 @@ let lower_closure = function
         (lower_type arg)
         (lower_body "    " name body)
 
-(* todo - remove printing bodge, add print statement to the language *)
+let lower_field_defs p =
+  List.filter_map
+    (function STORE_STATIC (_, f, ty) -> Some (f, ty) | _ -> None)
+    p
+  |> List.map (fun (f, ty) ->
+         sprintf ".field public static %s L%s;" f (lower_type ty))
+  |> String.concat "\n"
+
 let produce_instruction_bytecode p =
   sprintf
     {|
 .class public Foo
 .super java/lang/Object
+%s
 .method public static main : ([Ljava/lang/String;)V
     .code stack 13 locals 13
 %s
@@ -134,6 +144,7 @@ let produce_instruction_bytecode p =
 .end method
 .end class
 |}
+    (lower_field_defs p)
     (lower_body "        " "Foo" p)
 
 let stdlib =

@@ -7,6 +7,7 @@ type label_generators = {
   ctrl_label : unit -> string;
   ref_label : unit -> string;
   lambda_label : unit -> string;
+  static_label : unit -> string;
 }
 
 let make_counter () =
@@ -24,11 +25,16 @@ let make_lambda_gen () =
   let cnt = make_counter () in
   fun () -> "Lambda$" ^ cnt ()
 
+let make_static_gen () =
+  let cnt = make_counter () in
+  fun () -> "SF" ^ cnt ()
+
 let make_generators () =
   {
     ctrl_label = make_ctrl_gen ();
     ref_label = make_counter ();
     lambda_label = make_lambda_gen ();
+    static_label = make_static_gen ();
   }
 
 let reset_per_func_generators g =
@@ -149,7 +155,7 @@ and compile_lambda label_gen env (arg_type, return_type, x, e) =
   in
   let body_env =
     List.fold_left
-      (fun acc (name, ty) -> Value_env.add_field name (name, ty) acc)
+      (fun acc (name, ty) -> Value_env.add_instance_field name (name, ty) acc)
       body_env fvars_with_types
   in
   let defs, ecode = compile_expr body_label_gen body_env e in
@@ -162,10 +168,12 @@ and compile_lambda label_gen env (arg_type, return_type, x, e) =
     @ [ CONSTRUCT_CLOSURE (closure_label, List.rev fvar_types) ] )
 
 let compile_decl label_gen env = function
-  | Val (_, _, x, e) ->
+  | Val (_, ty, x, e) ->
       let defs, c = compile_expr label_gen env e in
-      let x_label = label_gen.ref_label () in
-      (defs, c @ [ STORE_REF x_label ], Value_env.add_local_var x x_label env)
+      let x_label = label_gen.static_label () in
+      ( defs,
+        c @ [ STORE_STATIC ("Foo", x_label, ty) ],
+        Value_env.add_static_field x ("Foo", x_label, ty) env )
   | _ ->
       raise
       @@ Invalid_argument
