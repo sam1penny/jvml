@@ -29,6 +29,7 @@ let lower_instruction clazz = function
   | BOX_INT ->
       [ "invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;" ]
   | UNBOX_INT -> [ "invokevirtual Method java/lang/Integer intValue ()I" ]
+  | PUSH_UNIT -> [ "getstatic Field Unit INSTANCE LUnit;" ]
   | BOP bop -> [ lower_bop bop ]
   | STORE_REF r -> [ sprintf "astore %s" r ]
   | LOAD_REF r -> [ sprintf "aload %s" r ]
@@ -146,6 +147,20 @@ let stdlib =
       aload_0
       invokespecial Method java/lang/Object <init> ()V
       return
+    .end code
+.end method
+
+.method public toString : ()Ljava/lang/String;
+    .code stack 1 locals 1
+L0:     ldc "()"
+L2:     areturn
+L3:
+        .linenumbertable
+            L0 7
+        .end linenumbertable
+        .localvariabletable
+            0 is this LUnit; from L0 to L3
+        .end localvariabletable
     .end code
 .end method
 

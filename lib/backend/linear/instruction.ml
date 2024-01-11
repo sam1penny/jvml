@@ -2,6 +2,7 @@ type instruction =
   | PUSH_INT of int
   | BOX_INT
   | UNBOX_INT
+  | PUSH_UNIT
   | STORE_REF of string
   | LOAD_REF of string
   | IFZERO of string

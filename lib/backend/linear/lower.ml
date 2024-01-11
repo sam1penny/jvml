@@ -87,6 +87,7 @@ let rec compile_expr label_gen env e =
   | Int (_, i) -> ([], [ PUSH_INT i; BOX_INT ])
   | Bool (_, b) -> ([], [ PUSH_INT (if b then 1 else 0); BOX_INT ])
   | Ident (_, _, x) -> ([], Value_env.lookup x env)
+  | Unit _ -> ([], [ PUSH_UNIT ])
   | Bop (_, _, e0, bop, e1) -> compile_bop label_gen env e0 e1 bop
   | If (_, _, e0, e1, e2) ->
       let else_label = label_gen.ctrl_label () in
