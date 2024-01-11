@@ -41,7 +41,6 @@ let lower_instruction clazz = function
   | STORE_FIELD (f, ty) ->
       [ sprintf "putfield Field %s %s L%s;" clazz f (lower_type ty) ]
   | ALLOC_CLOSURE name -> [ sprintf "new %s" name; "dup" ]
-  (* todo - link to actual closure arguments *)
   | CONSTRUCT_CLOSURE (name, tys) ->
       [
         sprintf "invokespecial Method %s <init> (%s)V" name
