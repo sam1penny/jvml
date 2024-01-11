@@ -21,17 +21,13 @@ type instruction =
   | STORE_STATIC of string * string * Typing.Typed_ast.type_expr
 [@@deriving show]
 
-type closure =
-  (*
-  name, (fvar name, fvar type) list
-  arg type, return type, body
-  *)
-  | CLOSURE of
-      string
-      * (string * Typing.Typed_ast.type_expr) list
-      * Typing.Typed_ast.type_expr
-      * Typing.Typed_ast.type_expr
-      * instruction list
+type closure = {
+  name : string;
+  constructor_args : (string * Typing.Typed_ast.type_expr) list;
+  arg_type : Typing.Typed_ast.type_expr;
+  return_type : Typing.Typed_ast.type_expr;
+  body : instruction list;
+}
 [@@deriving show]
 
 let show_program p = List.map show_instruction p |> String.concat "\n"

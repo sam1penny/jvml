@@ -160,7 +160,13 @@ and compile_lambda label_gen env (arg_type, return_type, x, e) =
   in
   let defs, ecode = compile_expr body_label_gen body_env e in
   let closure =
-    CLOSURE (closure_label, fvars_with_types, arg_type, return_type, ecode)
+    {
+      name = closure_label;
+      constructor_args = fvars_with_types;
+      arg_type;
+      return_type;
+      body = ecode;
+    }
   in
   ( defs @ [ closure ],
     [ ALLOC_CLOSURE closure_label ]

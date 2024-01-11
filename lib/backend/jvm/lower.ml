@@ -85,11 +85,10 @@ let lower_constructor_body indent name constructor_args =
   |> String.concat "\n"
 
 (* todo - determine actual limits for stack and local variable sizes *)
-let lower_closure = function
-  | CLOSURE (name, constructor_args, arg, _, body) ->
-      let indent = "    " in
-      sprintf
-        {|
+let lower_closure c =
+  let indent = "    " in
+  sprintf
+    {|
 .class public %s
 .super java/lang/Object
 .implements java/util/function/Function
@@ -115,12 +114,12 @@ let lower_closure = function
 .end method
 .end class
     |}
-        name
-        (lower_constructor_args constructor_args)
-        (List.map (fun (_, ty) -> ty) constructor_args |> lower_type_list)
-        (lower_constructor_body indent name constructor_args)
-        (lower_type arg)
-        (lower_body "    " name body)
+    c.name
+    (lower_constructor_args c.constructor_args)
+    (List.map (fun (_, ty) -> ty) c.constructor_args |> lower_type_list)
+    (lower_constructor_body indent c.name c.constructor_args)
+    (lower_type c.arg_type)
+    (lower_body "    " c.name c.body)
 
 let lower_field_defs p =
   List.filter_map
