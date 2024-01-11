@@ -61,11 +61,16 @@ let lower_instruction clazz = function
   | STORE_STATIC (clazz, f, ty) ->
       [ sprintf "putstatic Field %s %s L%s;" clazz f (lower_type ty) ]
 
+let should_indent = function LABEL _ -> false | _ -> true
+
 let lower_body indent clazz b =
-  List.map (lower_instruction clazz) b
-  |> List.flatten
-  |> List.map (fun x -> indent ^ x)
-  |> String.concat "\n"
+  let apply_indent = List.map (fun i -> indent ^ i) in
+  List.map
+    (fun i ->
+      let lowered = lower_instruction clazz i in
+      if should_indent i then apply_indent lowered else lowered)
+    b
+  |> List.flatten |> String.concat "\n"
 
 let lower_constructor_args args =
   List.map
