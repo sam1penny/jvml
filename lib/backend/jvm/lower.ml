@@ -9,6 +9,7 @@ let lower_type =
   | TyBool -> "java/lang/Boolean"
   | TyFun _ -> "java/util/function/Function"
   | TyVar _ -> "java/lang/Object"
+  | TyUnit -> "Unit"
   | _ -> raise @@ Failure "attempted to lower unsupported type"
 
 let lower_type_list tys =
@@ -51,6 +52,8 @@ let lower_instruction clazz = function
          (Ljava/lang/Object;)Ljava/lang/Object; 2";
         sprintf "checkcast %s" (lower_type ty);
       ]
+  | LOAD_STD (f, ty) ->
+      [ sprintf "getstatic Field Std %s L%s;" f (lower_type ty) ]
 
 let lower_body indent clazz b =
   List.map (lower_instruction clazz) b
@@ -124,16 +127,99 @@ let produce_instruction_bytecode p =
 .super java/lang/Object
 .method public static main : ([Ljava/lang/String;)V
     .code stack 13 locals 13
-        getstatic Field java/lang/System out Ljava/io/PrintStream;
 %s
-        aload 2
-        invokevirtual Method java/io/PrintStream println (Ljava/lang/Object;)V
         return
   .end code
 .end method
 .end class
 |}
     (lower_body "        " "Foo" p)
+
+let stdlib =
+  {|
+.class public super Unit
+.super java/lang/Object
+.field public static INSTANCE LUnit;
+
+.method private <init> : ()V
+    .code stack 1 locals 1
+      aload_0
+      invokespecial Method java/lang/Object <init> ()V
+      return
+    .end code
+.end method
+
+.method static <clinit> : ()V
+    .code stack 2 locals 0
+      new Unit
+      dup
+      invokespecial Method Unit <init> ()V
+      putstatic Field Unit INSTANCE LUnit;
+      return
+    .end code
+.end method
+.end class
+
+.version 62 0
+.class public super Std
+.super java/lang/Object
+.field public static print Ljava/util/function/Function; .fieldattributes
+    .signature Ljava/util/function/Function<Ljava/lang/Object;LUnit;>;
+.end fieldattributes
+
+.method public <init> : ()V
+    .code stack 1 locals 1
+L0:     aload_0
+L1:     invokespecial Method java/lang/Object <init> ()V
+L4:     return
+L5:
+        .linenumbertable
+            L0 3
+        .end linenumbertable
+        .localvariabletable
+            0 is this LStd; from L0 to L5
+        .end localvariabletable
+    .end code
+.end method
+
+.method private static synthetic lambda$static$0 : (Ljava/lang/Object;)LUnit;
+    .code stack 2 locals 1
+L0:     getstatic Field java/lang/System out Ljava/io/PrintStream;
+L3:     aload_0
+L4:     invokevirtual Method java/io/PrintStream println (Ljava/lang/Object;)V
+L7:     getstatic Field Unit INSTANCE LUnit;
+L10:    areturn
+L11:
+        .linenumbertable
+            L0 5
+            L7 6
+        .end linenumbertable
+        .localvariabletable
+            0 is x Ljava/lang/Object; from L0 to L11
+        .end localvariabletable
+    .end code
+.end method
+
+.method static <clinit> : ()V
+    .code stack 1 locals 0
+L0:     invokedynamic [_25]
+L5:     putstatic Field Std print Ljava/util/function/Function;
+L8:     return
+L9:
+        .linenumbertable
+            L0 4
+        .end linenumbertable
+    .end code
+.end method
+.sourcefile "Std.java"
+.bootstrapmethods
+.innerclasses
+    java/lang/invoke/MethodHandles$Lookup java/lang/invoke/MethodHandles Lookup public static final
+.end innerclasses
+.const [_25] = InvokeDynamic invokeStatic Method java/lang/invoke/LambdaMetafactory metafactory (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; MethodType (Ljava/lang/Object;)Ljava/lang/Object; [_59] MethodType (Ljava/lang/Object;)LUnit; : apply ()Ljava/util/function/Function;
+.const [_59] = MethodHandle invokeStatic Method Std lambda$static$0 (Ljava/lang/Object;)LUnit;
+.end class
+|}
 
 (*
 --- MAIN METHOD FOR USING GENERATED CLOSURE ---

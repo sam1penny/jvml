@@ -144,7 +144,7 @@ and compile_lambda label_gen env (arg_type, return_type, x, e) =
   let body_label_gen = reset_per_func_generators label_gen in
 
   let body_env =
-    Value_env.empty |> Value_env.add_local_var x (body_label_gen.ref_label ())
+    Value_env.stdlib |> Value_env.add_local_var x (body_label_gen.ref_label ())
   in
   let body_env =
     List.fold_left
@@ -172,7 +172,7 @@ let compile_decl label_gen env = function
 
 let compile_decl_from_scratch d =
   let generators = make_generators () in
-  let defs, code, _ = compile_decl generators Value_env.empty d in
+  let defs, code, _ = compile_decl generators Value_env.stdlib d in
   (defs, code)
 
 let compile_program_from_scratch p =
@@ -181,5 +181,5 @@ let compile_program_from_scratch p =
     (fun (defsacc, codeacc, envacc) d ->
       let defs, code, env = compile_decl generators envacc d in
       (defsacc @ defs, codeacc @ code, env))
-    ([], [], Value_env.empty) p
+    ([], [], Value_env.stdlib) p
   |> fun (defs, code, _) -> (defs, code)
