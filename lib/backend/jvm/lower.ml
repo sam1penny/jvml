@@ -29,6 +29,9 @@ let lower_instruction clazz = function
   | BOX_INT ->
       [ "invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;" ]
   | UNBOX_INT -> [ "invokevirtual Method java/lang/Integer intValue ()I" ]
+  | BOX_BOOL ->
+      [ "invokestatic Method java/lang/Boolean valueOf (Z)Ljava/lang/Boolean;" ]
+  | UNBOX_BOOL -> [ "invokevirtual Method java/lang/Boolean booleanValue ()Z" ]
   | PUSH_UNIT -> [ "getstatic Field Unit INSTANCE LUnit;" ]
   | BOP bop -> [ lower_bop bop ]
   | STORE_REF r -> [ sprintf "astore %s" r ]

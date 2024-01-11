@@ -91,7 +91,7 @@ let free_vars_with_types_expr bound e =
 let rec compile_expr label_gen env e =
   match e with
   | Int (_, i) -> ([], [ PUSH_INT i; BOX_INT ])
-  | Bool (_, b) -> ([], [ PUSH_INT (if b then 1 else 0); BOX_INT ])
+  | Bool (_, b) -> ([], [ PUSH_INT (if b then 1 else 0); BOX_BOOL ])
   | Ident (_, _, x) -> ([], Value_env.lookup x env)
   | Unit _ -> ([], [ PUSH_UNIT ])
   | Bop (_, _, e0, bop, e1) -> compile_bop label_gen env e0 e1 bop
@@ -128,15 +128,17 @@ and compile_bop label_gen env e0 e1 = function
       let defs1, c1 = compile_expr label_gen env e1 in
       ( defs0 @ defs1,
         c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP intop; BOX_INT ] )
+  (* todo - make short circuiting *)
+  | (AND | OR) as boolop ->
+      let defs0, c0 = compile_expr label_gen env e0 in
+      let defs1, c1 = compile_expr label_gen env e1 in
+      ( defs0 @ defs1,
+        c0 @ [ UNBOX_BOOL ] @ c1 @ [ UNBOX_BOOL ] @ [ BOP boolop; BOX_BOOL ] )
   (* polymorphic eq *)
   | EQ ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
       (defs0 @ defs1, c0 @ c1 @ [ BOP EQ ])
-  | _ ->
-      raise
-      @@ Invalid_argument
-           "Attempted to lower unsupported binary operator to linear_ir"
 
 and compile_lambda label_gen env (arg_type, return_type, x, e) =
   let fvars_with_types =
