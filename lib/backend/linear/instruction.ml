@@ -8,6 +8,7 @@ type instruction =
   | STORE_REF of string
   | LOAD_REF of string
   | IFZERO of string
+  | IFNONZERO of string
   | GOTO of string
   | LABEL of string
   | BOP of Common.bop

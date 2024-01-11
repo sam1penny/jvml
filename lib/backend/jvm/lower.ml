@@ -37,6 +37,7 @@ let lower_instruction clazz = function
   | STORE_REF r -> [ sprintf "astore %s" r ]
   | LOAD_REF r -> [ sprintf "aload %s" r ]
   | IFZERO l -> [ sprintf "ifeq %s" l ]
+  | IFNONZERO l -> [ sprintf "ifne %s" l ]
   | GOTO l -> [ sprintf "goto %s" l ]
   | LABEL l -> [ sprintf "%s:" l ]
   | LOAD_FIELD (f, ty) ->

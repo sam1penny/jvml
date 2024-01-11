@@ -128,12 +128,44 @@ and compile_bop label_gen env e0 e1 = function
       let defs1, c1 = compile_expr label_gen env e1 in
       ( defs0 @ defs1,
         c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP intop; BOX_INT ] )
-  (* todo - make short circuiting *)
-  | (AND | OR) as boolop ->
+  | AND ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
+      let false_label = label_gen.ctrl_label () in
+      let after_label = label_gen.ctrl_label () in
       ( defs0 @ defs1,
-        c0 @ [ UNBOX_BOOL ] @ c1 @ [ UNBOX_BOOL ] @ [ BOP boolop; BOX_BOOL ] )
+        c0
+        @ [ UNBOX_BOOL; IFZERO false_label ]
+        @ c1
+        @ [ UNBOX_BOOL; IFZERO false_label ]
+        @ [
+            PUSH_INT 1;
+            BOX_BOOL;
+            GOTO after_label;
+            LABEL false_label;
+            PUSH_INT 0;
+            BOX_BOOL;
+            LABEL after_label;
+          ] )
+  | OR ->
+      let defs0, c0 = compile_expr label_gen env e0 in
+      let defs1, c1 = compile_expr label_gen env e1 in
+      let true_label = label_gen.ctrl_label () in
+      let after_label = label_gen.ctrl_label () in
+      ( defs0 @ defs1,
+        c0
+        @ [ UNBOX_BOOL; IFNONZERO true_label ]
+        @ c1
+        @ [ UNBOX_BOOL; IFNONZERO true_label ]
+        @ [
+            PUSH_INT 0;
+            BOX_BOOL;
+            GOTO after_label;
+            LABEL true_label;
+            PUSH_INT 1;
+            BOX_BOOL;
+            LABEL after_label;
+          ] )
   (* polymorphic eq *)
   | EQ ->
       let defs0, c0 = compile_expr label_gen env e0 in
