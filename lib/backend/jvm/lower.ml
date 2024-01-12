@@ -174,6 +174,21 @@ L14:    return
 
     .end code
 .end method
+
+.method public toString : ()Ljava/lang/String;
+    .code stack 3 locals 1
+L0:     new java/lang/StringBuilder
+L3:     dup
+L4:     ldc "%s "
+L6:     invokespecial Method java/lang/StringBuilder <init> (Ljava/lang/String;)V
+%s
+L16:    invokevirtual Method java/lang/StringBuilder toString ()Ljava/lang/String;
+L19:    areturn
+
+    .end code
+.end method
+
+
 .end class
 |}
     vc.name vc.tname
@@ -189,6 +204,18 @@ L14:    return
            "aload_0";
            "aload_1";
            sprintf "putfield Field %s val L%s;" vc.name (lower_type arg);
+         ]
+         |> String.concat "\n")
+       vc.arg
+    |> Option.value ~default:"")
+    vc.name
+    (Option.map
+       (fun arg ->
+         [
+           "aload_0";
+           sprintf "getfield Field %s val L%s;" vc.name (lower_type arg);
+           "invokevirtual Method java/lang/StringBuilder append \
+            (Ljava/lang/Object;)Ljava/lang/StringBuilder;";
          ]
          |> String.concat "\n")
        vc.arg
