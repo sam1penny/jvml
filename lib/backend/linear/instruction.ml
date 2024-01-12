@@ -36,4 +36,20 @@ type closure = {
 }
 [@@deriving show]
 
+type type_interface = { name : string; constructors : string list }
+[@@deriving show]
+
+type constructor = {
+  name : string;
+  tname : string;
+  arg : Typing.Typed_ast.type_expr option;
+}
+[@@deriving show]
+
+type declaration =
+  | Closure of closure
+  | Type_interface of type_interface
+  | Constructor of constructor
+[@@deriving show]
+
 let show_program p = List.map show_instruction p |> String.concat "\n"

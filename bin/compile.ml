@@ -31,5 +31,5 @@ let () =
   in
   let decs, instructions = Linear.Driver.compile_program prog in
   print_endline Jvm.Lower.stdlib;
-  List.iter (fun x -> Jvm.Lower.lower_closure x |> print_endline) decs;
+  List.iter (fun x -> Jvm.Lower.lower_declaration x |> print_endline) decs;
   Jvm.Lower.produce_instruction_bytecode instructions |> print_endline

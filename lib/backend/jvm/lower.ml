@@ -9,6 +9,7 @@ let lower_type =
   | TyFun _ -> "java/util/function/Function"
   | TyVar _ -> "java/lang/Object"
   | TyUnit -> "Unit"
+  | TyCustom (_, c) -> String.capitalize_ascii c
   | _ -> raise @@ Failure "attempted to lower unsupported type"
 
 let lower_type_list tys =
@@ -107,7 +108,7 @@ let lower_constructor_body indent name constructor_args =
   |> String.concat "\n"
 
 (* todo - determine actual limits for stack and local variable sizes *)
-let lower_closure c =
+let lower_closure (c : closure) =
   let indent = "    " in
   sprintf
     {|
@@ -142,6 +143,61 @@ let lower_closure c =
     (lower_constructor_body indent c.name c.constructor_args)
     (lower_type c.arg_type)
     (lower_body "    " c.name c.body)
+
+let lower_type_interface (ti : type_interface) =
+  sprintf
+    {|
+.version 62 0
+.class public interface abstract %s
+.super java/lang/Object
+.permittedsubclasses %s
+.end class
+|}
+    ti.name
+    (String.concat " " ti.constructors)
+
+let lower_value_constructor (vc : constructor) =
+  sprintf
+    {|
+.version 62 0
+.class public final super %s
+.super java/lang/Object
+.implements %s
+%s
+
+.method public <init> : (%s)V
+    .code stack 2 locals 3
+L0:     aload_0
+L1:     invokespecial Method java/lang/Object <init> ()V
+%s
+L14:    return
+
+    .end code
+.end method
+.end class
+|}
+    vc.name vc.tname
+    (Option.map
+       (fun arg -> sprintf ".field public val L%s;" (lower_type arg))
+       vc.arg
+    |> Option.value ~default:"")
+    (Option.map (fun arg -> "L" ^ lower_type arg ^ ";") vc.arg
+    |> Option.value ~default:"")
+    (Option.map
+       (fun arg ->
+         [
+           "aload_0";
+           "aload_1";
+           sprintf "putfield Field %s val L%s;" vc.name (lower_type arg);
+         ]
+         |> String.concat "\n")
+       vc.arg
+    |> Option.value ~default:"")
+
+let lower_declaration = function
+  | Closure c -> lower_closure c
+  | Type_interface ti -> lower_type_interface ti
+  | Constructor c -> lower_value_constructor c
 
 let lower_field_defs p =
   List.filter_map

@@ -107,7 +107,7 @@ let rec compile_expr label_gen env e =
         @ c1
         @ [ GOTO after_label; LABEL else_label ]
         @ c2 @ [ LABEL after_label ] )
-  | Fun (_, t0, t1, x, e) -> compile_lambda label_gen env (t0, t1, x, e)
+  | Fun (_, t0, t1, x, e) -> compile_lambda_expr label_gen env (t0, t1, x, e)
   | App (_, ty, e0, e1) ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
@@ -118,6 +118,7 @@ let rec compile_expr label_gen env e =
       let env_with_x = Value_env.add_local_var x x_label env in
       let defs1, c1 = compile_expr label_gen env_with_x e1 in
       (defs0 @ defs1, c0 @ [ STORE_REF x_label ] @ c1)
+  | Constr (_, _, cname) -> ([], Value_env.lookup cname env)
   | _ ->
       raise
       @@ Invalid_argument "Attempted to lower unsupported expr to linear_ir"
@@ -189,16 +190,12 @@ and compile_bop label_gen env e0 e1 = function
       let defs1, c1 = compile_expr label_gen env e1 in
       (defs0 @ defs1, c0 @ c1 @ [ BOP EQ ])
 
-and compile_lambda label_gen env (arg_type, return_type, x, e) =
+and compile_lambda_expr label_gen env (arg_type, return_type, x, e) =
   let fvars_with_types =
     free_vars_with_types_expr (StringSet.singleton x) e
     |> StringMap.to_seq |> List.of_seq
   in
-  let fvars = List.map (fun (x, _) -> x) fvars_with_types in
-  let fvar_types = List.map (fun (_, y) -> y) fvars_with_types in
-  let fetch_fvars = List.map (fun x -> Value_env.lookup x env) fvars in
 
-  let closure_label = label_gen.lambda_label () in
   let body_label_gen = reset_per_func_generators label_gen in
 
   let body_env =
@@ -210,19 +207,58 @@ and compile_lambda label_gen env (arg_type, return_type, x, e) =
       body_env fvars_with_types
   in
   let defs, ecode = compile_expr body_label_gen body_env e in
+  compile_lambda label_gen env fvars_with_types defs
+    (arg_type, return_type, ecode)
+
+and compile_lambda label_gen env fvars_with_types defs
+    (arg_type, return_type, body_code) =
+  let fvars = List.map (fun (x, _) -> x) fvars_with_types in
+  let fvar_types = List.map (fun (_, y) -> y) fvars_with_types in
+  let fetch_fvars = List.map (fun x -> Value_env.lookup x env) fvars in
+
+  let closure_label = label_gen.lambda_label () in
+
   let closure =
-    {
-      name = closure_label;
-      constructor_args = fvars_with_types;
-      arg_type;
-      return_type;
-      body = ecode;
-    }
+    Closure
+      {
+        name = closure_label;
+        constructor_args = fvars_with_types;
+        arg_type;
+        return_type;
+        body = body_code;
+      }
   in
   ( defs @ [ closure ],
     [ ALLOC_CLOSURE closure_label ]
     @ (List.rev fetch_fvars |> List.flatten)
     @ [ CONSTRUCT_CLOSURE (closure_label, List.rev fvar_types) ] )
+
+let lower_type_constructor tname (DeclConstr (_, cname, type_expr_opt)) =
+  Constructor { name = cname; tname; arg = type_expr_opt }
+
+let lambda_for_constructor label_gen env cname typedef_texpr arg =
+  match arg with
+  | None ->
+      ( [],
+        [
+          ALLOC_CLOSURE cname;
+          CONSTRUCT_CLOSURE (cname, []);
+          STORE_STATIC ("Foo", cname, typedef_texpr);
+        ],
+        Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
+  | Some ty ->
+      let body =
+        [ ALLOC_CLOSURE cname; LOAD_REF "1"; CONSTRUCT_CLOSURE (cname, [ ty ]) ]
+      in
+      let fvars_with_types = [] in
+
+      let defs, code =
+        compile_lambda label_gen env fvars_with_types []
+          (ty, typedef_texpr, body)
+      in
+      ( defs,
+        code @ [ STORE_STATIC ("Foo", cname, typedef_texpr) ],
+        Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
 
 let compile_decl label_gen env = function
   | Val (_, ty, x, e) ->
@@ -231,10 +267,32 @@ let compile_decl label_gen env = function
       ( defs,
         c @ [ STORE_STATIC ("Foo", x_label, ty) ],
         Value_env.add_static_field x ("Foo", x_label, ty) env )
-  | _ ->
-      raise
-      @@ Invalid_argument
-           "Attempted to lower unsupported declaration to linear_ir"
+  | Type (_, ty, _, tname, type_constructors) ->
+      let class_tname = String.capitalize_ascii tname in
+      let typei =
+        Type_interface
+          {
+            name = class_tname;
+            constructors =
+              List.map
+                (function DeclConstr (_, cname, _) -> cname)
+                type_constructors;
+          }
+      in
+      let tconstrs =
+        List.map (lower_type_constructor class_tname) type_constructors
+      in
+      (* current bodge - adding static fields for creating constructors *)
+      let defs, code, env =
+        List.fold_left
+          (fun (accdefs, acccode, env) (DeclConstr (_, cname, type_expr_op)) ->
+            let defs, code, env =
+              lambda_for_constructor label_gen env cname ty type_expr_op
+            in
+            (defs @ accdefs, code @ acccode, env))
+          ([], [], env) type_constructors
+      in
+      ([ typei ] @ tconstrs @ defs, code, env)
 
 let compile_decl_from_scratch d =
   let generators = make_generators () in
