@@ -1,19 +1,24 @@
 open Linear.Instruction
 open Printf
 
-let lower_type =
-  let open Typing.Typed_ast in
-  function
+let rec lower_type = function
   | TyInt -> "java/lang/Integer"
   | TyBool -> "java/lang/Boolean"
   | TyFun _ -> "java/util/function/Function"
-  | TyVar _ -> "java/lang/Object"
+  | TyAny -> "java/lang/Object"
   | TyUnit -> "Unit"
-  | TyCustom (_, c) -> String.capitalize_ascii c
+  | TyCustom c -> String.capitalize_ascii c
   | TyTuple _ -> "Tuple"
+  | TyArray t -> lower_type t
+
+let rec lower_type_as_descriptor ty =
+  match ty with
+  | TyInt | TyBool | TyFun _ | TyAny | TyUnit | TyCustom _ | TyTuple _ ->
+      "L" ^ lower_type ty ^ ";"
+  | TyArray t -> "[" ^ lower_type_as_descriptor t
 
 let lower_type_list tys =
-  List.map (fun t -> "L" ^ lower_type t ^ ";") tys |> String.concat ""
+  List.map lower_type_as_descriptor tys |> String.concat ""
 
 let make_jvm_ctrl_gen () =
   let cnt = Linear.Lower.make_counter () in
@@ -57,18 +62,18 @@ let lower_instruction ctrl_gen clazz = function
   | GOTO l -> [ sprintf "goto %s" l ]
   | LABEL l -> [ sprintf "%s:" l ]
   | LOAD_FIELD (f, ty) ->
-      [ sprintf "getfield Field %s %s L%s;" clazz f (lower_type ty) ]
+      [
+        sprintf "getfield Field %s %s %s" clazz f (lower_type_as_descriptor ty);
+      ]
   | STORE_FIELD (f, ty) ->
-      [ sprintf "putfield Field %s %s L%s;" clazz f (lower_type ty) ]
+      [
+        sprintf "putfield Field %s %s %s" clazz f (lower_type_as_descriptor ty);
+      ]
   | ALLOC_OBJ name -> [ sprintf "new %s" name; "dup" ]
   | CONSTRUCT_OBJ (name, tys) ->
       [
-        (if name = "Tuple" then
-           sprintf "invokespecial Method %s <init> ([%s)V" name
-             (lower_type_list tys)
-         else
-           sprintf "invokespecial Method %s <init> (%s)V" name
-             (lower_type_list tys));
+        sprintf "invokespecial Method %s <init> (%s)V" name
+          (lower_type_list tys);
       ]
   | ALLOC_ARRAY name -> [ sprintf "anewarray %s" name ]
   | STORE_ARRAY -> [ "aastore" ]

@@ -74,18 +74,17 @@ let%expect_test "test compiling simple type union" =
   Dog
   |}]
 
-(*
 let%expect_test "test compiling simple type product" =
-  let program ={|
+  let program =
+    {|
   type assoc = Entry of (int * bool)
   val x = print (Entry (1, true))
   |}
-in
+  in
   let _ = build_and_run program in
   [%expect {|
-  Entry [1, true]
+  Entry ([1, true])
   |}]
-*)
 
 let%expect_test "test recursive type product" =
   let program =

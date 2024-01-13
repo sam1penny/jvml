@@ -1,5 +1,6 @@
 open Instruction
-open Typing.Typed_ast
+open Common
+open Typing
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
@@ -40,7 +41,9 @@ let make_generators () =
 let reset_per_func_generators g =
   { g with ctrl_label = make_ctrl_gen (); ref_label = make_counter () }
 
-let rec pattern_bindings = function
+let rec pattern_bindings =
+  let open Typed_ast in
+  function
   | Pat_Int _ | Pat_Bool _ | Pat_Unit _ | Pat_Any _ -> StringSet.empty
   | Pat_Ident (_, _, i) -> StringSet.singleton i
   | Pat_Or (_, _, p0, p1) ->
@@ -52,6 +55,7 @@ let rec pattern_bindings = function
   | Pat_Constr (_, _, _, Some p) -> pattern_bindings p
 
 let free_vars_with_types_expr bound e =
+  let open Typed_ast in
   let takeleft _ x _ = Some x in
   let rec aux bound free = function
     | Int _ | Bool _ | Unit _ | Constr _ -> free
@@ -88,7 +92,18 @@ let free_vars_with_types_expr bound e =
   in
   aux bound StringMap.empty e
 
+let rec convert_type = function
+  | Typed_ast.TyInt -> Instruction.TyInt
+  | Typed_ast.TyBool -> Instruction.TyBool
+  | Typed_ast.TyUnit -> Instruction.TyUnit
+  | Typed_ast.TyVar _ -> Instruction.TyAny
+  | Typed_ast.TyCustom (_, n) -> Instruction.TyCustom n
+  | Typed_ast.TyFun (t0, t1) ->
+      Instruction.TyFun (convert_type t0, convert_type t1)
+  | Typed_ast.TyTuple ts -> Instruction.TyTuple (List.map convert_type ts)
+
 let rec compile_expr label_gen env e =
+  let open Typed_ast in
   match e with
   | Int (_, i) -> ([], [ PUSH_INT i; BOX_INT ])
   | Bool (_, b) -> ([], [ PUSH_BOOL b; BOX_BOOL ])
@@ -107,11 +122,12 @@ let rec compile_expr label_gen env e =
         @ c1
         @ [ GOTO after_label; LABEL else_label ]
         @ c2 @ [ LABEL after_label ] )
-  | Fun (_, t0, t1, x, e) -> compile_lambda_expr label_gen env (t0, t1, x, e)
+  | Fun (_, t0, t1, x, e) ->
+      compile_lambda_expr label_gen env (convert_type t0, convert_type t1, x, e)
   | App (_, ty, e0, e1) ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
-      (defs0 @ defs1, c0 @ c1 @ [ APPLY ty ])
+      (defs0 @ defs1, c0 @ c1 @ [ APPLY (convert_type ty) ])
   | Let (_, _, x, e0, e1) ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let x_label = label_gen.ref_label () in
@@ -125,7 +141,7 @@ let rec compile_expr label_gen env e =
       in
       ( defs,
         [ ALLOC_OBJ "Tuple" ] @ lowered_tuple_code
-        @ [ CONSTRUCT_OBJ ("Tuple", [ TyVar "sam$" ]) ] )
+        @ [ CONSTRUCT_OBJ ("Tuple", [ TyArray TyAny ]) ] )
   | _ ->
       raise
       @@ Invalid_argument "Attempted to lower unsupported expr to linear_ir"
@@ -201,6 +217,7 @@ and compile_lambda_expr label_gen env (arg_type, return_type, x, e) =
   let fvars_with_types =
     free_vars_with_types_expr (StringSet.singleton x) e
     |> StringMap.to_seq |> List.of_seq
+    |> List.map (fun (x, ty) -> (x, convert_type ty))
   in
 
   let body_label_gen = reset_per_func_generators label_gen in
@@ -256,8 +273,10 @@ and lower_tuple_eles_to_array label_gen env es =
   in
   (defs, prelude @ maincode)
 
-let lower_type_constructor tname (DeclConstr (_, cname, type_expr_opt)) =
-  Constructor { name = cname; tname; arg = type_expr_opt }
+let lower_type_constructor tname
+    (Typed_ast.DeclConstr (_, cname, type_expr_opt)) =
+  Constructor
+    { name = cname; tname; arg = Option.map convert_type type_expr_opt }
 
 let lambda_for_constructor label_gen env cname typedef_texpr arg =
   match arg with
@@ -284,13 +303,13 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
         Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
 
 let compile_decl label_gen env = function
-  | Val (_, ty, x, e) ->
+  | Typed_ast.Val (_, ty, x, e) ->
       let defs, c = compile_expr label_gen env e in
       let x_label = label_gen.static_label () in
       ( defs,
-        c @ [ STORE_STATIC ("Foo", x_label, ty) ],
-        Value_env.add_static_field x ("Foo", x_label, ty) env )
-  | Type (_, ty, _, tname, type_constructors) ->
+        c @ [ STORE_STATIC ("Foo", x_label, convert_type ty) ],
+        Value_env.add_static_field x ("Foo", x_label, convert_type ty) env )
+  | Typed_ast.Type (_, ty, _, tname, type_constructors) ->
       let class_tname = String.capitalize_ascii tname in
       let typei =
         Type_interface
@@ -298,7 +317,7 @@ let compile_decl label_gen env = function
             name = class_tname;
             constructors =
               List.map
-                (function DeclConstr (_, cname, _) -> cname)
+                (function Typed_ast.DeclConstr (_, cname, _) -> cname)
                 type_constructors;
           }
       in
@@ -308,9 +327,11 @@ let compile_decl label_gen env = function
       (* current bodge - adding static fields for creating constructors *)
       let defs, code, env =
         List.fold_left
-          (fun (accdefs, acccode, env) (DeclConstr (_, cname, type_expr_op)) ->
+          (fun (accdefs, acccode, env)
+               (Typed_ast.DeclConstr (_, cname, type_expr_op)) ->
             let defs, code, env =
-              lambda_for_constructor label_gen env cname ty type_expr_op
+              lambda_for_constructor label_gen env cname (convert_type ty)
+                (Option.map convert_type type_expr_op)
             in
             (defs @ accdefs, code @ acccode, env))
           ([], [], env) type_constructors

@@ -1,5 +1,4 @@
 open Instruction
-open Typing.Typed_ast
 module StringMap = Map.Make (String)
 
 type source =
@@ -13,7 +12,7 @@ let empty = StringMap.empty
 
 let stdlib =
   StringMap.singleton "print"
-    (Static_field ("Std", "print", TyFun (TyVar "'a", TyUnit)))
+    (Static_field ("Std", "print", TyFun (TyAny, TyUnit)))
 
 let add_local_var k v env = StringMap.add k (Local_var v) env
 
