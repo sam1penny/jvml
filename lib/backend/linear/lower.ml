@@ -119,6 +119,13 @@ let rec compile_expr label_gen env e =
       let defs1, c1 = compile_expr label_gen env_with_x e1 in
       (defs0 @ defs1, c0 @ [ STORE_REF x_label ] @ c1)
   | Constr (_, _, cname) -> ([], Value_env.lookup cname env)
+  | Tuple (_, _, ts) ->
+      let defs, lowered_tuple_code =
+        lower_tuple_eles_to_array label_gen env ts
+      in
+      ( defs,
+        [ ALLOC_OBJ "Tuple" ] @ lowered_tuple_code
+        @ [ CONSTRUCT_OBJ ("Tuple", [ TyVar "sam$" ]) ] )
   | _ ->
       raise
       @@ Invalid_argument "Attempted to lower unsupported expr to linear_ir"
@@ -232,6 +239,22 @@ and compile_lambda label_gen env fvars_with_types defs
     [ ALLOC_OBJ closure_label ]
     @ (List.rev fetch_fvars |> List.flatten)
     @ [ CONSTRUCT_OBJ (closure_label, List.rev fvar_types) ] )
+
+and lower_tuple_eles_to_array label_gen env es =
+  let prelude = [ PUSH_INT (List.length es); ALLOC_ARRAY "java/lang/Object" ] in
+  let main_col =
+    List.mapi
+      (fun i e ->
+        let edefs, ecode = compile_expr label_gen env e in
+        (edefs, [ DUP; PUSH_INT i ] @ ecode @ [ STORE_ARRAY ]))
+      es
+  in
+  let defs, maincode =
+    List.fold_right
+      (fun (defs, code) (accdefs, acccode) -> (defs @ accdefs, code @ acccode))
+      main_col ([], [])
+  in
+  (defs, prelude @ maincode)
 
 let lower_type_constructor tname (DeclConstr (_, cname, type_expr_opt)) =
   Constructor { name = cname; tname; arg = type_expr_opt }

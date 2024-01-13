@@ -21,6 +21,9 @@ type instruction =
   | ALLOC_OBJ of string
   (* closure label, arg_types *)
   | CONSTRUCT_OBJ of string * Typing.Typed_ast.type_expr list
+  | ALLOC_ARRAY of string
+  | STORE_ARRAY
+  | DUP
   (* save return type in order to cast *)
   | APPLY of Typing.Typed_ast.type_expr
   (* class, field, type *)

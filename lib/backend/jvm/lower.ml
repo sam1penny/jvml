@@ -10,7 +10,7 @@ let lower_type =
   | TyVar _ -> "java/lang/Object"
   | TyUnit -> "Unit"
   | TyCustom (_, c) -> String.capitalize_ascii c
-  | _ -> raise @@ Failure "attempted to lower unsupported type"
+  | TyTuple _ -> "Tuple"
 
 let lower_type_list tys =
   List.map (fun t -> "L" ^ lower_type t ^ ";") tys |> String.concat ""
@@ -63,9 +63,16 @@ let lower_instruction ctrl_gen clazz = function
   | ALLOC_OBJ name -> [ sprintf "new %s" name; "dup" ]
   | CONSTRUCT_OBJ (name, tys) ->
       [
-        sprintf "invokespecial Method %s <init> (%s)V" name
-          (lower_type_list tys);
+        (if name = "Tuple" then
+           sprintf "invokespecial Method %s <init> ([%s)V" name
+             (lower_type_list tys)
+         else
+           sprintf "invokespecial Method %s <init> (%s)V" name
+             (lower_type_list tys));
       ]
+  | ALLOC_ARRAY name -> [ sprintf "anewarray %s" name ]
+  | STORE_ARRAY -> [ "aastore" ]
+  | DUP -> [ "dup" ]
   | APPLY ty ->
       [
         "invokeinterface InterfaceMethod java/util/function/Function apply \
@@ -261,6 +268,59 @@ let produce_instruction_bytecode p =
 
 let stdlib =
   {|
+; my custom tuple class
+.version 62 0
+.class public super Tuple
+.super java/lang/Object
+.field public data [Ljava/lang/Object;
+
+.method <init> : ([Ljava/lang/Object;)V
+    .code stack 2 locals 2
+L0:     aload_0
+L1:     invokespecial Method java/lang/Object <init> ()V
+L4:     aload_0
+L5:     aload_1
+L6:     putfield Field Tuple data [Ljava/lang/Object;
+L9:     return
+
+    .end code
+.end method
+
+.method public toString : ()Ljava/lang/String;
+    .code stack 1 locals 1
+L0:     aload_0
+L1:     getfield Field Tuple data [Ljava/lang/Object;
+L4:     invokestatic Method java/util/Arrays toString ([Ljava/lang/Object;)Ljava/lang/String;
+L7:     areturn
+
+    .end code
+.end method
+
+.method public equals : (Ljava/lang/Object;)Z
+    .code stack 2 locals 2
+L0:     aload_0
+L1:     getfield Field Tuple data [Ljava/lang/Object;
+L4:     aload_1
+L5:     checkcast Tuple
+L8:     getfield Field Tuple data [Ljava/lang/Object;
+L11:    invokestatic Method java/util/Arrays equals ([Ljava/lang/Object;[Ljava/lang/Object;)Z
+L14:    ireturn
+
+    .end code
+.end method
+
+.method public hashCode : ()I
+    .code stack 1 locals 1
+L0:     aload_0
+L1:     getfield Field Tuple data [Ljava/lang/Object;
+L4:     invokestatic Method java/util/Arrays hashCode ([Ljava/lang/Object;)I
+L7:     ireturn
+
+    .end code
+.end method
+.sourcefile "Tuple.java"
+.end class
+
 .class public super Unit
 .super java/lang/Object
 .field public static INSTANCE LUnit;
