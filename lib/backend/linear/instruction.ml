@@ -5,6 +5,7 @@ type instruction =
   | PUSH_INT of int
   | BOX_INT
   | UNBOX_INT
+  | PUSH_BOOL of bool
   | BOX_BOOL
   | UNBOX_BOOL
   | PUSH_UNIT

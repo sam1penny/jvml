@@ -44,6 +44,7 @@ let lower_instruction ctrl_gen clazz = function
   | BOX_INT ->
       [ "invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;" ]
   | UNBOX_INT -> [ "invokevirtual Method java/lang/Integer intValue ()I" ]
+  | PUSH_BOOL b -> [ (if b then "iconst_1" else "iconst_0") ]
   | BOX_BOOL ->
       [ "invokestatic Method java/lang/Boolean valueOf (Z)Ljava/lang/Boolean;" ]
   | UNBOX_BOOL -> [ "invokevirtual Method java/lang/Boolean booleanValue ()Z" ]

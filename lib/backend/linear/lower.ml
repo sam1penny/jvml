@@ -91,7 +91,7 @@ let free_vars_with_types_expr bound e =
 let rec compile_expr label_gen env e =
   match e with
   | Int (_, i) -> ([], [ PUSH_INT i; BOX_INT ])
-  | Bool (_, b) -> ([], [ PUSH_INT (if b then 1 else 0); BOX_BOOL ])
+  | Bool (_, b) -> ([], [ PUSH_BOOL b; BOX_BOOL ])
   | Ident (_, _, x) -> ([], Value_env.lookup x env)
   | Unit _ -> ([], [ PUSH_UNIT ])
   | Bop (_, _, e0, bop, e1) -> compile_bop label_gen env e0 e1 bop
@@ -157,11 +157,11 @@ and compile_bop label_gen env e0 e1 = function
         @ c1
         @ [ UNBOX_BOOL; IFZERO false_label ]
         @ [
-            PUSH_INT 1;
+            PUSH_BOOL true;
             BOX_BOOL;
             GOTO after_label;
             LABEL false_label;
-            PUSH_INT 0;
+            PUSH_BOOL false;
             BOX_BOOL;
             LABEL after_label;
           ] )
@@ -176,11 +176,11 @@ and compile_bop label_gen env e0 e1 = function
         @ c1
         @ [ UNBOX_BOOL; IFNONZERO true_label ]
         @ [
-            PUSH_INT 0;
+            PUSH_BOOL false;
             BOX_BOOL;
             GOTO after_label;
             LABEL true_label;
-            PUSH_INT 1;
+            PUSH_BOOL true;
             BOX_BOOL;
             LABEL after_label;
           ] )
