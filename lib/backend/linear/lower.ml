@@ -229,9 +229,9 @@ and compile_lambda label_gen env fvars_with_types defs
       }
   in
   ( defs @ [ closure ],
-    [ ALLOC_CLOSURE closure_label ]
+    [ ALLOC_OBJ closure_label ]
     @ (List.rev fetch_fvars |> List.flatten)
-    @ [ CONSTRUCT_CLOSURE (closure_label, List.rev fvar_types) ] )
+    @ [ CONSTRUCT_OBJ (closure_label, List.rev fvar_types) ] )
 
 let lower_type_constructor tname (DeclConstr (_, cname, type_expr_opt)) =
   Constructor { name = cname; tname; arg = type_expr_opt }
@@ -241,14 +241,14 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
   | None ->
       ( [],
         [
-          ALLOC_CLOSURE cname;
-          CONSTRUCT_CLOSURE (cname, []);
+          ALLOC_OBJ cname;
+          CONSTRUCT_OBJ (cname, []);
           STORE_STATIC ("Foo", cname, typedef_texpr);
         ],
         Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
   | Some ty ->
       let body =
-        [ ALLOC_CLOSURE cname; LOAD_REF "1"; CONSTRUCT_CLOSURE (cname, [ ty ]) ]
+        [ ALLOC_OBJ cname; LOAD_REF "1"; CONSTRUCT_OBJ (cname, [ ty ]) ]
       in
       let fvars_with_types = [] in
 

@@ -17,9 +17,9 @@ type instruction =
   | BOP of standard_bop
   | LOAD_FIELD of string * Typing.Typed_ast.type_expr
   | STORE_FIELD of string * Typing.Typed_ast.type_expr
-  | ALLOC_CLOSURE of string
+  | ALLOC_OBJ of string
   (* closure label, arg_types *)
-  | CONSTRUCT_CLOSURE of string * Typing.Typed_ast.type_expr list
+  | CONSTRUCT_OBJ of string * Typing.Typed_ast.type_expr list
   (* save return type in order to cast *)
   | APPLY of Typing.Typed_ast.type_expr
   (* class, field, type *)
