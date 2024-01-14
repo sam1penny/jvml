@@ -148,6 +148,18 @@ let lower_closure (c : closure) =
     areturn
   .end code
 .end method
+
+.method public equals : (Ljava/lang/Object;)Z
+    .code stack 3 locals 2
+L0:     new java/lang/IllegalStateException
+L3:     dup
+L4:     ldc "should not be able to call equality on lambda function"
+L6:     invokespecial Method java/lang/IllegalStateException <init> (Ljava/lang/String;)V
+L9:     athrow
+
+    .end code
+.end method
+
 .end class
     |}
     c.name

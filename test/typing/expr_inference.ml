@@ -156,3 +156,9 @@ let%expect_test "test ored pattern" =
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
   |> print_string;
   [%expect {|Ok(int)|}]
+
+let%expect_test "test function equality fails" =
+  let x = Bop (Fun ("x", Ident "x"), EQ, Fun ("y", Ident "y")) in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
+  |> print_string;
+  [%expect {|Error|}]

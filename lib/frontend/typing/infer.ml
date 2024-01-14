@@ -302,7 +302,7 @@ let rec type_expr unifications nt env expr =
             find_unified_type unifications t |> instantiate nt bound
           in
           Ok (Typed_ast.Ident (loc, instantiated, v)))
-  | Parsed_ast.Bop (loc, e0, op, e1) ->
+  | Parsed_ast.Bop (loc, e0, op, e1) -> (
       let arg_type = Typed_ast.bop_arg_type nt op in
       type_expr unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_expr_type e0node) arg_type
@@ -312,7 +312,21 @@ let rec type_expr unifications nt env expr =
       unify unifications (get_expr_type e1node) arg_type
         (Parsed_ast.get_expr_loc e1)
       >>=? fun _ ->
-      Ok (Typed_ast.Bop (loc, Typed_ast.bop_return_type op, e0node, op, e1node))
+      match op with
+      | EQ ->
+          if
+            find_unified_type unifications arg_type |> function
+            | Typed_ast.TyFun _ -> true
+            | _ -> false
+          then Error (loc, "Equality of functions not supported!")
+          else
+            Ok
+              (Typed_ast.Bop
+                 (loc, Typed_ast.bop_return_type op, e0node, op, e1node))
+      | _ ->
+          Ok
+            (Typed_ast.Bop
+               (loc, Typed_ast.bop_return_type op, e0node, op, e1node)))
   | Parsed_ast.If (loc, e0, e1, e2) ->
       type_expr unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_expr_type e0node) TyBool
