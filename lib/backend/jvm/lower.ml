@@ -1,6 +1,31 @@
 open Linear.Instruction
 open Printf
 
+let stack_size_change = function
+  | PUSH_INT _ | PUSH_BOOL _ | PUSH_UNIT -> 1
+  | BOX_INT | BOX_BOOL | UNBOX_INT | UNBOX_BOOL -> 0
+  | STORE_REF _ -> -1
+  | LOAD_REF _ -> 1
+  | IFZERO _ | IFNONZERO _ -> -1
+  | GOTO _ | LABEL _ -> 0
+  | BOP _ -> 1
+  | LOAD_FIELD _ -> 0
+  | STORE_FIELD _ -> -2
+  | ALLOC_OBJ _ -> 2
+  | CONSTRUCT_OBJ (_, tys) -> -1 + List.length tys
+  | ALLOC_ARRAY _ -> 0
+  | STORE_ARRAY -> -3
+  | DUP -> 1
+  | POP -> -1
+  | APPLY _ -> -1
+  | LOAD_STATIC _ -> 1
+  | STORE_STATIC _ -> -1
+
+let max_stack_depth prog =
+  List.map stack_size_change prog
+  |> List.fold_left_map (fun acc x -> (acc + x, acc + x)) 0
+  |> fun (_, l) -> List.fold_left max 0 l
+
 let rec lower_type = function
   | TyInt -> "java/lang/Integer"
   | TyBool -> "java/lang/Boolean"
@@ -134,7 +159,7 @@ let lower_constructor_body indent name constructor_args =
     constructor_args
   |> String.concat "\n"
 
-(* todo - determine actual limits for stack and local variable sizes *)
+(* todo - determine actual limits for local variable sizes *)
 let lower_closure (c : closure) =
   let indent = "    " in
   sprintf
@@ -154,7 +179,7 @@ let lower_closure (c : closure) =
 .end method
 
 .method public apply : (Ljava/lang/Object;)Ljava/lang/Object;
-  .code stack 10 locals 10
+  .code stack %i locals 10
     aload_1
     checkcast %s
     astore_1
@@ -180,7 +205,7 @@ L9:     athrow
     (lower_constructor_args c.constructor_args)
     (List.map (fun (_, ty) -> ty) c.constructor_args |> lower_type_list)
     (lower_constructor_body indent c.name c.constructor_args)
-    (lower_type c.arg_type)
+    (max_stack_depth c.body) (lower_type c.arg_type)
     (lower_body "    " c.name c.body)
 
 let lower_type_interface (ti : type_interface) =
@@ -325,14 +350,14 @@ let produce_instruction_bytecode p =
 .super java/lang/Object
 %s
 .method public static main : ([Ljava/lang/String;)V
-    .code stack 100 locals 100
+    .code stack %i locals 100
 %s
         return
   .end code
 .end method
 .end class
 |}
-    (lower_field_defs p)
+    (lower_field_defs p) (max_stack_depth p)
     (lower_body "        " "Foo" p)
 
 let stdlib =
