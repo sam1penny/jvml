@@ -125,3 +125,18 @@ let%expect_test "test nested patterns" =
                  └──App
                     └──Ident length_minus_one
                     └──Ident y|}]
+
+let%expect_test "test sequencing" =
+  let x = "val x = do {1; (); true; 3}" in
+  Parsing.Driver.parse_string x
+  |> List.iter (fun x ->
+         Parsing.Parsed_ast.pp_decl x;
+         print_newline ());
+  [%expect
+    {|
+   └──Val x
+      └──Seq
+         └──Int 1
+         └──()
+         └──Bool true
+         └──Int 3 |}]

@@ -39,6 +39,9 @@ rule token = parse
     | '_' { UNDERSCORE }
     | ',' { COMMA }
     | '\'' { APOSTROPHE }
+    | ';' { SEMICOLON }
+    | '{' { LCURLY }
+    | '}' { RCURLY }
     | "::" { CONS }
     | "[]" { EMPTY_LIST }
     | "true" { TRUE }
@@ -57,6 +60,7 @@ rule token = parse
     | "val" { VAL }
     | "let" { LET }
     | "in" { IN }
+    | "do" { DO }
     | lowercase_indent { LOWERCASE_IDENT (Lexing.lexeme lexbuf)}
     | uppercase_ident { UPPERCASE_IDENT (Lexing.lexeme lexbuf)}
     | eof { EOF }

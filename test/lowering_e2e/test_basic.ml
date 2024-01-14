@@ -144,3 +144,14 @@ let%expect_test "test tuple equality" =
     false
     false
     |}]
+
+let%expect_test "test basic sequence" =
+  let program = {|
+  val a = do {(); print(true); 3}
+  val b = print(a)
+  |} in
+  let _ = build_and_run program in
+  [%expect {|
+  true
+  3
+  |}]

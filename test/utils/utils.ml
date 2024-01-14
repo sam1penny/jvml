@@ -22,6 +22,7 @@ type expr =
   | Match of expr * (pattern * expr) list
   | Tuple of expr list
   | Let of string * expr * expr
+  | Seq of expr list
 
 and pattern =
   | Pat_Int of int
@@ -85,6 +86,7 @@ let rec add_dummy_loc_expr =
   | Tuple es -> Parsed_ast.Tuple (dummy, List.map add_dummy_loc_expr es)
   | Let (x, e0, e1) ->
       Parsed_ast.Let (dummy, x, add_dummy_loc_expr e0, add_dummy_loc_expr e1)
+  | Seq es -> Parsed_ast.Seq (dummy, List.map add_dummy_loc_expr es)
 
 and add_dummy_loc_pat =
   let open Parsing in

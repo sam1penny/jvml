@@ -41,6 +41,10 @@ let make_generators () =
 let reset_per_func_generators g =
   { g with ctrl_label = make_ctrl_gen (); ref_label = make_counter () }
 
+let rec intersperse sep = function
+  | ([] | [ _ ]) as l -> l
+  | x :: xs -> x :: sep :: intersperse sep xs
+
 let rec pattern_bindings =
   let open Typed_ast in
   function
@@ -89,6 +93,9 @@ let free_vars_with_types_expr bound e =
         let free_e0 = aux bound free e0 in
         let bound' = StringSet.add x bound in
         StringMap.union takeleft free_e0 (aux bound' free e1)
+    | Seq (_, _, es) ->
+        List.map (aux bound free) es
+        |> List.fold_left (StringMap.union takeleft) StringMap.empty
   in
   aux bound StringMap.empty e
 
@@ -142,6 +149,12 @@ let rec compile_expr label_gen env e =
       ( defs,
         [ ALLOC_OBJ "Tuple" ] @ lowered_tuple_code
         @ [ CONSTRUCT_OBJ ("Tuple", [ TyArray TyAny ]) ] )
+  | Seq (_, _, es) ->
+      let linear_es = List.map (compile_expr label_gen env) es in
+      let defs = List.map (fun (defs, _) -> defs) linear_es |> List.flatten in
+      let ecode = List.map (fun (_, code) -> code) linear_es in
+      let pop_throwaways = intersperse [ POP ] ecode in
+      (defs, List.flatten pop_throwaways)
   | _ ->
       raise
       @@ Invalid_argument "Attempted to lower unsupported expr to linear_ir"

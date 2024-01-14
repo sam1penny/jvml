@@ -25,6 +25,7 @@ type expr =
   | Tuple of loc * type_expr * expr list
   | Let of loc * type_expr * string * expr * expr
   | Constr of loc * type_expr * string
+  | Seq of loc * type_expr * expr list
 
 and pattern =
   | Pat_Int of loc * int
@@ -95,6 +96,7 @@ let string_of_expr_node =
   | Tuple _ -> "Tuple"
   | Let (_, _, x, _, _) -> sprintf "Let %s" x
   | Constr (_, _, cname) -> sprintf "Constructor %s" cname
+  | Seq _ -> "Seq"
 
 let string_of_pat_node =
   let open Printf in
@@ -159,6 +161,9 @@ let rec pp_expr ?(indent = "") expr =
       pp_node expr;
       pp_rec_expr e0;
       pp_rec_expr e1
+  | Seq (_, _, es) ->
+      pp_node expr;
+      List.iter pp_rec_expr es
 
 and pp_case indent (pattern, expr) =
   let open Printf in

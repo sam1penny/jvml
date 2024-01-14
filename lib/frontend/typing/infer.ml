@@ -17,6 +17,7 @@ let get_expr_type =
   | Tuple (_, t, _) -> t
   | Let (_, t, _, _, _) -> t
   | Constr (_, t, _) -> t
+  | Seq (_, t, _) -> t
 
 let get_decl_type =
   let open Typed_ast in
@@ -133,6 +134,9 @@ let rec map_over_expr_texprs f expr =
       let e1' = map_over_expr_texprs f e1 in
       Let (loc, ty', x, e0', e1')
   | Constr (loc, ty, cname) -> Constr (loc, f ty, cname)
+  | Seq (loc, ty, es) ->
+      let ty' = f ty in
+      Seq (loc, ty', List.map (map_over_expr_texprs f) es)
 
 let map_over_decl_texprs f decl =
   let open Typed_ast in
@@ -393,6 +397,11 @@ let rec type_expr unifications nt env expr =
           Ok
             (Typed_ast.Constr
                (loc, find_unified_type unifications instantiated, cname)))
+  | Parsed_ast.Seq (loc, es) ->
+      List.map (type_expr unifications nt env) es |> collect_result
+      >>=? fun enodes ->
+      let ty = List.length enodes - 1 |> List.nth enodes |> get_expr_type in
+      Ok (Typed_ast.Seq (loc, ty, enodes))
 
 and check_case e_type unifications nt env (pattern, case_expr) =
   validate_pattern unifications env nt pattern

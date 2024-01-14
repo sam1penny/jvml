@@ -78,6 +78,7 @@ let lower_instruction ctrl_gen clazz = function
   | ALLOC_ARRAY name -> [ sprintf "anewarray %s" name ]
   | STORE_ARRAY -> [ "aastore" ]
   | DUP -> [ "dup" ]
+  | POP -> [ "pop" ]
   | APPLY ty ->
       [
         "invokeinterface InterfaceMethod java/util/function/Function apply \

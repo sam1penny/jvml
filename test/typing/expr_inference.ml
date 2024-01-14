@@ -162,3 +162,9 @@ let%expect_test "test function equality fails" =
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
   |> print_string;
   [%expect {|Error|}]
+
+let%expect_test "test sequence typing" =
+  let x = Seq [ Unit; Bool true; Int 3 ] in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_tree_result
+  |> print_string;
+  [%expect {|Ok(int)|}]

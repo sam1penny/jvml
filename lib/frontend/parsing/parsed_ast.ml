@@ -15,6 +15,7 @@ type expr =
   | Match of loc * expr * (pattern * expr) list
   | Tuple of loc * expr list
   | Let of loc * string * expr * expr
+  | Seq of loc * expr list
 
 and pattern =
   | Pat_Int of loc * int
@@ -54,6 +55,7 @@ let get_expr_loc = function
   | Tuple (loc, _) -> loc
   | Let (loc, _, _, _) -> loc
   | Constr (loc, _) -> loc
+  | Seq (loc, _) -> loc
 
 let get_pattern_loc = function
   | Pat_Int (loc, _) -> loc
@@ -80,6 +82,7 @@ let string_of_expr_node =
   | Match _ -> "Match"
   | Tuple _ -> "Tuple"
   | Let (_, x, _, _) -> sprintf "Let %s" x
+  | Seq _ -> "Seq"
 
 let string_of_pat_node =
   let open Printf in
@@ -166,6 +169,9 @@ let rec pp_expr ?(indent = "") expr =
       pp_node expr;
       pp_rec_expr e0;
       pp_rec_expr e1
+  | Seq (_, es) ->
+      pp_node expr;
+      List.iter pp_rec_expr es
 
 and pp_case indent (pattern, expr) =
   let open Printf in

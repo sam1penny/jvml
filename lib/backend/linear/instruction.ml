@@ -35,6 +35,7 @@ type instruction =
   | ALLOC_ARRAY of string
   | STORE_ARRAY
   | DUP
+  | POP
   (* save return type in order to cast *)
   | APPLY of type_expr
   (* class, field, type *)
