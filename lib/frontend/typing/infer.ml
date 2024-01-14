@@ -470,7 +470,7 @@ let rec validate_texpr type_env params = function
       validate_texpr type_env params t1 >>=? fun t1' ->
       Ok (Typed_ast.TyFun (t0', t1'))
 
-let infer_constructor _ _ env type_env type_constructor params = function
+let infer_constructor env type_env type_constructor params = function
   | Parsed_ast.DeclConstr (loc, cname, None) ->
       if StringMap.mem cname env then
         Error (loc, sprintf "Duplicate definition of constructor %s" cname)
@@ -523,14 +523,13 @@ let type_decl unifications nt env type_env = function
         in
         let type_env' = StringMap.add tname (List.length params) type_env in
         let acc =
-          List.fold_left
-            (fun acc c ->
+          List.fold_right
+            (fun c acc ->
               acc >>=? fun (typed_cs, env) ->
-              infer_constructor unifications nt env type_env' type_constructor
-                params c
+              infer_constructor env type_env' type_constructor params c
               >>=? fun (typed_c, env') -> Ok (typed_c :: typed_cs, env'))
-            (Ok ([], env))
             constructors
+            (Ok ([], env))
         in
         acc >>=? fun (typed_constructors, env') ->
         Ok

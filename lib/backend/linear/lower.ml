@@ -326,15 +326,15 @@ let compile_decl label_gen env = function
       in
       (* current bodge - adding static fields for creating constructors *)
       let defs, code, env =
-        List.fold_left
-          (fun (accdefs, acccode, env)
-               (Typed_ast.DeclConstr (_, cname, type_expr_op)) ->
+        List.fold_right
+          (fun (Typed_ast.DeclConstr (_, cname, type_expr_op))
+               (accdefs, acccode, env) ->
             let defs, code, env =
               lambda_for_constructor label_gen env cname (convert_type ty)
                 (Option.map convert_type type_expr_op)
             in
             (defs @ accdefs, code @ acccode, env))
-          ([], [], env) type_constructors
+          type_constructors ([], [], env)
       in
       ([ typei ] @ tconstrs @ defs, code, env)
 
