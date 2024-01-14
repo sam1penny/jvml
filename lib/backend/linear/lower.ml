@@ -211,7 +211,7 @@ and compile_bop label_gen env e0 e1 = function
   | EQ ->
       let defs0, c0 = compile_expr label_gen env e0 in
       let defs1, c1 = compile_expr label_gen env e1 in
-      (defs0 @ defs1, c0 @ c1 @ [ BOP EQ ])
+      (defs0 @ defs1, c0 @ c1 @ [ BOP EQ; BOX_BOOL ])
 
 and compile_lambda_expr label_gen env (arg_type, return_type, x, e) =
   let fvars_with_types =

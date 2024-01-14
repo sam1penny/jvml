@@ -30,10 +30,7 @@ let lower_bop ctrl_gen = function
   | MUL -> [ "imul" ]
   | DIV -> [ "idiv" ]
   | EQ ->
-      [
-        "invokevirtual Method java/lang/Object equals (Ljava/lang/Object;)Z";
-        "invokestatic Method java/lang/Boolean valueOf (Z)Ljava/lang/Boolean;";
-      ]
+      [ "invokevirtual Method java/lang/Object equals (Ljava/lang/Object;)Z" ]
   | (LT | GT) as bop ->
       let false_label = ctrl_gen () in
       let after_label = ctrl_gen () in

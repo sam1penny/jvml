@@ -122,3 +122,25 @@ let%expect_test "test equality of adts" =
   true
   false
   |}]
+
+let%expect_test "test tuple equality" =
+  let program =
+    {|
+    val a = (1, 2)
+    val b = (1, 2)
+    val c = (1, 3)
+    val d = (3, 2)
+
+    val f = print(a = b)
+    val g = print(a = c)
+    val h = print(a = d)
+    val i = print(c = d)
+    |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    true
+    false
+    false
+    false
+    |}]
