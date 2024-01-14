@@ -22,7 +22,7 @@ let lower_type_list tys =
 
 let make_jvm_ctrl_gen () =
   let cnt = Linear.Lower.make_counter () in
-  fun () -> "Ljvm" ^ cnt ()
+  fun () -> "Ljvm" ^ string_of_int @@ cnt ()
 
 let lower_bop ctrl_gen = function
   | Linear.Instruction.ADD -> [ "iadd" ]
@@ -44,8 +44,21 @@ let lower_bop ctrl_gen = function
         after_label ^ ":";
       ]
 
+let load_int = function
+  | -1 -> "iconst_m1"
+  | (0 | 1 | 2 | 3 | 4 | 5) as n -> sprintf "iconst_%i" n
+  | n -> sprintf "ldc %i" n
+
+let store_ref = function
+  | (0 | 1 | 2 | 3) as n -> sprintf "astore_%i" n
+  | n -> sprintf "astore %i" n
+
+let load_ref = function
+  | (0 | 1 | 2 | 3) as n -> sprintf "aload_%i" n
+  | n -> sprintf "aload %i" n
+
 let lower_instruction ctrl_gen clazz = function
-  | PUSH_INT i -> [ sprintf "ldc %s" (string_of_int i) ]
+  | PUSH_INT i -> [ load_int i ]
   | BOX_INT ->
       [ "invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;" ]
   | UNBOX_INT -> [ "invokevirtual Method java/lang/Integer intValue ()I" ]
@@ -55,8 +68,8 @@ let lower_instruction ctrl_gen clazz = function
   | UNBOX_BOOL -> [ "invokevirtual Method java/lang/Boolean booleanValue ()Z" ]
   | PUSH_UNIT -> [ "getstatic Field Unit INSTANCE LUnit;" ]
   | BOP bop -> lower_bop ctrl_gen bop
-  | STORE_REF r -> [ sprintf "astore %s" r ]
-  | LOAD_REF r -> [ sprintf "aload %s" r ]
+  | STORE_REF r -> [ store_ref r ]
+  | LOAD_REF r -> [ load_ref r ]
   | IFZERO l -> [ sprintf "ifeq %s" l ]
   | IFNONZERO l -> [ sprintf "ifne %s" l ]
   | GOTO l -> [ sprintf "goto %s" l ]

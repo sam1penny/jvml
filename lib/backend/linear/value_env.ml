@@ -2,7 +2,7 @@ open Instruction
 module StringMap = Map.Make (String)
 
 type source =
-  | Local_var of string
+  | Local_var of int
   | Instance_field of string * type_expr
   | Static_field of string * string * type_expr
 
@@ -25,7 +25,7 @@ let add_static_field k (clazz, f, ty) env =
 let lookup k env =
   match StringMap.find_opt k env with
   | Some (Local_var v) -> [ LOAD_REF v ]
-  | Some (Instance_field (f, ty)) -> [ LOAD_REF "0"; LOAD_FIELD (f, ty) ]
+  | Some (Instance_field (f, ty)) -> [ LOAD_REF 0; LOAD_FIELD (f, ty) ]
   | Some (Static_field (clazz, name, ty)) -> [ LOAD_STATIC (clazz, name, ty) ]
   | None ->
       raise

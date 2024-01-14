@@ -6,7 +6,7 @@ module StringMap = Map.Make (String)
 
 type label_generators = {
   ctrl_label : unit -> string;
-  ref_label : unit -> string;
+  ref_label : unit -> int;
   lambda_label : unit -> string;
   static_label : unit -> string;
 }
@@ -16,19 +16,19 @@ let make_counter () =
   fun () ->
     let n = !t in
     let _ = t := !t + 1 in
-    string_of_int n
+    n
 
 let make_ctrl_gen () =
   let cnt = make_counter () in
-  fun () -> "L" ^ cnt ()
+  fun () -> "L" ^ string_of_int @@ cnt ()
 
 let make_lambda_gen () =
   let cnt = make_counter () in
-  fun () -> "Lambda$" ^ cnt ()
+  fun () -> "Lambda$" ^ string_of_int @@ cnt ()
 
 let make_static_gen () =
   let cnt = make_counter () in
-  fun () -> "SF" ^ cnt ()
+  fun () -> "SF" ^ string_of_int @@ cnt ()
 
 let make_generators () =
   {
@@ -303,7 +303,7 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
         Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
   | Some ty ->
       let body =
-        [ ALLOC_OBJ cname; LOAD_REF "1"; CONSTRUCT_OBJ (cname, [ ty ]) ]
+        [ ALLOC_OBJ cname; LOAD_REF 1; CONSTRUCT_OBJ (cname, [ ty ]) ]
       in
       let fvars_with_types = [] in
 

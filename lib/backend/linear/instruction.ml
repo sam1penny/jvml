@@ -20,8 +20,8 @@ type instruction =
   | BOX_BOOL
   | UNBOX_BOOL
   | PUSH_UNIT
-  | STORE_REF of string
-  | LOAD_REF of string
+  | STORE_REF of int
+  | LOAD_REF of int
   | IFZERO of string
   | IFNONZERO of string
   | GOTO of string
