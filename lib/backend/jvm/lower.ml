@@ -30,7 +30,10 @@ let lower_bop ctrl_gen = function
   | MUL -> [ "imul" ]
   | DIV -> [ "idiv" ]
   | EQ ->
-      [ "invokevirtual Method java/lang/Boolean equals (Ljava/lang/Object;)Z" ]
+      [
+        "invokevirtual Method java/lang/Object equals (Ljava/lang/Object;)Z";
+        "invokestatic Method java/lang/Boolean valueOf (Z)Ljava/lang/Boolean;";
+      ]
   | (LT | GT) as bop ->
       let false_label = ctrl_gen () in
       let after_label = ctrl_gen () in
@@ -201,6 +204,28 @@ L19:    areturn
     .end code
 .end method
 
+.method public equals : (Ljava/lang/Object;)Z
+    .code stack 2 locals 2
+L0:     aload_0
+L1:     aload_1
+L2:     if_acmpne L7
+L5:     iconst_1
+L6:     ireturn
+
+        .stack same
+L7:     aload_0
+L8:     invokevirtual Method java/lang/Object getClass ()Ljava/lang/Class;
+L11:    aload_1
+L12:    invokevirtual Method java/lang/Object getClass ()Ljava/lang/Class;
+L15:    if_acmpeq L20
+L18:    iconst_0
+L19:    ireturn
+
+        .stack same
+%s
+L34:    ireturn
+    .end code
+.end method
 
 .end class
 |}
@@ -240,6 +265,22 @@ L19:    areturn
          |> String.concat "\n")
        vc.arg
     |> Option.value ~default:"")
+    (Option.map
+       (fun arg ->
+         sprintf
+           {|
+L20:    aload_0
+L21:    getfield Field %s val L%s;
+L24:    aload_1
+L25:    checkcast %s
+L28:    getfield Field %s val L%s;
+L31:    invokevirtual Method java/lang/Object equals (Ljava/lang/Object;)Z
+      |}
+           vc.name (lower_type arg) vc.name vc.name (lower_type arg))
+       vc.arg
+    |> Option.value ~default:{|
+L20:    iconst_1
+    |})
 
 let lower_declaration = function
   | Closure c -> lower_closure c
@@ -261,7 +302,7 @@ let produce_instruction_bytecode p =
 .super java/lang/Object
 %s
 .method public static main : ([Ljava/lang/String;)V
-    .code stack 13 locals 13
+    .code stack 100 locals 100
 %s
         return
   .end code

@@ -99,3 +99,26 @@ let%expect_test "test recursive type product" =
   Z
   S (S (S (Z)))
   |}]
+
+let%expect_test "test equality of adts" =
+  let program =
+    {|
+  type 'a list = N | C of int * 'a list
+  val compnil = print(N = N)
+  val compdiff = print(N = C(0, N))
+  val comp_eqcons = print(C(0, N) = C(0, N))
+  val comp_almost_eq_cons = print(C(0, N) = C(1, N))
+
+  val deepnesting_pos = print(C(0, C(1, C(2, N))) = C(0, C(1, C(2, N))))
+  val deepnesting_false = print(C(0, C(1, C(2, N))) = C(0, C(1, C(2, C(3, N)))))
+    |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+  true
+  false
+  true
+  false
+  true
+  false
+  |}]
