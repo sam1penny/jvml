@@ -125,7 +125,7 @@ let rec compile_expr label_gen env e =
       let defs2, c2 = compile_expr label_gen env e2 in
       ( defs0 @ defs1 @ defs2,
         c0
-        @ [ UNBOX_INT; IFZERO else_label ]
+        @ [ UNBOX_BOOL; IFZERO else_label ]
         @ c1
         @ [ GOTO after_label; LABEL else_label ]
         @ c2 @ [ LABEL after_label ] )
