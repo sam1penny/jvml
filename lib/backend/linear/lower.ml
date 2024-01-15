@@ -317,11 +317,14 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
 
 let compile_decl label_gen env = function
   | Typed_ast.Val (_, ty, x, e) ->
-      let defs, c = compile_expr label_gen env e in
+      (* make value available in e for compiling recursion *)
       let x_label = label_gen.static_label () in
-      ( defs,
-        c @ [ STORE_STATIC ("Foo", x_label, convert_type ty) ],
-        Value_env.add_static_field x ("Foo", x_label, convert_type ty) env )
+      let env' =
+        Value_env.add_static_field x ("Foo", x_label, convert_type ty) env
+      in
+
+      let defs, c = compile_expr label_gen env' e in
+      (defs, c @ [ STORE_STATIC ("Foo", x_label, convert_type ty) ], env')
   | Typed_ast.Type (_, ty, _, tname, type_constructors) ->
       let class_tname = String.capitalize_ascii tname in
       let typei =

@@ -86,14 +86,16 @@ let string_of_expr_node =
   function
   | Int (_, i) -> sprintf "Int %i" i
   | Bool (_, b) -> sprintf "Bool %b" b
-  | Ident (_, _, ident) -> sprintf "Ident %s" ident
+  | Ident (_, ty, ident) -> sprintf "Ident %s : %s" ident (pp_texpr ty)
   | Unit _ -> "()"
-  | Bop (_, _, _, op, _) -> sprintf "Bop: %s" (show_bop op)
+  | Bop (_, return_ty, _, op, _) ->
+      sprintf "Bop %s : %s" (show_bop op) (pp_texpr return_ty)
   | If _ -> "If"
-  | Fun (_, _, _, x, _) -> sprintf "Fun %s" x
+  | Fun (_, arg_type, return_type, x, _) ->
+      sprintf "Fun %s : %s" x (pp_texpr (TyFun (arg_type, return_type)))
   | App _ -> "App"
   | Match _ -> "Match"
-  | Tuple _ -> "Tuple"
+  | Tuple (_, ty, _) -> sprintf "Tuple : %s" (pp_texpr ty)
   | Let (_, _, x, _, _) -> sprintf "Let %s" x
   | Constr (_, _, cname) -> sprintf "Constructor %s" cname
   | Seq _ -> "Seq"

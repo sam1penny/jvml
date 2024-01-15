@@ -457,9 +457,12 @@ let type_expr_from_scratch expr =
   let u = Unifications.create 10 in
   let env = stdlib_env in
   let type_gen = make_new_type () in
-  type_expr u type_gen env expr
-  |> Result.map (fun tytree ->
-         find_unified_type u (get_expr_type tytree) |> simplify_texpr)
+  type_expr u type_gen env expr >>=? fun exprnode ->
+  let state = simplify_texpr_state () in
+  let simplify_texpr texpr =
+    find_unified_type u texpr |> map_over_texpr_vars state
+  in
+  Ok (map_over_expr_texprs simplify_texpr exprnode)
 
 let rec validate_texpr type_env params = function
   | Parsed_ast.TyInt _ -> Ok Typed_ast.TyInt
