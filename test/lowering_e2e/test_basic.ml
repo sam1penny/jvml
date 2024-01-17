@@ -155,3 +155,19 @@ let%expect_test "test basic sequence" =
   true
   3
   |}]
+
+let%expect_test "test recursive function" =
+  let factorial =
+    {|
+  val fact = fun n -> if n = 0 then 1 else n * fact (n - 1)
+  val test = do {print(fact 0); print (fact 1); print (fact 2); print (fact 5); print(fact 6)}
+  |}
+  in
+  let _ = build_and_run factorial in
+  [%expect {|
+  1
+  1
+  2
+  120
+  720
+  |}]
