@@ -207,7 +207,6 @@ let rec unify unifications t1 t2 loc_on_fail =
 
 (* return (type, variable bindings, )*)
 let rec validate_pattern unifications env nt =
-  (* todo allow overlapping bindings if they unify *)
   (* todo :
      -- report more refine location complaints --
      to achieve this i should could pass the maps down to recursive calls,
@@ -235,6 +234,29 @@ let rec validate_pattern unifications env nt =
         else Ok (StringMap.union (fun _ x _ -> Some x) acc map))
       (Ok StringMap.empty) maps
   in
+  let verify_same_bindings_same_types unifications loc m1 m2 =
+    StringMap.fold
+      (fun x _ acc ->
+        acc >>=? fun _ ->
+        if StringMap.mem x m1 then Ok ()
+        else
+          Error
+            ( loc,
+              sprintf "Variable %s must occur on both sides of the pattern" x ))
+      m2 (Ok ())
+    >>=? fun _ ->
+    StringMap.fold
+      (fun x (ty2, _) acc ->
+        acc >>=? fun _ ->
+        match StringMap.find_opt x m1 with
+        | None ->
+            Error
+              ( loc,
+                sprintf "Variable %s must occur on both sides of the pattern" x
+              )
+        | Some (ty1, _) -> unify unifications ty1 ty2 loc)
+      m2 (Ok ())
+  in
   let open Parsing in
   function
   | Parsed_ast.Pat_Int (loc, i) ->
@@ -253,14 +275,13 @@ let rec validate_pattern unifications env nt =
   | Parsed_ast.Pat_Or (loc, p1, p2) ->
       validate_pattern unifications env nt p1 >>=? fun (p1node, p1bindings) ->
       validate_pattern unifications env nt p2 >>=? fun (p2node, p2bindings) ->
-      union_maps_if_disjoint loc [ p1bindings; p2bindings ]
-      >>=? fun updated_bindings ->
-      if get_pattern_type p1node <> get_pattern_type p2node then
-        Error (loc, "patterns are not of the same type")
-      else
-        Ok
-          ( Typed_ast.Pat_Or (loc, get_pattern_type p1node, p1node, p2node),
-            updated_bindings )
+      verify_same_bindings_same_types unifications loc p1bindings p2bindings
+      >>=? fun _ ->
+      unify unifications (get_pattern_type p1node) (get_pattern_type p2node) loc
+      >>=? fun _ ->
+      Ok
+        ( Typed_ast.Pat_Or (loc, get_pattern_type p1node, p1node, p2node),
+          p1bindings )
   | Parsed_ast.Pat_Tuple (loc, ps) ->
       List.map (validate_pattern unifications env nt) ps |> collect_result
       >>=? fun recursive_calls ->

@@ -188,3 +188,51 @@ let%expect_test "test sequence typing" =
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
   [%expect {|Ok(int)|}]
+
+let%expect_test "test matched pattern bindings ok" =
+  let x =
+    Fun
+      ( "x",
+        Match
+          ( Ident "x",
+            [
+              ( Pat_Or
+                  ( Pat_Tuple [ Pat_Int 3; Pat_Ident "x" ],
+                    Pat_Tuple [ Pat_Ident "x"; Pat_Int 3 ] ),
+                Bool true );
+            ] ) )
+  in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
+  |> Result.map Typing.Infer.get_expr_type
+  |> pp_tree_result |> print_string;
+  [%expect {|Ok((int * int) -> bool)|}]
+
+let%expect_test "test uncorresponding types in pattern bindings fails" =
+  let x =
+    Fun
+      ( "x",
+        Match
+          ( Ident "x",
+            [
+              ( Pat_Or
+                  ( Pat_Tuple [ Pat_Int 3; Pat_Ident "x" ],
+                    Pat_Tuple [ Pat_Ident "x"; Pat_Bool true ] ),
+                Bool true );
+            ] ) )
+  in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
+  |> Result.map Typing.Infer.get_expr_type
+  |> pp_tree_result |> print_string;
+  [%expect {|Error|}]
+
+let%expect_test "test unmatched pattern bindings fails" =
+  let x =
+    Fun
+      ( "x",
+        Match (Ident "x", [ (Pat_Or (Pat_Ident "x", Pat_Ident "y"), Bool true) ])
+      )
+  in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
+  |> Result.map Typing.Infer.get_expr_type
+  |> pp_tree_result |> print_string;
+  [%expect {|Error|}]
