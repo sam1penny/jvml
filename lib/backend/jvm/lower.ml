@@ -163,7 +163,6 @@ let lower_constructor_body indent name constructor_args =
     constructor_args
   |> String.concat "\n"
 
-(* todo - determine actual limits for local variable sizes *)
 let lower_closure (c : closure) =
   let indent = "    " in
   sprintf
@@ -174,7 +173,7 @@ let lower_closure (c : closure) =
 %s
 
 .method <init> : (%s)V
-  .code stack 10 locals 10
+  .code stack 2 locals %i
     aload_0
     invokespecial Method java/lang/Object <init> ()V
 %s
@@ -208,6 +207,7 @@ L9:     athrow
     c.name
     (lower_constructor_args c.constructor_args)
     (List.map (fun (_, ty) -> ty) c.constructor_args |> lower_type_list)
+    (1 + List.length c.constructor_args)
     (lower_constructor_body indent c.name c.constructor_args)
     (max_stack_depth c.body) (num_local_vars 1 c.body) (lower_type c.arg_type)
     (lower_body "    " c.name c.body)
