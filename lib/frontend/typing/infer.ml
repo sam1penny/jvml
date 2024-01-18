@@ -225,7 +225,13 @@ let rec validate_pattern unifications env nt =
             acc map
         in
         if StringMap.cardinal intersection > 0 then
-          Error (loc, "pattern contains duplicate bindings")
+          let first_duplicate =
+            StringMap.find_first (fun _ -> true) intersection |> fun (x, _) -> x
+          in
+          Error
+            ( loc,
+              sprintf "pattern contains duplicate binding for %s"
+                first_duplicate )
         else Ok (StringMap.union (fun _ x _ -> Some x) acc map))
       (Ok StringMap.empty) maps
   in
