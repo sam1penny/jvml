@@ -41,6 +41,8 @@ type instruction =
   (* class, field, type *)
   | LOAD_STATIC of string * string * type_expr
   | STORE_STATIC of string * string * type_expr
+  (* freevar types, arg, return *)
+  | CREATE_DYNAMIC_CLOSURE of string * type_expr list * type_expr * type_expr
 [@@deriving show]
 
 type closure = {
@@ -62,6 +64,14 @@ type declaration =
   | Closure of closure
   | Type_interface of type_interface
   | Constructor of constructor
+[@@deriving show]
+
+type static_method = {
+  name : string;
+  args : type_expr list;
+  return_type : type_expr;
+  body : instruction list;
+}
 [@@deriving show]
 
 let show_program p = List.map show_instruction p |> String.concat "\n"

@@ -11,35 +11,38 @@ type label_generators = {
   static_label : unit -> string;
 }
 
-let make_counter () =
-  let t = ref 1 in
+let make_counter n =
+  let t = ref n in
   fun () ->
     let n = !t in
     let _ = t := !t + 1 in
     n
 
 let make_ctrl_gen () =
-  let cnt = make_counter () in
+  let cnt = make_counter 0 in
   fun () -> "L" ^ string_of_int @@ cnt ()
 
 let make_lambda_gen () =
-  let cnt = make_counter () in
+  let cnt = make_counter 0 in
   fun () -> "Lambda$" ^ string_of_int @@ cnt ()
 
 let make_static_gen () =
-  let cnt = make_counter () in
+  let cnt = make_counter 0 in
   fun () -> "SF" ^ string_of_int @@ cnt ()
 
 let make_generators () =
   {
     ctrl_label = make_ctrl_gen ();
-    ref_label = make_counter ();
+    ref_label = make_counter 1;
     lambda_label = make_lambda_gen ();
     static_label = make_static_gen ();
   }
 
 let reset_per_func_generators g =
-  { g with ctrl_label = make_ctrl_gen (); ref_label = make_counter () }
+  { g with ctrl_label = make_ctrl_gen (); ref_label = make_counter 1 }
+
+let reset_for_static_func_generators g =
+  { g with ctrl_label = make_ctrl_gen (); ref_label = make_counter 0 }
 
 let rec intersperse sep = function
   | ([] | [ _ ]) as l -> l
@@ -114,51 +117,60 @@ let rec compile_expr label_gen env top_level_bindings e =
   (* curried for convenience *)
   let compile_expr_rec = compile_expr label_gen env top_level_bindings in
   match e with
-  | Int (_, i) -> ([], [ PUSH_INT i; BOX_INT ])
-  | Bool (_, b) -> ([], [ PUSH_BOOL b; BOX_BOOL ])
-  | Ident (_, _, x) -> ([], Value_env.lookup x env)
-  | Unit _ -> ([], [ PUSH_UNIT ])
+  | Int (_, i) -> ([], [ PUSH_INT i; BOX_INT ], [])
+  | Bool (_, b) -> ([], [ PUSH_BOOL b; BOX_BOOL ], [])
+  | Ident (_, _, x) -> ([], Value_env.lookup x env, [])
+  | Unit _ -> ([], [ PUSH_UNIT ], [])
   | Bop (_, _, e0, bop, e1) ->
       compile_bop label_gen env top_level_bindings e0 e1 bop
   | If (_, _, e0, e1, e2) ->
       let else_label = label_gen.ctrl_label () in
       let after_label = label_gen.ctrl_label () in
-      let defs0, c0 = compile_expr_rec e0 in
-      let defs1, c1 = compile_expr_rec e1 in
-      let defs2, c2 = compile_expr_rec e2 in
+      let defs0, c0, s0 = compile_expr_rec e0 in
+      let defs1, c1, s1 = compile_expr_rec e1 in
+      let defs2, c2, s2 = compile_expr_rec e2 in
       ( defs0 @ defs1 @ defs2,
         c0
         @ [ UNBOX_BOOL; IFZERO else_label ]
         @ c1
         @ [ GOTO after_label; LABEL else_label ]
-        @ c2 @ [ LABEL after_label ] )
+        @ c2 @ [ LABEL after_label ],
+        s0 @ s1 @ s2 )
   | Fun (_, t0, t1, x, e) ->
-      compile_lambda_expr label_gen env top_level_bindings
+      compile_anon_lambda_expr label_gen env top_level_bindings
         (convert_type t0, convert_type t1, x, e)
   | App (_, ty, e0, e1) ->
-      let defs0, c0 = compile_expr_rec e0 in
-      let defs1, c1 = compile_expr_rec e1 in
-      (defs0 @ defs1, c0 @ c1 @ [ APPLY (convert_type ty) ])
+      let defs0, c0, s0 = compile_expr_rec e0 in
+      let defs1, c1, s1 = compile_expr_rec e1 in
+      (defs0 @ defs1, c0 @ c1 @ [ APPLY (convert_type ty) ], s0 @ s1)
   | Let (_, _, x, e0, e1) ->
-      let defs0, c0 = compile_expr_rec e0 in
+      let defs0, c0, s0 = compile_expr_rec e0 in
       let x_label = label_gen.ref_label () in
       let env_with_x = Value_env.add_local_var x x_label env in
-      let defs1, c1 = compile_expr label_gen env_with_x top_level_bindings e1 in
-      (defs0 @ defs1, c0 @ [ STORE_REF x_label ] @ c1)
-  | Constr (_, _, cname) -> ([], Value_env.lookup cname env)
+      let defs1, c1, s1 =
+        compile_expr label_gen env_with_x top_level_bindings e1
+      in
+      (defs0 @ defs1, c0 @ [ STORE_REF x_label ] @ c1, s0 @ s1)
+  | Constr (_, _, cname) -> ([], Value_env.lookup cname env, [])
   | Tuple (_, _, ts) ->
-      let defs, lowered_tuple_code =
+      let defs, lowered_tuple_code, smethods =
         lower_tuple_eles_to_array label_gen env top_level_bindings ts
       in
       ( defs,
         [ ALLOC_OBJ "Tuple" ] @ lowered_tuple_code
-        @ [ CONSTRUCT_OBJ ("Tuple", [ TyArray TyAny ]) ] )
+        @ [ CONSTRUCT_OBJ ("Tuple", [ TyArray TyAny ]) ],
+        smethods )
   | Seq (_, _, es) ->
       let linear_es = List.map compile_expr_rec es in
-      let defs = List.map (fun (defs, _) -> defs) linear_es |> List.flatten in
-      let ecode = List.map (fun (_, code) -> code) linear_es in
+      let defs =
+        List.map (fun (defs, _, _) -> defs) linear_es |> List.flatten
+      in
+      let ecode = List.map (fun (_, code, _) -> code) linear_es in
+      let smethods =
+        List.map (fun (_, _, smethods) -> smethods) linear_es |> List.flatten
+      in
       let pop_throwaways = intersperse [ POP ] ecode in
-      (defs, List.flatten pop_throwaways)
+      (defs, List.flatten pop_throwaways, smethods)
   | _ ->
       raise
       @@ Invalid_argument "Attempted to lower unsupported expr to linear_ir"
@@ -167,8 +179,8 @@ and compile_bop label_gen env top_level_bindings e0 e1 =
   let compile_expr_rec = compile_expr label_gen env top_level_bindings in
   function
   | (ADD | SUB | MUL | DIV) as int_to_int_op ->
-      let defs0, c0 = compile_expr_rec e0 in
-      let defs1, c1 = compile_expr_rec e1 in
+      let defs0, c0, s0 = compile_expr_rec e0 in
+      let defs1, c1, s1 = compile_expr_rec e1 in
       let standardise_bop = function
         | Common.ADD -> Instruction.ADD
         | SUB -> SUB
@@ -178,19 +190,20 @@ and compile_bop label_gen env top_level_bindings e0 e1 =
       in
       ( defs0 @ defs1,
         c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ]
-        @ [ BOP (standardise_bop int_to_int_op); BOX_INT ] )
+        @ [ BOP (standardise_bop int_to_int_op); BOX_INT ],
+        s0 @ s1 )
   | (LT | GT) as int_to_bool_op ->
-      let defs0, c0 = compile_expr_rec e0 in
-      let defs1, c1 = compile_expr_rec e1 in
+      let defs0, c0, s0 = compile_expr_rec e0 in
+      let defs1, c1, s1 = compile_expr_rec e1 in
       let standard_bop =
         if int_to_bool_op = LT then Instruction.LT else Instruction.GT
       in
       ( defs0 @ defs1,
-        c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP standard_bop; BOX_BOOL ]
-      )
+        c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP standard_bop; BOX_BOOL ],
+        s0 @ s1 )
   | AND ->
-      let defs0, c0 = compile_expr_rec e0 in
-      let defs1, c1 = compile_expr_rec e1 in
+      let defs0, c0, s0 = compile_expr_rec e0 in
+      let defs1, c1, s1 = compile_expr_rec e1 in
       let false_label = label_gen.ctrl_label () in
       let after_label = label_gen.ctrl_label () in
       ( defs0 @ defs1,
@@ -206,10 +219,11 @@ and compile_bop label_gen env top_level_bindings e0 e1 =
             PUSH_BOOL false;
             BOX_BOOL;
             LABEL after_label;
-          ] )
+          ],
+        s0 @ s1 )
   | OR ->
-      let defs0, c0 = compile_expr_rec e0 in
-      let defs1, c1 = compile_expr_rec e1 in
+      let defs0, c0, s0 = compile_expr_rec e0 in
+      let defs1, c1, s1 = compile_expr_rec e1 in
       let true_label = label_gen.ctrl_label () in
       let after_label = label_gen.ctrl_label () in
       ( defs0 @ defs1,
@@ -225,14 +239,15 @@ and compile_bop label_gen env top_level_bindings e0 e1 =
             PUSH_BOOL true;
             BOX_BOOL;
             LABEL after_label;
-          ] )
+          ],
+        s0 @ s1 )
   (* polymorphic eq *)
   | EQ ->
-      let defs0, c0 = compile_expr_rec e0 in
-      let defs1, c1 = compile_expr_rec e1 in
-      (defs0 @ defs1, c0 @ c1 @ [ BOP EQ; BOX_BOOL ])
+      let defs0, c0, smethods0 = compile_expr_rec e0 in
+      let defs1, c1, smethods1 = compile_expr_rec e1 in
+      (defs0 @ defs1, c0 @ c1 @ [ BOP EQ; BOX_BOOL ], smethods0 @ smethods1)
 
-and compile_lambda_expr label_gen env top_level_bindings
+and compile_anon_lambda_expr label_gen env top_level_bindings
     (arg_type, return_type, x, e) =
   let fvars_with_types =
     free_vars_with_types_expr (StringSet.add x top_level_bindings) e
@@ -251,12 +266,15 @@ and compile_lambda_expr label_gen env top_level_bindings
       (fun acc (name, ty) -> Value_env.add_instance_field name (name, ty) acc)
       body_env fvars_with_types
   in
-  let defs, ecode = compile_expr body_label_gen body_env top_level_bindings e in
-  compile_lambda label_gen env fvars_with_types defs
+  let defs, ecode, smethods =
+    compile_expr body_label_gen body_env top_level_bindings e
+  in
+  compile_anon_lambda label_gen env fvars_with_types defs
     (arg_type, return_type, ecode)
+    smethods
 
-and compile_lambda label_gen env fvars_with_types defs
-    (arg_type, return_type, body_code) =
+and compile_anon_lambda label_gen env fvars_with_types defs
+    (arg_type, return_type, body_code) smethods =
   let fvars = List.map (fun (x, _) -> x) fvars_with_types in
   let fvar_types = List.map (fun (_, y) -> y) fvars_with_types in
   let fetch_fvars = List.map (fun x -> Value_env.lookup x env) fvars in
@@ -276,23 +294,76 @@ and compile_lambda label_gen env fvars_with_types defs
   ( defs @ [ closure ],
     [ ALLOC_OBJ closure_label ]
     @ (List.rev fetch_fvars |> List.flatten)
-    @ [ CONSTRUCT_OBJ (closure_label, List.rev fvar_types) ] )
+    @ [ CONSTRUCT_OBJ (closure_label, List.rev fvar_types) ],
+    smethods )
+
+and compile_dyn_lambda_expr label_gen env top_level_bindings
+    (arg_type, return_type, x, e) =
+  let fvars_with_types =
+    free_vars_with_types_expr (StringSet.add x top_level_bindings) e
+    |> StringMap.to_seq |> List.of_seq
+    |> List.map (fun (x, ty) -> (x, convert_type ty))
+  in
+
+  let body_label_gen = reset_for_static_func_generators label_gen in
+
+  let body_env =
+    Value_env.strip_nonstatic env |> fun env ->
+    List.fold_left
+      (fun env (fv, _) ->
+        Value_env.add_local_var fv (body_label_gen.ref_label ()) env)
+      env fvars_with_types
+    |> Value_env.add_local_var x (body_label_gen.ref_label ())
+  in
+
+  let defs, ecode, smethods =
+    compile_expr body_label_gen body_env top_level_bindings e
+  in
+  compile_dyn_lambda label_gen env fvars_with_types defs
+    (arg_type, return_type, ecode)
+    smethods
+
+and compile_dyn_lambda label_gen env fvars_with_types defs
+    (arg_type, return_type, body_code) smethods =
+  let fvars = List.map (fun (x, _) -> x) fvars_with_types in
+  let fvar_types = List.map (fun (_, y) -> y) fvars_with_types in
+  let fetch_fvars = List.map (fun x -> Value_env.lookup x env) fvars in
+
+  let lifted_label = label_gen.lambda_label () in
+
+  let lifted_method =
+    {
+      name = lifted_label;
+      args = fvar_types @ [ arg_type ];
+      return_type;
+      body = body_code;
+    }
+  in
+  ( defs,
+    (List.rev fetch_fvars |> List.flatten)
+    @ [
+        CREATE_DYNAMIC_CLOSURE (lifted_label, fvar_types, arg_type, return_type);
+      ],
+    smethods @ [ lifted_method ] )
 
 and lower_tuple_eles_to_array label_gen env top_level_bindings es =
   let prelude = [ PUSH_INT (List.length es); ALLOC_ARRAY "java/lang/Object" ] in
   let main_col =
     List.mapi
       (fun i e ->
-        let edefs, ecode = compile_expr label_gen env top_level_bindings e in
-        (edefs, [ DUP; PUSH_INT i ] @ ecode @ [ STORE_ARRAY ]))
+        let edefs, ecode, smethods =
+          compile_expr label_gen env top_level_bindings e
+        in
+        (edefs, [ DUP; PUSH_INT i ] @ ecode @ [ STORE_ARRAY ], smethods))
       es
   in
-  let defs, maincode =
+  let defs, maincode, smethods =
     List.fold_right
-      (fun (defs, code) (accdefs, acccode) -> (defs @ accdefs, code @ acccode))
-      main_col ([], [])
+      (fun (defs, code, smethods) (accdefs, acccode, accsmethods) ->
+        (defs @ accdefs, code @ acccode, smethods @ accsmethods))
+      main_col ([], [], [])
   in
-  (defs, prelude @ maincode)
+  (defs, prelude @ maincode, smethods)
 
 let lower_type_constructor tname
     (Typed_ast.DeclConstr (_, cname, type_expr_opt)) =
@@ -308,6 +379,7 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
           CONSTRUCT_OBJ (cname, []);
           STORE_STATIC ("Foo", cname, typedef_texpr);
         ],
+        [],
         Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
   | Some ty ->
       let body =
@@ -315,12 +387,13 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
       in
       let fvars_with_types = [] in
 
-      let defs, code =
-        compile_lambda label_gen env fvars_with_types []
-          (ty, typedef_texpr, body)
+      let defs, code, smethods =
+        compile_anon_lambda label_gen env fvars_with_types []
+          (ty, typedef_texpr, body) []
       in
       ( defs,
         code @ [ STORE_STATIC ("Foo", cname, typedef_texpr) ],
+        smethods,
         Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
 
 let compile_decl label_gen env toplevel = function
@@ -331,9 +404,10 @@ let compile_decl label_gen env toplevel = function
         Value_env.add_static_field x ("Foo", x_label, convert_type ty) env
       in
       let new_toplevel = StringSet.add x toplevel in
-      let defs, c = compile_expr label_gen env' new_toplevel e in
+      let defs, c, smethods = compile_expr label_gen env' new_toplevel e in
       ( defs,
         c @ [ STORE_STATIC ("Foo", x_label, convert_type ty) ],
+        smethods,
         env',
         new_toplevel )
   | Typed_ast.Type (_, ty, _, tname, type_constructors) ->
@@ -352,32 +426,34 @@ let compile_decl label_gen env toplevel = function
         List.map (lower_type_constructor class_tname) type_constructors
       in
       (* current bodge - adding static fields for creating constructors *)
-      let defs, code, env =
+      let defs, code, smethods, env =
         List.fold_right
           (fun (Typed_ast.DeclConstr (_, cname, type_expr_op))
-               (accdefs, acccode, env) ->
-            let defs, code, env =
+               (accdefs, acccode, accsmethods, env) ->
+            let defs, code, smethods, env =
               lambda_for_constructor label_gen env cname (convert_type ty)
                 (Option.map convert_type type_expr_op)
             in
-            (defs @ accdefs, code @ acccode, env))
-          type_constructors ([], [], env)
+            (defs @ accdefs, code @ acccode, smethods @ accsmethods, env))
+          type_constructors ([], [], [], env)
       in
-      ([ typei ] @ tconstrs @ defs, code, env, toplevel)
+      ([ typei ] @ tconstrs @ defs, code, smethods, env, toplevel)
 
 let compile_decl_from_scratch d =
   let generators = make_generators () in
-  let defs, code, _, _ =
+  let defs, code, smethods, _, _ =
     compile_decl generators Value_env.stdlib StringSet.empty d
   in
-  (defs, code)
+  (defs, code, smethods)
 
 let compile_program_from_scratch p =
   let generators = make_generators () in
   List.fold_left
-    (fun (defsacc, codeacc, envacc, tlacc) d ->
-      let defs, code, env, tl = compile_decl generators envacc tlacc d in
-      (defsacc @ defs, codeacc @ code, env, tl))
-    ([], [], Value_env.stdlib, StringSet.empty)
+    (fun (defsacc, codeacc, smethodsacc, envacc, tlacc) d ->
+      let defs, code, smethods, env, tl =
+        compile_decl generators envacc tlacc d
+      in
+      (defsacc @ defs, codeacc @ code, smethodsacc @ smethods, env, tl))
+    ([], [], [], Value_env.stdlib, StringSet.empty)
     p
-  |> fun (defs, code, _, _) -> (defs, code)
+  |> fun (defs, code, smethods, _, _) -> (defs, code, smethods)

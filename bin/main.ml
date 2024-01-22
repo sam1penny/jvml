@@ -1,5 +1,5 @@
 let () =
-  let defs, linear_ir =
+  let defs, linear_ir, _ =
     Linear.Driver.compile_program "type either = X | Y val s = X"
   in
   List.iter

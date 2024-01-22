@@ -20,6 +20,7 @@ let stack_size_change = function
   | APPLY _ -> -1
   | LOAD_STATIC _ -> 1
   | STORE_STATIC _ -> -1
+  | CREATE_DYNAMIC_CLOSURE (_, tys, _, _) -> 1 - List.length tys
 
 let max_stack_depth prog =
   List.map stack_size_change prog
@@ -50,7 +51,7 @@ let lower_type_list tys =
   List.map lower_type_as_descriptor tys |> String.concat ""
 
 let make_jvm_ctrl_gen () =
-  let cnt = Linear.Lower.make_counter () in
+  let cnt = Linear.Lower.make_counter 0 in
   fun () -> "Ljvm" ^ string_of_int @@ cnt ()
 
 let lower_bop ctrl_gen = function
@@ -85,6 +86,21 @@ let store_ref = function
 let load_ref = function
   | (0 | 1 | 2 | 3) as n -> sprintf "aload_%i" n
   | n -> sprintf "aload %i" n
+
+let lower_dyn_closure lifted captured_tys arg_type return_type =
+  [
+    sprintf
+      "invokedynamic InvokeDynamic invokeStatic Method \
+       java/lang/invoke/LambdaMetafactory metafactory \
+       (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; \
+       MethodType (Ljava/lang/Object;)Ljava/lang/Object; MethodHandle \
+       invokeStatic Method Foo %s (%s)L%s; MethodType (L%s;)L%s; : apply \
+       (%s)Ljava/util/function/Function;"
+      lifted
+      (lower_type_list (captured_tys @ [ arg_type ]))
+      (lower_type return_type) (lower_type arg_type) (lower_type return_type)
+      (lower_type_list captured_tys);
+  ]
 
 let lower_instruction ctrl_gen clazz = function
   | PUSH_INT i -> [ load_int i ]
@@ -131,6 +147,8 @@ let lower_instruction ctrl_gen clazz = function
       [ sprintf "getstatic Field %s %s L%s;" clazz f (lower_type ty) ]
   | STORE_STATIC (clazz, f, ty) ->
       [ sprintf "putstatic Field %s %s L%s;" clazz f (lower_type ty) ]
+  | CREATE_DYNAMIC_CLOSURE (lifted, captured_tys, arg_type, return_type) ->
+      lower_dyn_closure lifted captured_tys arg_type return_type
 
 let should_indent = function LABEL _ -> false | _ -> true
 
@@ -339,6 +357,22 @@ let lower_declaration = function
   | Type_interface ti -> lower_type_interface ti
   | Constructor c -> lower_value_constructor c
 
+let lower_static_method static_method =
+  sprintf
+    {|
+.method private static synthetic %s : (%s)L%s;
+  .code stack 10 locals 10
+%s
+    areturn
+
+  .end code
+.end method
+  |}
+    static_method.name
+    (lower_type_list static_method.args)
+    (lower_type static_method.return_type)
+    (lower_body "     " "Foo" static_method.body)
+
 let lower_field_defs p =
   List.filter_map
     (function STORE_STATIC (_, f, ty) -> Some (f, ty) | _ -> None)
@@ -347,7 +381,8 @@ let lower_field_defs p =
          sprintf ".field public static %s L%s;" f (lower_type ty))
   |> String.concat "\n"
 
-let produce_instruction_bytecode p =
+let produce_instruction_bytecode (p, static_methods) =
+  (* .version 65 0 required for invokedynamic, however requires stackmaptable *)
   sprintf
     {|
 .class public Foo
@@ -359,10 +394,16 @@ let produce_instruction_bytecode p =
         return
   .end code
 .end method
+%s
+.bootstrapmethods
+.innerclasses
+    java/lang/invoke/MethodHandles$Lookup java/lang/invoke/MethodHandles Lookup public static final
+.end innerclasses
 .end class
 |}
     (lower_field_defs p) (max_stack_depth p) (num_local_vars 1 p)
     (lower_body "        " "Foo" p)
+    (List.map lower_static_method static_methods |> String.concat "\n")
 
 let stdlib =
   {|
