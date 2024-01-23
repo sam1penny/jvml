@@ -11,6 +11,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+/*
+credit - https://stackoverflow.com/questions/46622206/any-way-to-regenerate-stackmap-from-byte-code
+*/
+
 public class StackMapGen {
     public static void main(String[] args) {
         if (args.length == 0) {
