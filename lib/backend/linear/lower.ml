@@ -137,7 +137,7 @@ let rec compile_expr label_gen env top_level_bindings e =
         @ c2 @ [ LABEL after_label ],
         s0 @ s1 @ s2 )
   | Fun (_, t0, t1, x, e) ->
-      compile_anon_lambda_expr label_gen env top_level_bindings
+      compile_dyn_lambda_expr label_gen env top_level_bindings
         (convert_type t0, convert_type t1, x, e)
   | App (_, ty, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in

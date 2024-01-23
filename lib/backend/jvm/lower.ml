@@ -382,9 +382,10 @@ let lower_field_defs p =
   |> String.concat "\n"
 
 let produce_instruction_bytecode (p, static_methods) =
-  (* .version 65 0 required for invokedynamic, however requires stackmaptable *)
+  (* .version > 50 required for invokedynamic, however requires stackmaptable *)
   sprintf
     {|
+.version 52 0
 .class public Foo
 .super java/lang/Object
 %s
