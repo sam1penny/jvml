@@ -15,6 +15,7 @@ type expr =
   | Match of loc * expr * (pattern * expr) list
   | Tuple of loc * expr list
   | Let of loc * string * expr * expr
+  | LetRec of loc * string * expr * expr
   | Seq of loc * expr list
 
 and pattern =
@@ -54,6 +55,7 @@ let get_expr_loc = function
   | Match (loc, _, _) -> loc
   | Tuple (loc, _) -> loc
   | Let (loc, _, _, _) -> loc
+  | LetRec (loc, _, _, _) -> loc
   | Constr (loc, _) -> loc
   | Seq (loc, _) -> loc
 
@@ -82,6 +84,7 @@ let string_of_expr_node =
   | Match _ -> "Match"
   | Tuple _ -> "Tuple"
   | Let (_, x, _, _) -> sprintf "Let %s" x
+  | LetRec (_, x, _, _) -> sprintf "LetRec %s" x
   | Seq _ -> "Seq"
 
 let string_of_pat_node =
@@ -165,7 +168,7 @@ let rec pp_expr ?(indent = "") expr =
   | Tuple (_, es) ->
       pp_node expr;
       List.iter pp_rec_expr es
-  | Let (_, _, e0, e1) ->
+  | Let (_, _, e0, e1) | LetRec (_, _, e0, e1) ->
       pp_node expr;
       pp_rec_expr e0;
       pp_rec_expr e1

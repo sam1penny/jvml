@@ -5,7 +5,7 @@
 %token LPAREN, RPAREN
 %token TRUE, FALSE, AND, OR, IF, THEN, ELSE, EQ, LT, GT
 %token FUN, ARROW, MATCH, BAR, WITH, UNDERSCORE
-%token UNIT, COMMA, APOSTROPHE, LET, IN
+%token UNIT, COMMA, APOSTROPHE, LET, IN, REC
 %token DO, SEMICOLON, LCURLY, RCURLY
 %token CONS, EMPTY_LIST
 %token EOF
@@ -75,6 +75,7 @@ expr:
  | FUN; i = LOWERCASE_IDENT; ARROW; e = expr; {Parsed_ast.Fun($sloc, i, e)}
  | MATCH; e = expr; WITH ; option(BAR); cl = separated_nonempty_list(BAR, case) {Parsed_ast.Match($sloc, e, cl)}
  | LET; i = LOWERCASE_IDENT; EQ; e1 = expr; IN; e2 = expr; {Parsed_ast.Let ($sloc, i, e1, e2)}
+ | LET; REC; i = LOWERCASE_IDENT; EQ; e1 = expr; IN; e2 = expr; {Parsed_ast.LetRec ($sloc, i, e1, e2)}
  | DO; LCURLY; es = tuple_sep(SEMICOLON, expr); RCURLY { Parsed_ast.Seq($sloc, es)}
 
 pattern1:

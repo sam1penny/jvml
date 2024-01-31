@@ -59,6 +59,7 @@ rule token = parse
     | "of" { OF }
     | "val" { VAL }
     | "let" { LET }
+    | "rec" { REC }
     | "in" { IN }
     | "do" { DO }
     | lowercase_indent { LOWERCASE_IDENT (Lexing.lexeme lexbuf)}

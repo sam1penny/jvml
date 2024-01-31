@@ -96,6 +96,9 @@ let free_vars_with_types_expr bound e =
         let free_e0 = aux bound free e0 in
         let bound' = StringSet.add x bound in
         StringMap.union takeleft free_e0 (aux bound' free e1)
+    | LetRec (_, _, x, e0, e1) ->
+        let bound' = StringSet.add x bound in
+        StringMap.union takeleft (aux bound' free e0) (aux bound' free e1)
     | Seq (_, _, es) ->
         List.map (aux bound free) es
         |> List.fold_left (StringMap.union takeleft) StringMap.empty
@@ -137,7 +140,7 @@ let rec compile_expr label_gen env top_level_bindings e =
         @ c2 @ [ LABEL after_label ],
         s0 @ s1 @ s2 )
   | Fun (_, t0, t1, x, e) ->
-      compile_dyn_lambda_expr label_gen env top_level_bindings
+      compile_anon_lambda_expr label_gen env top_level_bindings
         (convert_type t0, convert_type t1, x, e)
   | App (_, ty, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in
@@ -151,6 +154,25 @@ let rec compile_expr label_gen env top_level_bindings e =
         compile_expr label_gen env_with_x top_level_bindings e1
       in
       (defs0 @ defs1, c0 @ [ STORE_REF x_label ] @ c1, s0 @ s1)
+  | LetRec (_, _, x, e0, e1) ->
+      let x_label = label_gen.static_label () in
+      let env_with_x =
+        Value_env.add_static_field x
+          ("Foo", x_label, convert_type (Infer.get_expr_type e0))
+          env
+      in
+      let new_toplevel = StringSet.add x top_level_bindings in
+      let defs0, c0, s0 = compile_expr label_gen env_with_x new_toplevel e0 in
+      let defs1, c1, s1 =
+        compile_expr label_gen env_with_x top_level_bindings e1
+      in
+      ( defs0 @ defs1,
+        c0
+        @ [
+            STORE_STATIC ("Foo", x_label, convert_type (Infer.get_expr_type e0));
+          ]
+        @ c1,
+        s0 @ s1 )
   | Constr (_, _, cname) -> ([], Value_env.lookup cname env, [])
   | Tuple (_, _, ts) ->
       let defs, lowered_tuple_code, smethods =

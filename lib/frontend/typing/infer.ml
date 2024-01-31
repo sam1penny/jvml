@@ -15,7 +15,7 @@ let get_expr_type =
   | App (_, t, _, _) -> t
   | Match (_, t, _, _) -> t
   | Tuple (_, t, _) -> t
-  | Let (_, t, _, _, _) -> t
+  | Let (_, t, _, _, _) | LetRec (_, t, _, _, _) -> t
   | Constr (_, t, _) -> t
   | Seq (_, t, _) -> t
 
@@ -133,6 +133,11 @@ let rec map_over_expr_texprs f expr =
       let e0' = map_over_expr_texprs f e0 in
       let e1' = map_over_expr_texprs f e1 in
       Let (loc, ty', x, e0', e1')
+  | LetRec (loc, ty, x, e0, e1) ->
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      LetRec (loc, ty', x, e0', e1')
   | Constr (loc, ty, cname) -> Constr (loc, f ty, cname)
   | Seq (loc, ty, es) ->
       let ty' = f ty in
@@ -416,6 +421,16 @@ let rec type_expr unifications nt env expr =
       in
       type_expr unifications nt env' e1 >>=? fun e1node ->
       Ok (Typed_ast.Let (loc, get_expr_type e1node, x, e0node, e1node))
+  | Parsed_ast.LetRec (loc, x, e0, e1) ->
+      let x_type = nt () in
+      let env' = StringMap.add x (x_type, StringSet.empty) env in
+      type_expr unifications nt env' e0 >>=? fun e0node ->
+      let env' =
+        StringMap.add x (generalize env' (get_expr_type e0node)) env'
+      in
+      unify unifications x_type (get_expr_type e0node) loc >>=? fun _ ->
+      type_expr unifications nt env' e1 >>=? fun e1node ->
+      Ok (Typed_ast.LetRec (loc, get_expr_type e1node, x, e0node, e1node))
   | Parsed_ast.Constr (loc, cname) -> (
       match StringMap.find_opt cname env with
       | None -> Error (loc, sprintf "unbound constructor %s" cname)

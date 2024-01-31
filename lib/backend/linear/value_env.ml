@@ -30,7 +30,10 @@ let lookup k env =
   | None ->
       raise
       @@ Failure
-           "looked up unknown var/field/staticmethod when lowering to linear_ir"
+           (Printf.sprintf
+              "looked up unknown var/field/staticmethod '%s' when lowering to \
+               linear_ir"
+              k)
 
 let strip_nonstatic env =
   StringMap.filter (fun _ -> function Static_field _ -> true | _ -> false) env
