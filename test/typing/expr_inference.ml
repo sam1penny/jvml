@@ -236,3 +236,10 @@ let%expect_test "test unmatched pattern bindings fails" =
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
   [%expect {|Error|}]
+
+let%expect_test "test let rec function typing" =
+  let x = LetRec ("x", Fun ("x", Ident "x"), Ident "x") in
+  Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
+  |> Result.map Typing.Infer.get_expr_type
+  |> pp_tree_result |> print_string;
+  [%expect {|Ok('a -> 'a)|}]

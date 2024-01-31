@@ -171,3 +171,19 @@ let%expect_test "test recursive function" =
   120
   720
   |}]
+
+let%expect_test "test let rec" =
+  let factorial_letrec =
+    {|
+  val fact = let rec fact_inner = fun n -> if n = 0 then 1 else n * fact_inner (n - 1) in fact_inner
+  val test = do {print(fact 0); print (fact 1); print (fact 2); print (fact 5); print(fact 6)}
+  |}
+  in
+  let _ = build_and_run factorial_letrec in
+  [%expect {|
+  1
+  1
+  2
+  120
+  720
+  |}]

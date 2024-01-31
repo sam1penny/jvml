@@ -140,3 +140,15 @@ let%expect_test "test sequencing" =
          └──()
          └──Bool true
          └──Int 3 |}]
+
+let%expect_test "test letrec without immediate binding" =
+  let parse () =
+    let x = "val f = let rec id = do {3; id x} in id" in
+    Parsing.Driver.parse_string x
+  in
+  try
+    let _ = parse () in
+    print_endline "Ok"
+  with _ ->
+    print_endline "Error";
+    [%expect {|Error|}]
