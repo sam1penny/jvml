@@ -74,4 +74,11 @@ type static_method = {
 }
 [@@deriving show]
 
+type program = {
+  declarations : declaration list;
+  code : instruction list;
+  static_methods : static_method list;
+}
+[@@deriving show]
+
 let show_program p = List.map show_instruction p |> String.concat "\n"

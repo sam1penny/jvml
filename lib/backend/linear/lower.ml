@@ -466,7 +466,7 @@ let compile_decl_from_scratch d =
   let defs, code, smethods, _, _ =
     compile_decl generators Value_env.stdlib StringSet.empty d
   in
-  (defs, code, smethods)
+  { declarations = defs; code; static_methods = smethods }
 
 let compile_program_from_scratch p =
   let generators = make_generators () in
@@ -478,4 +478,5 @@ let compile_program_from_scratch p =
       (defsacc @ defs, codeacc @ code, smethodsacc @ smethods, env, tl))
     ([], [], [], Value_env.stdlib, StringSet.empty)
     p
-  |> fun (defs, code, smethods, _, _) -> (defs, code, smethods)
+  |> fun (defs, code, smethods, _, _) ->
+  { declarations = defs; code; static_methods = smethods }

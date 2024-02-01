@@ -1,5 +1,6 @@
 let () =
-  let defs, linear_ir, _ =
+  let open Linear.Instruction in
+  let { declarations = defs; code = linear_ir; _ } =
     Linear.Driver.compile_program "type either = X | Y val s = X"
   in
   List.iter

@@ -29,7 +29,10 @@ let () =
       print_endline usage_msg;
       exit 0)
   in
-  let decs, instructions, static_methods = Linear.Driver.compile_program prog in
+  let open Linear.Instruction in
+  let { declarations = decs; code = instructions; static_methods } =
+    Linear.Driver.compile_program prog
+  in
   print_endline Jvm.Lower.stdlib;
   List.iter (fun x -> Jvm.Lower.lower_declaration x |> print_endline) decs;
   Jvm.Lower.produce_instruction_bytecode (instructions, static_methods)
