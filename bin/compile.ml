@@ -8,32 +8,17 @@ let speclist =
     ("-f", Arg.Set_string file, "Set file to compile");
   ]
 
-let open_file filename =
-  let ch = In_channel.open_bin filename in
-  let s =
-    In_channel.really_input_string ch (In_channel.length ch |> Int64.to_int)
-  in
-  In_channel.close ch;
-  Option.get s
-
 let () =
   Arg.parse speclist
     (fun _ ->
       print_endline usage_msg;
       exit 0)
     usage_msg;
-  let prog =
+  let program_text =
     if !program_string != "" then !program_string
-    else if !file != "" then open_file !file
+    else if !file != "" then Jvml.Run_jvml.file_to_string !file
     else (
       print_endline usage_msg;
       exit 0)
   in
-  let open Linear.Instruction in
-  let { declarations = decs; code = instructions; static_methods } =
-    Linear.Driver.compile_program prog
-  in
-  print_endline Jvm.Lower.stdlib;
-  List.iter (fun x -> Jvm.Lower.lower_declaration x |> print_endline) decs;
-  Jvm.Lower.produce_instruction_bytecode (instructions, static_methods)
-  |> print_endline
+  Jvml.Run_jvml.compile_program_from_string program_text |> print_endline

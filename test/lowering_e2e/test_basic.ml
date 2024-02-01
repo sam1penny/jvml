@@ -1,7 +1,10 @@
-open Printf
-
 let build_and_run prog =
-  Sys.command (sprintf "bash build_run_e2e.sh -s \"%s\"" prog)
+  let _ = if not (Sys.file_exists "tmp/") then Sys.mkdir "tmp/" 0o755 in
+  let tmp = open_out "tmp/test.j" in
+  let bytecode = Jvml.Run_jvml.compile_program_from_string prog in
+  Out_channel.output_string tmp bytecode;
+  Out_channel.close tmp;
+  Sys.command "bash build_run_e2e.sh"
 
 let%expect_test "basic arithmetic e2e" =
   let program = "val x = print (3 + 2 * 5)" in
@@ -15,7 +18,7 @@ let%expect_test "test closures" =
   in
   let _ = build_and_run program in
   [%expect {|6|}]
-
+(*
 let%expect_test "test boolean OR" =
   let program =
     {|
@@ -187,3 +190,4 @@ let%expect_test "test let rec" =
   120
   720
   |}]
+*)

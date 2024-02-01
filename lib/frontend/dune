@@ -1,5 +1,0 @@
-(library
- (name jvml)
- (libraries common parsing typing)
- (instrumentation
-  (backend bisect_ppx)))
