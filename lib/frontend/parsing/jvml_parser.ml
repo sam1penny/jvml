@@ -24,6 +24,18 @@ let rec check_letrec = function
 
 let map_over_decl_exprs f = function
   | Val (loc, x, e) -> Val (loc, x, f e)
+  | ValRec (loc, x, e) -> ValRec (loc, x, e)
   | Type _ as t -> t
 
-let prog t l = Parser.prog t l |> List.map (map_over_decl_exprs check_letrec)
+let check_valrec = function
+  | ValRec (_, _, Fun _) as decl -> decl
+  | ValRec (loc, _, _) ->
+      raise
+      @@ CustomParserError
+           (loc, "You must bind a lambda on the rhs of a 'val rec'")
+  | decl -> decl
+
+let prog t l =
+  Parser.prog t l
+  |> List.map (map_over_decl_exprs check_letrec)
+  |> List.map check_valrec

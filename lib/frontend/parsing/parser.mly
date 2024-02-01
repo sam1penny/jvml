@@ -100,6 +100,7 @@ case:
 decl:
   | TYPE; tparams = loption(type_params); tname = LOWERCASE_IDENT; EQ; option(BAR); cl = separated_nonempty_list(BAR, type_constr) {Parsed_ast.Type($sloc, tparams, tname, cl)}
   | VAL; vname = LOWERCASE_IDENT; EQ; e = expr {Parsed_ast.Val ($sloc, vname, e)}
+  | VAL; REC; vname = LOWERCASE_IDENT; EQ; e = expr {Parsed_ast.ValRec ($sloc, vname, e)}
 
 type_constr:
   | tconstr = UPPERCASE_IDENT; {Parsed_ast.DeclConstr ($sloc, tconstr, None) }

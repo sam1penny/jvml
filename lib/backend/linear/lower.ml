@@ -420,6 +420,18 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
 
 let compile_decl label_gen env toplevel = function
   | Typed_ast.Val (_, ty, x, e) ->
+      let defs, c, smethods = compile_expr label_gen env toplevel e in
+      let x_label = label_gen.static_label () in
+      let env' =
+        Value_env.add_static_field x ("Foo", x_label, convert_type ty) env
+      in
+      let new_toplevel = StringSet.add x toplevel in
+      ( defs,
+        c @ [ STORE_STATIC ("Foo", x_label, convert_type ty) ],
+        smethods,
+        env',
+        new_toplevel )
+  | Typed_ast.ValRec (_, ty, x, e) ->
       (* make value available in e for compiling recursion *)
       let x_label = label_gen.static_label () in
       let env' =

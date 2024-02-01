@@ -159,7 +159,7 @@ let%expect_test "test basic sequence" =
 let%expect_test "test recursive function" =
   let factorial =
     {|
-  val fact = fun n -> if n = 0 then 1 else n * fact (n - 1)
+  val rec fact = fun n -> if n = 0 then 1 else n * fact (n - 1)
   val test = do {print(fact 0); print (fact 1); print (fact 2); print (fact 5); print(fact 6)}
   |}
   in

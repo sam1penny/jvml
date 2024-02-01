@@ -42,6 +42,7 @@ type type_constr = DeclConstr of loc * string * type_expr option
 
 type decl =
   | Val of loc * type_expr * string * expr
+  | ValRec of loc * type_expr * string * expr
   | Type of loc * type_expr * string list * string * type_constr list
 
 (** important - call only *once* for a particularly operator. EQ is polymorphic *)
@@ -193,6 +194,9 @@ let pp_decl ?(indent = "") =
   function
   | Val (_, _, v, e) ->
       print_with_indent indent ("Val " ^ v);
+      pp_expr ~indent:(indent ^ "   ") e
+  | ValRec (_, _, v, e) ->
+      print_with_indent indent ("ValRec " ^ v);
       pp_expr ~indent:(indent ^ "   ") e
   | Type (_, _, params, t, constructors) ->
       print_with_indent indent ("Type " ^ t);

@@ -41,6 +41,7 @@ type type_constr = DeclConstr of loc * string * type_expr option
 
 type decl =
   | Val of loc * string * expr
+  | ValRec of loc * string * expr
   | Type of loc * string list * string * type_constr list
 
 let get_expr_loc = function
@@ -196,6 +197,9 @@ let pp_decl ?(indent = "") =
   function
   | Val (_, v, e) ->
       print_with_indent indent ("Val " ^ v);
+      pp_expr ~indent:(indent ^ "   ") e
+  | ValRec (_, v, e) ->
+      print_with_indent indent ("ValRec " ^ v);
       pp_expr ~indent:(indent ^ "   ") e
   | Type (_, params, t, constructors) ->
       print_with_indent indent ("Type " ^ t);

@@ -21,7 +21,7 @@ let get_expr_type =
 
 let get_decl_type =
   let open Typed_ast in
-  function Val (_, t, _, _) -> t | Type (_, t, _, _, _) -> t
+  function Val (_, t, _, _) | ValRec (_, t, _, _) | Type (_, t, _, _, _) -> t
 
 module Unifications = Disjoint_set.Make (struct
   type t = Typed_ast.type_expr
@@ -149,6 +149,9 @@ let map_over_decl_texprs f decl =
   | Val (loc, ty, x, e) ->
       let ty' = f ty in
       Val (loc, ty', x, map_over_expr_texprs f e)
+  | ValRec (loc, ty, x, e) ->
+      let ty' = f ty in
+      ValRec (loc, ty', x, map_over_expr_texprs f e)
   | Type _ -> decl (* todo: verify this is correct *)
 
 let instantiate nt bound t =
@@ -567,6 +570,18 @@ let type_decl unifications nt env type_env = function
       if StringMap.mem v env then
         Error (loc, sprintf "Duplicate definition of binding %s" v)
       else
+        type_expr unifications nt env expr >>=? fun exprnode ->
+        let env' =
+          StringMap.add v (generalize env (get_expr_type exprnode)) env
+        in
+        Ok
+          ( Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode),
+            env',
+            type_env )
+  | Parsed_ast.ValRec (loc, v, expr) ->
+      if StringMap.mem v env then
+        Error (loc, sprintf "Duplicate definition of binding %s" v)
+      else
         (* support recursion *)
         let v_type = nt () in
         let env' = StringMap.add v (v_type, StringSet.empty) env in
@@ -576,7 +591,7 @@ let type_decl unifications nt env type_env = function
         in
         unify unifications v_type (get_expr_type exprnode) loc >>=? fun _ ->
         Ok
-          ( Typed_ast.Val (loc, get_expr_type exprnode, v, exprnode),
+          ( Typed_ast.ValRec (loc, get_expr_type exprnode, v, exprnode),
             env',
             type_env )
   | Parsed_ast.Type (loc, params, tname, constructors) ->

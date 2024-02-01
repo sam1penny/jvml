@@ -39,6 +39,7 @@ type type_constr = DeclConstr of string * type_expr option
 
 type decl =
   | Val of string * expr
+  | ValRec of string * expr
   | Type of string list * string * type_constr list
 
 (* simplify dummy location for testing *)
@@ -117,6 +118,7 @@ let add_dummy_loc_decl =
   let open Parsing in
   function
   | Val (x, e) -> Parsed_ast.Val (dummy, x, add_dummy_loc_expr e)
+  | ValRec (x, e) -> Parsed_ast.ValRec (dummy, x, add_dummy_loc_expr e)
   | Type (params, tname, constructors) ->
       Parsed_ast.Type
         (dummy, params, tname, List.map add_dummy_loc_constr constructors)

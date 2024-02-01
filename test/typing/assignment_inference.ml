@@ -32,7 +32,7 @@ let%expect_test "basic assignment" =
 
 let%expect_test "recursive function" =
   let x =
-    Val
+    ValRec
       ( "fact",
         Fun
           ( "x",
@@ -181,7 +181,7 @@ let%expect_test "test pattern matching constructor" =
                 Some (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "list") ])
               );
           ] );
-      Val
+      ValRec
         ( "map",
           Fun
             ( "f",
