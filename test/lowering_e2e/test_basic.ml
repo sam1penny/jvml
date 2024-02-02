@@ -18,7 +18,7 @@ let%expect_test "test closures" =
   in
   let _ = build_and_run program in
   [%expect {|6|}]
-(*
+
 let%expect_test "test boolean OR" =
   let program =
     {|
@@ -190,4 +190,3 @@ let%expect_test "test let rec" =
   120
   720
   |}]
-*)

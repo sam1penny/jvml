@@ -2,6 +2,6 @@
  (name jvml)
  (preprocess
   (pps ppx_deriving.show))
- (libraries core common parsing typing jvm linear)
+ (libraries common parsing typing jvm linear)
  (instrumentation
   (backend bisect_ppx)))
