@@ -478,15 +478,6 @@ module StringTbl = Hashtbl.Make (struct
   let hash = Hashtbl.hash
 end)
 
-let simplify_texpr ty =
-  let nc = make_new_char () in
-  let remap = StringTbl.create 10 in
-  let simplify_tvar v =
-    if not @@ StringTbl.mem remap v then StringTbl.add remap v (nc ());
-    Typed_ast.TyVar (StringTbl.find remap v)
-  in
-  map_over_texpr_vars simplify_tvar ty
-
 let simplify_texpr_state () =
   let nc = make_new_char () in
   let remap = StringTbl.create 10 in
