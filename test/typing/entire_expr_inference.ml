@@ -10,6 +10,20 @@ let pp_entire_tree_result = function
       print_endline ")"
   | Error _ -> print_endline "Error"
 
+let pp_entire_decl_result = function
+    | Ok decl ->
+      print_endline "Ok(";
+      Typing.Typed_ast.pp_decl decl;
+      print_endline ")"
+    | Error _ -> print_endline "Error"
+
+let pp_entire_progam_result = function
+    | Ok program ->
+      print_endline "Ok(";
+      List.iter Typing.Typed_ast.pp_decl program;
+      print_endline ")"
+    | Error _ -> print_endline "Error"
+
 let%expect_test "test nested function unification + simplification in APPLY" =
   let x = Fun ("f", Fun ("x", App (Ident "f", Ident "x"))) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr |> pp_entire_tree_result;
@@ -59,3 +73,94 @@ let%expect_test "test operator unification + simplification" =
              └──Ident x : int
     )
   |}]
+
+let%expect_test "test valid type definition" =
+  let x = Type(["'a"], "list", [DeclConstr("Nil", None); DeclConstr("Some", Some (TyTuple([TyInt; TyCustom([TyVar "'a"], "list")])))]) in
+  Utils.add_dummy_loc_decl x |> Typing.Driver.type_decl |> pp_entire_decl_result;
+  [%expect {|
+    Ok(
+    └──Type list
+       └──params = ['a]
+       └──constructors
+          └──Nil
+          └──Some of (int * 'a list)
+    )|}]
+
+let%expect_test "test invalid type definition - unknown parameter" =
+  let x = Type(["'a"], "list", [DeclConstr("Nil", None); DeclConstr("Some", Some (TyTuple([TyInt; TyCustom([TyVar "'b"], "list")])))]) in
+  Utils.add_dummy_loc_decl x |> Typing.Driver.type_decl |> pp_entire_decl_result;
+  [%expect {|Error|}]
+
+let%expect_test "test entire tree with pattern matching constructor" =
+let x =
+  [
+    Type
+      ( [ "'a" ],
+        "list",
+        [
+          DeclConstr ("N", None);
+          DeclConstr
+            ( "C",
+              Some (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "list") ])
+            );
+        ] );
+    ValRec
+      ( "map",
+        Fun
+          ( "f",
+            Fun
+              ( "x",
+                Match
+                  ( Ident "x",
+                    [
+                      (Pat_Constr ("N", None), Constr "N");
+                      ( Pat_Constr
+                          ( "C",
+                            Some
+                              (Pat_Tuple [ Pat_Ident "hd"; Pat_Ident "tl" ])
+                          ),
+                        App
+                          ( Constr "C",
+                            Tuple
+                              [
+                                App (Ident "f", Ident "hd");
+                                App (App (Ident "map", Ident "f"), Ident "tl");
+                              ] ) );
+                    ] ) ) ) );
+  ]
+  in
+  List.map Utils.add_dummy_loc_decl x
+  |> Typing.Driver.type_program
+  |> pp_entire_progam_result;
+  [%expect {|
+    Ok(
+    └──Type list
+       └──params = ['a]
+       └──constructors
+          └──N
+          └──C of ('a * 'a list)
+    └──ValRec map
+       └──Fun f : ('a -> 'b) -> 'a list -> 'b list
+          └──Fun x : 'a list -> 'b list
+             └──Match
+                └──Ident x : 'a list
+                └── <case>
+                   └──Pat_Constr N
+                   └──Constructor N
+                └── <case>
+                   └──Pat_Constr C
+                      └──Pat_Tuple
+                         └──Pat_Ident hd
+                         └──Pat_Ident tl
+                   └──App
+                      └──Constructor C
+                      └──Tuple : ('b * 'b list)
+                         └──App
+                            └──Ident f : 'a -> 'b
+                            └──Ident hd : 'a
+                         └──App
+                            └──App
+                               └──Ident map : ('a -> 'b) -> 'a list -> 'b list
+                               └──Ident f : 'a -> 'b
+                            └──Ident tl : 'a list
+    ) |}]
