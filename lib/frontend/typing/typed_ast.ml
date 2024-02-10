@@ -100,20 +100,21 @@ let string_of_expr_node =
   | Tuple (_, ty, _) -> sprintf "Tuple : %s" (pp_texpr ty)
   | Let (_, _, x, _, _) -> sprintf "Let %s" x
   | LetRec (_, _, x, _, _) -> sprintf "LetRec %s" x
-  | Constr (_, _, cname) -> sprintf "Constructor %s" cname
+  | Constr (_, ty, cname) -> sprintf "Constructor %s : %s" cname (pp_texpr ty)
   | Seq _ -> "Seq"
 
 let string_of_pat_node =
   let open Printf in
   function
   | Pat_Int (_, i) -> sprintf "Pat_Int %i" i
-  | Pat_Ident (_, _, ident) -> sprintf "Pat_Ident %s" ident
+  | Pat_Ident (_, ty, ident) -> sprintf "Pat_Ident %s : %s" ident (pp_texpr ty)
   | Pat_Bool (_, b) -> sprintf "Pat_Bool %b" b
   | Pat_Unit _ -> sprintf "Pat_()"
   | Pat_Any _ -> "Pat_Any"
   | Pat_Or _ -> "Pat_Or"
   | Pat_Tuple _ -> "Pat_Tuple"
-  | Pat_Constr (_, _, cname, _) -> sprintf "Pat_Constr %s" cname
+  | Pat_Constr (_, ty, cname, _) ->
+      sprintf "Pat_Constr %s : %s" cname (pp_texpr ty)
 
 let rec pp_pattern ?(indent = "") pat =
   let open Printf in

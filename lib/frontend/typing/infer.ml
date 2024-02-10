@@ -92,6 +92,24 @@ let rec map_over_texpr_vars f =
   | TyCustom (targs, tname) ->
       TyCustom (List.map (map_over_texpr_vars f) targs, tname)
 
+let rec map_over_pat_texprs f pat =
+  let open Typed_ast in
+  match pat with
+  | Pat_Int _ | Pat_Bool _ | Pat_Unit _ -> pat
+  | Pat_Ident (loc, ty, x) -> Pat_Ident (loc, f ty, x)
+  | Pat_Any (loc, ty) -> Pat_Any (loc, f ty)
+  | Pat_Or (loc, ty, p0, p1) ->
+      let ty' = f ty in
+      let p0' = map_over_pat_texprs f p0 in
+      let p1' = map_over_pat_texprs f p1 in
+      Pat_Or (loc, ty', p0', p1')
+  | Pat_Tuple (loc, ty, pats) ->
+      let ty' = f ty in
+      Pat_Tuple (loc, ty', List.map (map_over_pat_texprs f) pats)
+  | Pat_Constr (loc, ty, x, pat_opt) ->
+      let ty' = f ty in
+      Pat_Constr (loc, ty', x, Option.map (map_over_pat_texprs f) pat_opt)
+
 let rec map_over_expr_texprs f expr =
   let open Typed_ast in
   match expr with
@@ -124,7 +142,9 @@ let rec map_over_expr_texprs f expr =
         ( loc,
           ty',
           e',
-          List.map (fun (p, e) -> (p, map_over_expr_texprs f e)) cases )
+          List.map
+            (fun (p, e) -> (map_over_pat_texprs f p, map_over_expr_texprs f e))
+            cases )
   | Tuple (loc, ty, es) ->
       let ty' = f ty in
       Tuple (loc, ty', List.map (map_over_expr_texprs f) es)
