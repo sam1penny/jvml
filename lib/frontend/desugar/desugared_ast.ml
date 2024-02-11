@@ -24,11 +24,10 @@ type expr =
   | LetRec of Typed_ast.type_expr * string * expr * expr
   | Constr of Typed_ast.type_expr * string
   | Seq of Typed_ast.type_expr * expr list
-  | Obj (* until i work out something better *)
-  | TupleGet of int * expr
-  | ConstructorGet of expr
+  | TupleGet of Typed_ast.type_expr * int * expr
+  | ConstructorGet of Typed_ast.type_expr * expr
   (* switch branch_var, constructor + decision list, fallback_opt *)
-  | Switch of expr * (con * expr) list * expr option
+  | Switch of Typed_ast.type_expr * expr * (con * expr) list * expr option
   | Match_Failure
 
 type type_constr = DeclConstr of string * int * Typed_ast.type_expr option
@@ -37,6 +36,13 @@ type decl =
   | Val of Typed_ast.type_expr * string * expr
   | ValRec of Typed_ast.type_expr * string * expr
   | Type of Typed_ast.type_expr * string list * string * type_constr list
+
+let desugared_tvar_cnter =
+  let n = ref 0 in
+  fun () ->
+    let x = !n in
+    n := x + 1;
+    "match_failure_tvar" ^ string_of_int x
 
 let get_expr_type = function
   | Int _ -> Typed_ast.TyInt
@@ -51,7 +57,11 @@ let get_expr_type = function
   | Let (t, _, _, _) | LetRec (t, _, _, _) -> t
   | Constr (t, _) -> t
   | Seq (t, _) -> t
-  | _ -> raise @@ Failure "todo - add types to new constructs"
+  | TupleGet (t, _, _) -> t
+  | ConstructorGet (t, _) -> t
+  | Switch (t, _, _, _) -> t
+  | Match_Failure -> TyVar (desugared_tvar_cnter ())
+(* huge bodge to get match_failure working *)
 
 (* printing *)
 
@@ -75,8 +85,7 @@ let string_of_expr_node =
   | Constr (ty, cname) ->
       sprintf "Constructor %s : %s" cname (Typed_ast.pp_texpr ty)
   | Seq _ -> "Seq"
-  | Obj -> "Obj"
-  | TupleGet (i, _) -> sprintf "Get %i" i
+  | TupleGet (_, i, _) -> sprintf "Get %i" i
   | ConstructorGet _ -> "GetArg"
   | Switch _ -> "Switch"
   | Match_Failure -> "Match_Failure"
@@ -122,14 +131,13 @@ let rec pp_expr ?(indent = "") expr =
   | Seq (_, es) ->
       pp_node expr;
       List.iter pp_rec_expr es
-  | Obj -> pp_node expr
-  | TupleGet (_, e) ->
+  | TupleGet (_, _, e) ->
       pp_node expr;
       pp_rec_expr e
-  | ConstructorGet e ->
+  | ConstructorGet (_, e) ->
       pp_node expr;
       pp_rec_expr e
-  | Switch (e, cases, fallback) -> (
+  | Switch (_, e, cases, fallback) -> (
       pp_node expr;
       pp_rec_expr e;
       let case_indent = indent ^ "   " in

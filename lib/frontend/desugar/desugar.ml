@@ -2,6 +2,13 @@ open Typing
 open Desugared_ast
 open Common
 
+let desugared_temp_var =
+  let n = ref 0 in
+  fun () ->
+    let x = !n in
+    n := x + 1;
+    "desugar_t" ^ string_of_int x
+
 let rec desugar_expr constructors_by_type expr =
   let rec_desugar = desugar_expr constructors_by_type in
   match expr with
@@ -15,12 +22,21 @@ let rec desugar_expr constructors_by_type expr =
       If (ty, rec_desugar e0, rec_desugar e1, rec_desugar e2)
   | Typed_ast.Fun (_, t0, t1, x, e) -> Fun (t0, t1, x, rec_desugar e)
   | Typed_ast.App (_, ty, e0, e1) -> App (ty, rec_desugar e0, rec_desugar e1)
-  | Typed_ast.Match (_, _, _, cases) ->
+  | Typed_ast.Match (_, ty, e, cases) ->
       let desugared_cases =
         List.map (fun (pat, expr) -> (pat, rec_desugar expr)) cases
       in
-      let clauses = List.map Compile_patterns.clause_of_case desugared_cases in
-      Compile_patterns.compile_match constructors_by_type clauses
+      let var = desugared_temp_var () in
+      let clauses =
+        List.map
+          (Compile_patterns.clause_of_case (Ident (Infer.get_expr_type e, var)))
+          desugared_cases
+      in
+      Let
+        ( ty,
+          var,
+          rec_desugar e,
+          Compile_patterns.compile_match constructors_by_type ty clauses )
   | Typed_ast.Tuple (_, ty, es) -> Tuple (ty, List.map rec_desugar es)
   | Typed_ast.Let (_, ty, x, e0, e1) ->
       Let (ty, x, rec_desugar e0, rec_desugar e1)

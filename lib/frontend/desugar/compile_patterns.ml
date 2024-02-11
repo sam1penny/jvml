@@ -11,7 +11,7 @@ module ConSet = Set.Make (struct
   let compare = compare
 end)
 
-let clause_of_case (pattern, expr) = Clause ([ (Obj, pattern) ], expr)
+let clause_of_case e (pattern, case_expr) = Clause ([ (e, pattern) ], case_expr)
 
 let get_tname = function
   | Typed_ast.TyCustom (_, tname) -> tname
@@ -42,7 +42,7 @@ let move_wildcard_patterns (Clause (pats, body)) =
   Clause (pats', body)
 
 let rec compile_match (constructors : con StringMap.t StringMap.t)
-    (clauses : clause list) : expr =
+    (return_type : Typed_ast.type_expr) (clauses : clause list) : expr =
   let clauses = List.map move_variable_patterns clauses in
   let clauses = List.map move_wildcard_patterns clauses in
   match clauses with
@@ -64,13 +64,16 @@ let rec compile_match (constructors : con StringMap.t StringMap.t)
       | Typed_ast.Pat_Constr (_, ty, _, _) ->
           compile_constructor_match constructors clauses branch_var
             (StringMap.find (get_tname ty) constructors)
-      | Typed_ast.Pat_Int _ -> compile_int_match constructors clauses branch_var
+            return_type
+      | Typed_ast.Pat_Int _ ->
+          compile_int_match constructors clauses branch_var return_type
       | Typed_ast.Pat_Tuple _ ->
-          compile_tuple_match constructors clauses branch_var
+          compile_tuple_match constructors return_type clauses branch_var
       | _ -> raise @@ Failure "")
 
 and compile_constructor_match constructors (clauses : clause list)
-    (branch_var : expr) (constructors_by_name : con StringMap.t) =
+    (branch_var : expr) (constructors_by_name : con StringMap.t)
+    (return_type : Typed_ast.type_expr) =
   List.fold_right
     (fun (Clause (pats, body)) (case_clauses, fallback_clauses) ->
       match List.assoc_opt branch_var pats with
@@ -81,7 +84,10 @@ and compile_constructor_match constructors (clauses : clause list)
             List.assoc_opt con case_clauses |> Option.value ~default:[]
           in
           let maybe_extra_test =
-            Option.map (fun parg -> (ConstructorGet branch_var, parg)) parg_opt
+            Option.map
+              (fun parg ->
+                (ConstructorGet (Infer.get_pattern_type parg, branch_var), parg))
+              parg_opt
             |> Option.to_list
           in
           let new_case_clauses =
@@ -100,7 +106,9 @@ and compile_constructor_match constructors (clauses : clause list)
   let compiled_cases =
     List.map
       (fun (con, nested_match) ->
-        (con, compile_match constructors (nested_match @ fallback_clauses)))
+        ( con,
+          compile_match constructors return_type
+            (nested_match @ fallback_clauses) ))
       case_clauses
   in
   let constructors_in_switch =
@@ -113,11 +121,12 @@ and compile_constructor_match constructors (clauses : clause list)
   in
   let fallback_clauses_opt =
     if ConSet.equal constructors_in_switch all_constructors then None
-    else Some (compile_match constructors fallback_clauses)
+    else Some (compile_match constructors return_type fallback_clauses)
   in
-  Switch (branch_var, compiled_cases, fallback_clauses_opt)
+  Switch (return_type, branch_var, compiled_cases, fallback_clauses_opt)
 
-and compile_int_match constructors (clauses : clause list) (branch_var : expr) =
+and compile_int_match constructors (clauses : clause list) (branch_var : expr)
+    (return_type : Typed_ast.type_expr) =
   List.fold_right
     (fun (Clause (pats, body)) (case_clauses, fallback_clauses) ->
       match List.assoc_opt branch_var pats with
@@ -143,23 +152,29 @@ and compile_int_match constructors (clauses : clause list) (branch_var : expr) =
   let compiled_cases =
     List.map
       (fun (con, nested_match) ->
-        (con, compile_match constructors (nested_match @ fallback_clauses)))
+        ( con,
+          compile_match constructors return_type
+            (nested_match @ fallback_clauses) ))
       case_clauses
   in
   Switch
-    ( branch_var,
+    ( return_type,
+      branch_var,
       compiled_cases,
-      Some (compile_match constructors fallback_clauses) )
+      Some (compile_match constructors return_type fallback_clauses) )
 
-and compile_tuple_match constructors (clauses : clause list) (branch_var : expr)
-    =
+and compile_tuple_match constructors return_type (clauses : clause list)
+    (branch_var : expr) =
   List.map
     (fun (Clause (pats, body)) ->
       match List.assoc_opt branch_var pats with
       | None -> Clause (pats, body)
       | Some (Typed_ast.Pat_Tuple (_, _, nested_pats)) ->
           let vars =
-            List.mapi (fun i _ -> TupleGet (i, branch_var)) nested_pats
+            List.mapi
+              (fun i nested_pat ->
+                TupleGet (Infer.get_pattern_type nested_pat, i, branch_var))
+              nested_pats
           in
           Clause
             ( List.remove_assoc branch_var pats @ List.combine vars nested_pats,
@@ -170,4 +185,4 @@ and compile_tuple_match constructors (clauses : clause list) (branch_var : expr)
                "illegal state - all cells in a column must be of the same \
                 constructor")
     clauses
-  |> compile_match constructors
+  |> compile_match constructors return_type
