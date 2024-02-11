@@ -34,7 +34,7 @@ let move_wildcard_patterns (Clause (pats, body)) =
   in
   Clause (pats', body)
 
-let rec compile_match (constructors : (string * con list) list)
+let rec compile_match (constructors : (string * (string * con) list) list)
     (clauses : clause list) : expr =
   let clauses = List.map move_variable_patterns clauses in
   let clauses = List.map move_wildcard_patterns clauses in
@@ -63,25 +63,25 @@ let rec compile_match (constructors : (string * con list) list)
       | _ -> raise @@ Failure "")
 
 and compile_constructor_match constructors (clauses : clause list)
-    (branch_var : expr) (all_constructors : con list) =
+    (branch_var : expr) (constructors_by_name : (string * con) list) =
   List.fold_right
     (fun (Clause (pats, body)) (case_clauses, fallback_clauses) ->
       match List.assoc_opt branch_var pats with
       | None -> (case_clauses, Clause (pats, body) :: fallback_clauses)
       | Some (Typed_ast.Pat_Constr (_, _, name, parg_opt)) ->
+          let con = List.assoc name constructors_by_name in
           let existing_clauses_for_case =
-            List.assoc_opt (AdtCon name) case_clauses
-            |> Option.value ~default:[]
+            List.assoc_opt con case_clauses |> Option.value ~default:[]
           in
           let maybe_extra_test =
             Option.map (fun parg -> (ConstructorGet branch_var, parg)) parg_opt
             |> Option.to_list
           in
           let new_case_clauses =
-            ( AdtCon name,
+            ( con,
               Clause (List.remove_assoc branch_var pats @ maybe_extra_test, body)
               :: existing_clauses_for_case )
-            :: List.remove_assoc (AdtCon name) case_clauses
+            :: List.remove_assoc con case_clauses
           in
           (new_case_clauses, fallback_clauses)
       | _ ->
@@ -97,6 +97,8 @@ and compile_constructor_match constructors (clauses : clause list)
       case_clauses
   in
   let constructors_in_switch = List.map (fun (con, _) -> con) case_clauses in
+  let all_constructors = List.map (fun (_, con) -> con) constructors_by_name in
+  (* this should actually test set equality, not list equality. *)
   let fallback_clauses_opt =
     if constructors_in_switch = all_constructors then None
     else Some (compile_match constructors fallback_clauses)

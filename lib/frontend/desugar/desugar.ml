@@ -28,8 +28,8 @@ let rec desugar_expr constructors_by_type expr =
   | Typed_ast.Constr (_, ty, cname) -> Constr (ty, cname)
   | Typed_ast.Seq (_, ty, es) -> Seq (ty, List.map rec_desugar es)
 
-let desugar_type_constructor = function
-  | Typed_ast.DeclConstr (_, cname, ty_opt) -> DeclConstr (cname, ty_opt)
+let desugar_type_constructor tag = function
+  | Typed_ast.DeclConstr (_, cname, ty_opt) -> DeclConstr (cname, tag, ty_opt)
 
 let desugar_decl constructors_by_type = function
   | Typed_ast.Val (_, ty, x, e) ->
@@ -38,14 +38,15 @@ let desugar_decl constructors_by_type = function
       (ValRec (ty, x, desugar_expr constructors_by_type e), constructors_by_type)
   | Typed_ast.Type (_, ty, params, tname, constructors) ->
       let desugared_constructors =
-        List.map desugar_type_constructor constructors
+        List.mapi desugar_type_constructor constructors
       in
       let testcons =
         List.map
-          (function DeclConstr (cname, _) -> AdtCon cname)
+          (function
+            | DeclConstr (cname, tag, _) -> (cname, AdtCon (cname, tag)))
           desugared_constructors
       in
-      ( Type (ty, params, tname, List.map desugar_type_constructor constructors),
+      ( Type (ty, params, tname, desugared_constructors),
         (tname, testcons) :: constructors_by_type )
 
 let desugar_program program =

@@ -1,13 +1,14 @@
 (* changes to typed_ast.ml
-   - Add tupleget
-   - Drop locations everywhere other than in Match
+   - Add TupleGet, ConstructorGet, Switch and Match_Failure
+   - Drop locations
+   - Add explicit tag index to DeclConstr
 *)
 open Typing
 open Printf
 open Common
 
 type loc = Lexing.position * Lexing.position
-type con = IntCon of int | AdtCon of string
+type con = IntCon of int | AdtCon of string * int
 
 type expr =
   | Int of int
@@ -30,7 +31,7 @@ type expr =
   | Switch of expr * (con * expr) list * expr option
   | Match_Failure
 
-type type_constr = DeclConstr of string * Typed_ast.type_expr option
+type type_constr = DeclConstr of string * int * Typed_ast.type_expr option
 
 type decl =
   | Val of Typed_ast.type_expr * string * expr
@@ -68,7 +69,7 @@ let string_of_expr_node =
 let pp_con ?(indent = "") con =
   match con with
   | IntCon i -> printf "%s└──Int(%i)\n" indent i
-  | AdtCon cname -> printf "%s└──%s\n" indent cname
+  | AdtCon (cname, tag) -> printf "%s└──%s : tag=%i\n" indent cname tag
 
 let rec pp_expr ?(indent = "") expr =
   let open Printf in
@@ -116,12 +117,13 @@ let rec pp_expr ?(indent = "") expr =
   | Switch (e, cases, fallback) -> (
       pp_node expr;
       pp_rec_expr e;
-      List.iter (fun c -> pp_case (indent ^ "   ") c) cases;
+      let case_indent = indent ^ "   " in
+      List.iter (fun c -> pp_case case_indent c) cases;
       match fallback with
       | None -> ()
       | Some expr ->
-          printf "%s└── <fallback>\n" indent;
-          pp_rec_expr expr)
+          printf "%s└── <fallback>\n" case_indent;
+          pp_expr ~indent:(case_indent ^ "   ") expr)
   | Match_Failure -> pp_node expr
 
 and pp_case indent (pattern, expr) =
@@ -133,9 +135,11 @@ and pp_case indent (pattern, expr) =
 let pp_tconstr ?(indent = "") =
   let open Printf in
   function
-  | DeclConstr (cname, None) -> printf "%s└──%s\n" indent cname
-  | DeclConstr (cname, Some texpr) ->
-      printf "%s└──%s of %s\n" indent cname (Typed_ast.pp_texpr texpr)
+  | DeclConstr (cname, tag, None) ->
+      printf "%s└──%s : tag=%i\n" indent cname tag
+  | DeclConstr (cname, tag, Some texpr) ->
+      printf "%s└──%s of %s : tag=%i\n" indent cname (Typed_ast.pp_texpr texpr)
+        tag
 
 let pp_decl ?(indent = "") =
   let open Printf in
