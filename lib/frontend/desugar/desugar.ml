@@ -1,5 +1,6 @@
 open Typing
 open Desugared_ast
+open Common
 
 let rec desugar_expr constructors_by_type expr =
   let rec_desugar = desugar_expr constructors_by_type in
@@ -33,30 +34,30 @@ let desugar_type_constructor tag = function
 
 let desugar_decl constructors_by_type = function
   | Typed_ast.Val (_, ty, x, e) ->
-      (Val (ty, x, desugar_expr constructors_by_type e), constructors_by_type)
+      (constructors_by_type, Val (ty, x, desugar_expr constructors_by_type e))
   | Typed_ast.ValRec (_, ty, x, e) ->
-      (ValRec (ty, x, desugar_expr constructors_by_type e), constructors_by_type)
+      (constructors_by_type, ValRec (ty, x, desugar_expr constructors_by_type e))
   | Typed_ast.Type (_, ty, params, tname, constructors) ->
       let desugared_constructors =
         List.mapi desugar_type_constructor constructors
       in
-      let testcons =
-        List.map
-          (function
-            | DeclConstr (cname, tag, _) -> (cname, AdtCon (cname, tag)))
-          desugared_constructors
+      let casecons_by_name =
+        List.fold_left
+          (fun acc (DeclConstr (cname, tag, _)) ->
+            StringMap.add cname (AdtCon (cname, tag)) acc)
+          StringMap.empty desugared_constructors
       in
-      ( Type (ty, params, tname, desugared_constructors),
-        (tname, testcons) :: constructors_by_type )
+      ( StringMap.add tname casecons_by_name constructors_by_type,
+        Type (ty, params, tname, desugared_constructors) )
 
 let desugar_program program =
   List.fold_left
     (fun (constructors_by_type, desugared_program_rev) decl ->
-      let desugared_decl, constructors_by_type =
+      let constructors_by_type, desugared_decl =
         desugar_decl constructors_by_type decl
       in
       (constructors_by_type, desugared_decl :: desugared_program_rev))
-    ([], []) program
+    (StringMap.empty, []) program
   |> fun (_, reversed_program) -> List.rev reversed_program
 
 module Desugared_ast = Desugared_ast

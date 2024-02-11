@@ -24,3 +24,6 @@ let collect_result l =
       acc >>=? fun acc ->
       x >>=? fun x -> Ok (x :: acc))
     l (Ok [])
+
+module StringMap = Map.Make (String)
+module StringSet = Set.Make (String)

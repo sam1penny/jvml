@@ -1,8 +1,15 @@
 open Desugared_ast
 open Typing
+open Common
 
 type clause =
   | Clause of (Desugared_ast.expr * Typed_ast.pattern) list * Desugared_ast.expr
+
+module ConSet = Set.Make (struct
+  type t = con
+
+  let compare = compare
+end)
 
 let clause_of_case (pattern, expr) = Clause ([ (Obj, pattern) ], expr)
 
@@ -34,7 +41,7 @@ let move_wildcard_patterns (Clause (pats, body)) =
   in
   Clause (pats', body)
 
-let rec compile_match (constructors : (string * (string * con) list) list)
+let rec compile_match (constructors : con StringMap.t StringMap.t)
     (clauses : clause list) : expr =
   let clauses = List.map move_variable_patterns clauses in
   let clauses = List.map move_wildcard_patterns clauses in
@@ -56,20 +63,20 @@ let rec compile_match (constructors : (string * (string * con) list) list)
                 variables inside"
       | Typed_ast.Pat_Constr (_, ty, _, _) ->
           compile_constructor_match constructors clauses branch_var
-            (List.assoc (get_tname ty) constructors)
+            (StringMap.find (get_tname ty) constructors)
       | Typed_ast.Pat_Int _ -> compile_int_match constructors clauses branch_var
       | Typed_ast.Pat_Tuple _ ->
           compile_tuple_match constructors clauses branch_var
       | _ -> raise @@ Failure "")
 
 and compile_constructor_match constructors (clauses : clause list)
-    (branch_var : expr) (constructors_by_name : (string * con) list) =
+    (branch_var : expr) (constructors_by_name : con StringMap.t) =
   List.fold_right
     (fun (Clause (pats, body)) (case_clauses, fallback_clauses) ->
       match List.assoc_opt branch_var pats with
       | None -> (case_clauses, Clause (pats, body) :: fallback_clauses)
-      | Some (Typed_ast.Pat_Constr (_, _, name, parg_opt)) ->
-          let con = List.assoc name constructors_by_name in
+      | Some (Typed_ast.Pat_Constr (_, _, cname, parg_opt)) ->
+          let con = StringMap.find cname constructors_by_name in
           let existing_clauses_for_case =
             List.assoc_opt con case_clauses |> Option.value ~default:[]
           in
@@ -96,11 +103,16 @@ and compile_constructor_match constructors (clauses : clause list)
         (con, compile_match constructors (nested_match @ fallback_clauses)))
       case_clauses
   in
-  let constructors_in_switch = List.map (fun (con, _) -> con) case_clauses in
-  let all_constructors = List.map (fun (_, con) -> con) constructors_by_name in
-  (* this should actually test set equality, not list equality. *)
+  let constructors_in_switch =
+    List.map (fun (con, _) -> con) case_clauses |> ConSet.of_list
+  in
+  let all_constructors =
+    StringMap.to_list constructors_by_name
+    |> List.map (fun (_, con) -> con)
+    |> ConSet.of_list
+  in
   let fallback_clauses_opt =
-    if constructors_in_switch = all_constructors then None
+    if ConSet.equal constructors_in_switch all_constructors then None
     else Some (compile_match constructors fallback_clauses)
   in
   Switch (branch_var, compiled_cases, fallback_clauses_opt)

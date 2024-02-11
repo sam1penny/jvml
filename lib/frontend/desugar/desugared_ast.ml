@@ -1,7 +1,7 @@
 (* changes to typed_ast.ml
    - Add TupleGet, ConstructorGet, Switch and Match_Failure
    - Drop locations
-   - Add explicit tag index to DeclConstr
+   - Add explicit tag index to DeclConstr and con
 *)
 open Typing
 open Printf
