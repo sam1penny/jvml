@@ -41,6 +41,13 @@ let move_wildcard_patterns (Clause (pats, body)) =
   in
   Clause (pats', body)
 
+(*
+todos:
+- Report warning on missing/redundant cases
+- Add better logic for binding variables to avoid redundant tuple_get/constructor_get
+- Consider refactoring to inner methods to avoid passing (constructors & return_type) to every method
+- Handle other cases (bool/unit/or)
+*)
 let rec compile_match (constructors : con StringMap.t StringMap.t)
     (return_type : Typed_ast.type_expr) (clauses : clause list) : expr =
   let clauses = List.map move_variable_patterns clauses in

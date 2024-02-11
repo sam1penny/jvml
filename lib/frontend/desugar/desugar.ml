@@ -2,6 +2,7 @@ open Typing
 open Desugared_ast
 open Common
 
+(* todo - tidy up by encapsulating this into an argument *)
 let desugared_temp_var =
   let n = ref 0 in
   fun () ->

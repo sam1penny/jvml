@@ -61,7 +61,10 @@ let get_expr_type = function
   | ConstructorGet (t, _) -> t
   | Switch (t, _, _, _) -> t
   | Match_Failure -> TyVar (desugared_tvar_cnter ())
-(* huge bodge to get match_failure working *)
+(* huge bodge to get match_failure working
+
+   todo - think of an alternative to get this working
+*)
 
 (* printing *)
 
