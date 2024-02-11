@@ -38,6 +38,21 @@ type decl =
   | ValRec of Typed_ast.type_expr * string * expr
   | Type of Typed_ast.type_expr * string list * string * type_constr list
 
+let get_expr_type = function
+  | Int _ -> Typed_ast.TyInt
+  | Ident (t, _) -> t
+  | Bool _ -> Typed_ast.TyBool
+  | Unit -> Typed_ast.TyUnit
+  | Bop (t, _, _, _) -> t
+  | If (t, _, _, _) -> t
+  | Fun (t0, t1, _, _) -> Typed_ast.TyFun (t0, t1)
+  | App (t, _, _) -> t
+  | Tuple (t, _) -> t
+  | Let (t, _, _, _) | LetRec (t, _, _, _) -> t
+  | Constr (t, _) -> t
+  | Seq (t, _) -> t
+  | _ -> raise @@ Failure "todo - add types to new constructs"
+
 (* printing *)
 
 let string_of_expr_node =

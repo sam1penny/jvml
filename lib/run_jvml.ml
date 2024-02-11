@@ -7,11 +7,13 @@ let file_to_string filename =
   Option.get s
 
 let run_frontend filename =
-  Parsing.Driver.parse_string filename |> Typing.Driver.type_program
+  Parsing.Driver.parse_string filename |> Typing.Driver.type_program |> fun p ->
+  Result.bind p (fun program -> Ok (Desugar.desugar_program program))
 
 let run_frontend_exn filename =
   Parsing.Driver.parse_string filename
   |> Typing.Infer.type_program_exn_from_file filename
+  |> Desugar.desugar_program
 
 let linear_ir_from_string program =
   run_frontend_exn program |> Linear.Driver.lower_program_to_linear_ir

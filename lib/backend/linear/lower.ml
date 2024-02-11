@@ -1,6 +1,7 @@
 open Instruction
 open Common
 open Typing
+open Desugar
 module StringSet = Set.Make (String)
 module StringMap = Map.Make (String)
 
@@ -48,60 +49,37 @@ let rec intersperse sep = function
   | ([] | [ _ ]) as l -> l
   | x :: xs -> x :: sep :: intersperse sep xs
 
-let rec pattern_bindings =
-  let open Typed_ast in
-  function
-  | Pat_Int _ | Pat_Bool _ | Pat_Unit _ | Pat_Any _ -> StringSet.empty
-  | Pat_Ident (_, _, i) -> StringSet.singleton i
-  | Pat_Or (_, _, p0, p1) ->
-      StringSet.union (pattern_bindings p0) (pattern_bindings p1)
-  | Pat_Tuple (_, _, ps) ->
-      List.map pattern_bindings ps
-      |> List.fold_left StringSet.union StringSet.empty
-  | Pat_Constr (_, _, _, None) -> StringSet.empty
-  | Pat_Constr (_, _, _, Some p) -> pattern_bindings p
-
 let free_vars_with_types_expr bound e =
-  let open Typed_ast in
+  let open Desugared_ast in
   let takeleft _ x _ = Some x in
   let rec aux bound free = function
-    | Int _ | Bool _ | Unit _ | Constr _ -> free
-    | Ident (_, ty, i) ->
+    | Int _ | Bool _ | Unit | Constr _ -> free
+    | Ident (ty, i) ->
         if StringSet.mem i bound then free else StringMap.add i ty free
-    | Bop (_, _, e0, _, e1) ->
+    | Bop (_, e0, _, e1) ->
         StringMap.union takeleft (aux bound free e0) (aux bound free e1)
-    | If (_, _, e0, e1, e2) ->
+    | If (_, e0, e1, e2) ->
         StringMap.union takeleft (aux bound free e0) (aux bound free e1)
         |> StringMap.union takeleft (aux bound free e2)
-    | Fun (_, _, _, x, e) ->
+    | Fun (_, _, x, e) ->
         let bound' = StringSet.add x bound in
         aux bound' free e
-    | App (_, _, e0, e1) ->
+    | App (_, e0, e1) ->
         StringMap.union takeleft (aux bound free e0) (aux bound free e1)
-    | Match (_, _, e, cases) ->
-        let free_e = aux bound free e in
-        let free_cases =
-          List.map
-            (fun (p, ce) ->
-              let bound' = StringSet.union bound (pattern_bindings p) in
-              aux bound' free ce)
-            cases
-        in
-        List.fold_left (StringMap.union takeleft) StringMap.empty
-          (free_e :: free_cases)
-    | Tuple (_, _, es) ->
+    | Tuple (_, es) ->
         List.map (aux bound free) es
         |> List.fold_left (StringMap.union takeleft) StringMap.empty
-    | Let (_, _, x, e0, e1) ->
+    | Let (_, x, e0, e1) ->
         let free_e0 = aux bound free e0 in
         let bound' = StringSet.add x bound in
         StringMap.union takeleft free_e0 (aux bound' free e1)
-    | LetRec (_, _, x, e0, e1) ->
+    | LetRec (_, x, e0, e1) ->
         let bound' = StringSet.add x bound in
         StringMap.union takeleft (aux bound' free e0) (aux bound' free e1)
-    | Seq (_, _, es) ->
+    | Seq (_, es) ->
         List.map (aux bound free) es
         |> List.fold_left (StringMap.union takeleft) StringMap.empty
+    | _ -> raise @@ Failure "todo - extend for new statements"
   in
   aux bound StringMap.empty e
 
@@ -116,17 +94,17 @@ let rec convert_type = function
   | Typed_ast.TyTuple ts -> Instruction.TyTuple (List.map convert_type ts)
 
 let rec compile_expr label_gen env top_level_bindings e =
-  let open Typed_ast in
+  let open Desugared_ast in
   (* curried for convenience *)
   let compile_expr_rec = compile_expr label_gen env top_level_bindings in
   match e with
-  | Int (_, i) -> ([], [ PUSH_INT i; BOX_INT ], [])
-  | Bool (_, b) -> ([], [ PUSH_BOOL b; BOX_BOOL ], [])
-  | Ident (_, _, x) -> ([], Value_env.lookup x env, [])
-  | Unit _ -> ([], [ PUSH_UNIT ], [])
-  | Bop (_, _, e0, bop, e1) ->
+  | Int i -> ([], [ PUSH_INT i; BOX_INT ], [])
+  | Bool b -> ([], [ PUSH_BOOL b; BOX_BOOL ], [])
+  | Ident (_, x) -> ([], Value_env.lookup x env, [])
+  | Unit -> ([], [ PUSH_UNIT ], [])
+  | Bop (_, e0, bop, e1) ->
       compile_bop label_gen env top_level_bindings e0 e1 bop
-  | If (_, _, e0, e1, e2) ->
+  | If (_, e0, e1, e2) ->
       let else_label = label_gen.ctrl_label () in
       let after_label = label_gen.ctrl_label () in
       let defs0, c0, s0 = compile_expr_rec e0 in
@@ -139,14 +117,14 @@ let rec compile_expr label_gen env top_level_bindings e =
         @ [ GOTO after_label; LABEL else_label ]
         @ c2 @ [ LABEL after_label ],
         s0 @ s1 @ s2 )
-  | Fun (_, t0, t1, x, e) ->
+  | Fun (t0, t1, x, e) ->
       compile_anon_lambda_expr label_gen env top_level_bindings
         (convert_type t0, convert_type t1, x, e)
-  | App (_, ty, e0, e1) ->
+  | App (ty, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in
       let defs1, c1, s1 = compile_expr_rec e1 in
       (defs0 @ defs1, c0 @ c1 @ [ APPLY (convert_type ty) ], s0 @ s1)
-  | Let (_, _, x, e0, e1) ->
+  | Let (_, x, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in
       let x_label = label_gen.ref_label () in
       let env_with_x = Value_env.add_local_var x x_label env in
@@ -154,11 +132,11 @@ let rec compile_expr label_gen env top_level_bindings e =
         compile_expr label_gen env_with_x top_level_bindings e1
       in
       (defs0 @ defs1, c0 @ [ STORE_REF x_label ] @ c1, s0 @ s1)
-  | LetRec (_, _, x, e0, e1) ->
+  | LetRec (_, x, e0, e1) ->
       let x_label = label_gen.static_label () in
       let env_with_x =
         Value_env.add_static_field x
-          ("Foo", x_label, convert_type (Infer.get_expr_type e0))
+          ("Foo", x_label, convert_type (Desugared_ast.get_expr_type e0))
           env
       in
       let new_toplevel = StringSet.add x top_level_bindings in
@@ -169,12 +147,13 @@ let rec compile_expr label_gen env top_level_bindings e =
       ( defs0 @ defs1,
         c0
         @ [
-            STORE_STATIC ("Foo", x_label, convert_type (Infer.get_expr_type e0));
+            STORE_STATIC
+              ("Foo", x_label, convert_type (Desugared_ast.get_expr_type e0));
           ]
         @ c1,
         s0 @ s1 )
-  | Constr (_, _, cname) -> ([], Value_env.lookup cname env, [])
-  | Tuple (_, _, ts) ->
+  | Constr (_, cname) -> ([], Value_env.lookup cname env, [])
+  | Tuple (_, ts) ->
       let defs, lowered_tuple_code, smethods =
         lower_tuple_eles_to_array label_gen env top_level_bindings ts
       in
@@ -182,7 +161,7 @@ let rec compile_expr label_gen env top_level_bindings e =
         [ ALLOC_OBJ "Tuple" ] @ lowered_tuple_code
         @ [ CONSTRUCT_OBJ ("Tuple", [ TyArray TyAny ]) ],
         smethods )
-  | Seq (_, _, es) ->
+  | Seq (_, es) ->
       let linear_es = List.map compile_expr_rec es in
       let defs =
         List.map (fun (defs, _, _) -> defs) linear_es |> List.flatten
@@ -388,7 +367,7 @@ and lower_tuple_eles_to_array label_gen env top_level_bindings es =
   (defs, prelude @ maincode, smethods)
 
 let lower_type_constructor tname
-    (Typed_ast.DeclConstr (_, cname, type_expr_opt)) =
+    (Desugared_ast.DeclConstr (cname, _, type_expr_opt)) =
   Constructor
     { name = cname; tname; arg = Option.map convert_type type_expr_opt }
 
@@ -419,7 +398,7 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
         Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
 
 let compile_decl label_gen env toplevel = function
-  | Typed_ast.Val (_, ty, x, e) ->
+  | Desugared_ast.Val (ty, x, e) ->
       let defs, c, smethods = compile_expr label_gen env toplevel e in
       let x_label = label_gen.static_label () in
       let env' =
@@ -431,7 +410,7 @@ let compile_decl label_gen env toplevel = function
         smethods,
         env',
         new_toplevel )
-  | Typed_ast.ValRec (_, ty, x, e) ->
+  | Desugared_ast.ValRec (ty, x, e) ->
       (* make value available in e for compiling recursion *)
       let x_label = label_gen.static_label () in
       let env' =
@@ -444,7 +423,7 @@ let compile_decl label_gen env toplevel = function
         smethods,
         env',
         new_toplevel )
-  | Typed_ast.Type (_, ty, _, tname, type_constructors) ->
+  | Desugared_ast.Type (ty, _, tname, type_constructors) ->
       let class_tname = String.capitalize_ascii tname in
       let typei =
         Type_interface
@@ -452,7 +431,7 @@ let compile_decl label_gen env toplevel = function
             name = class_tname;
             constructors =
               List.map
-                (function Typed_ast.DeclConstr (_, cname, _) -> cname)
+                (function Desugared_ast.DeclConstr (cname, _, _) -> cname)
                 type_constructors;
           }
       in
@@ -462,7 +441,7 @@ let compile_decl label_gen env toplevel = function
       (* current bodge - adding static fields for creating constructors *)
       let defs, code, smethods, env =
         List.fold_right
-          (fun (Typed_ast.DeclConstr (_, cname, type_expr_op))
+          (fun (Desugared_ast.DeclConstr (cname, _, type_expr_op))
                (accdefs, acccode, accsmethods, env) ->
             let defs, code, smethods, env =
               lambda_for_constructor label_gen env cname (convert_type ty)

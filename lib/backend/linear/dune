@@ -2,6 +2,6 @@
  (name linear)
  (preprocess
   (pps ppx_deriving.show))
- (libraries common typing parsing)
+ (libraries common typing desugar parsing)
  (instrumentation
   (backend bisect_ppx)))
