@@ -29,9 +29,7 @@ jobs:
 
       - run: opam exec -- dune build
 
-      #- run: opam exec -- dune runtest
-      # TODO - install rust + krakatau so
-      #  tests can be ran, or add flag to dune runtest to avoid running e2e tests
+      - run: opam exec -- dune runtest
   lint-doc:
     runs-on: ubuntu-latest
     steps:
