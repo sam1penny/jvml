@@ -43,6 +43,12 @@ type instruction =
   | STORE_STATIC of string * string * type_expr
   (* freevar types, arg, return *)
   | CREATE_DYNAMIC_CLOSURE of string * type_expr list * type_expr * type_expr
+  | TUPLE_GET of type_expr * int
+  | CONSTRUCTOR_GET of type_expr * string
+  | LOOKUP_SWITCH of
+      (int * string) list * string (* (int_to_test, label), default label *)
+  | MATCH_FAILURE
+  | CONSTRUCTOR_INDEX of string
 [@@deriving show]
 
 type closure = {
@@ -57,7 +63,12 @@ type closure = {
 type type_interface = { name : string; constructors : string list }
 [@@deriving show]
 
-type constructor = { name : string; tname : string; arg : type_expr option }
+type constructor = {
+  name : string;
+  tag : int;
+  tname : string;
+  arg : type_expr option;
+}
 [@@deriving show]
 
 type declaration =

@@ -21,6 +21,14 @@ let stack_size_change = function
   | LOAD_STATIC _ -> 1
   | STORE_STATIC _ -> -1
   | CREATE_DYNAMIC_CLOSURE (_, tys, _, _) -> 1 - List.length tys
+  (* todo - these might have to be increased, as they are transformed
+     into multiple bytecode instructions that, during execution,
+     may push multiple values onto the stack.
+  *)
+  | TUPLE_GET _ | CONSTRUCTOR_GET _ -> 0
+  | LOOKUP_SWITCH _ -> -1
+  | MATCH_FAILURE -> 0
+  | CONSTRUCTOR_INDEX _ -> 0
 
 let max_stack_depth prog =
   List.map stack_size_change prog
@@ -149,6 +157,31 @@ let lower_instruction ctrl_gen clazz = function
       [ sprintf "putstatic Field %s %s L%s;" clazz f (lower_type ty) ]
   | CREATE_DYNAMIC_CLOSURE (lifted, captured_tys, arg_type, return_type) ->
       lower_dyn_closure lifted captured_tys arg_type return_type
+  | TUPLE_GET (ty, i) ->
+      [
+        "getfield Field Tuple data [Ljava/lang/Object;";
+        load_int i;
+        "aaload";
+        sprintf "checkcast %s" (lower_type ty);
+      ]
+  | CONSTRUCTOR_GET (ty, cname) ->
+      [
+        sprintf "checkcast %s" cname;
+        sprintf "getfield Field %s val L%s;" cname (lower_type ty);
+      ]
+  | LOOKUP_SWITCH (cases, default_lab) ->
+      [ "lookupswitch" ]
+      @ List.map (fun (index, lab) -> sprintf "%i : %s" index lab) cases
+      @ [ sprintf "default : %s" default_lab ]
+  | CONSTRUCTOR_INDEX tname ->
+      [ sprintf "getfield Field %s tag I" (String.capitalize_ascii tname) ]
+  | MATCH_FAILURE ->
+      [
+        "new MatchFailure";
+        "dup";
+        "invokespecial Method MatchFailure <init> ()V";
+        "athrow";
+      ]
 
 let should_indent = function LABEL _ -> false | _ -> true
 
@@ -234,9 +267,19 @@ let lower_type_interface (ti : type_interface) =
   sprintf
     {|
 .version 62 0
-.class public interface abstract %s
+.class public super abstract %s
 .super java/lang/Object
+.field tag I
 .permittedsubclasses %s
+
+.method public <init> : ()V
+    .code stack 1 locals 1
+L0:     aload_0
+L1:     invokespecial Method java/lang/Object <init> ()V
+L4:     return
+    .end code
+.end method
+
 .end class
 |}
     ti.name
@@ -247,14 +290,14 @@ let lower_value_constructor (vc : constructor) =
     {|
 .version 62 0
 .class public final super %s
-.super java/lang/Object
-.implements %s
+.super %s
 %s
 
 .method public <init> : (%s)V
     .code stack 2 locals 3
 L0:     aload_0
-L1:     invokespecial Method java/lang/Object <init> ()V
+L1:     invokespecial Method %s <init> ()V
+%s
 %s
 L14:    return
 
@@ -306,6 +349,9 @@ L34:    ireturn
     |> Option.value ~default:"")
     (Option.map (fun arg -> "L" ^ lower_type arg ^ ";") vc.arg
     |> Option.value ~default:"")
+    vc.tname
+    ([ "aload_0"; load_int vc.tag; sprintf "putfield Field %s tag I" vc.name ]
+    |> String.concat "\n")
     (Option.map
        (fun arg ->
          [
@@ -408,6 +454,19 @@ let produce_instruction_bytecode (p, static_methods) =
 
 let stdlib =
   {|
+.version 62 0
+.class public super MatchFailure
+.super java/lang/RuntimeException
+
+.method public <init> : ()V
+    .code stack 1 locals 1
+        aload_0
+        invokespecial Method java/lang/RuntimeException <init> ()V
+        return
+    .end code
+.end method
+.end class
+
 ; my custom tuple class
 .version 62 0
 .class public super Tuple

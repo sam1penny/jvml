@@ -79,8 +79,20 @@ let free_vars_with_types_expr bound e =
     | Seq (_, es) ->
         List.map (aux bound free) es
         |> List.fold_left (StringMap.union takeleft) StringMap.empty
-    | _ -> raise @@ Failure "todo - extend for new statements"
+    (* index is undecidable, so look at entire e *)
+    | TupleGet (_, _, e) -> aux bound free e
+    | ConstructorGet (_, _, e) -> aux bound free e
+    | Switch (_, e, cases, fallback_opt) ->
+        let free_e = aux bound free e in
+        List.map (fun (_, case_expr) -> case_expr) cases
+        |> List.map (aux bound free)
+        |> List.fold_left (StringMap.union takeleft) free_e
+        |> StringMap.union takeleft
+             (Option.map (fun e -> aux bound free e) fallback_opt
+             |> Option.value ~default:StringMap.empty)
+    | Match_Failure -> StringMap.empty
   in
+
   aux bound StringMap.empty e
 
 let rec convert_type = function
@@ -92,6 +104,17 @@ let rec convert_type = function
   | Typed_ast.TyFun (t0, t1) ->
       Instruction.TyFun (convert_type t0, convert_type t1)
   | Typed_ast.TyTuple ts -> Instruction.TyTuple (List.map convert_type ts)
+
+let con_index = function
+  | Desugared_ast.IntCon i -> i
+  | Desugared_ast.AdtCon (_, tag) -> tag
+
+let get_index = function
+  | Typed_ast.TyInt -> [ UNBOX_INT ]
+  | Typed_ast.TyBool -> [ UNBOX_BOOL ]
+  (*| Typed_ast.TyUnit -> [PUSH_INT 0; UNBOX_INT]*)
+  | Typed_ast.TyCustom (_, tname) -> [ CONSTRUCTOR_INDEX tname ]
+  | _ -> raise @@ Failure "attempted to match on unsupported type"
 
 let rec compile_expr label_gen env top_level_bindings e =
   let open Desugared_ast in
@@ -172,9 +195,85 @@ let rec compile_expr label_gen env top_level_bindings e =
       in
       let pop_throwaways = intersperse [ POP ] ecode in
       (defs, List.flatten pop_throwaways, smethods)
-  | _ ->
-      raise
-      @@ Invalid_argument "Attempted to lower unsupported expr to linear_ir"
+  | TupleGet (ty, i, e) ->
+      let defs, code, static_methods = compile_expr_rec e in
+      (defs, code @ [ TUPLE_GET (convert_type ty, i) ], static_methods)
+  | ConstructorGet (ty, cname, e) ->
+      let defs, code, static_methods = compile_expr_rec e in
+      (defs, code @ [ CONSTRUCTOR_GET (convert_type ty, cname) ], static_methods)
+  | Switch (_, e0, cases, fallback_opt) -> (
+      let defs0, code0, static_methods0 = compile_expr_rec e0 in
+      let after_label = label_gen.ctrl_label () in
+      let case_exprs = List.map (fun (_, case_expr) -> case_expr) cases in
+      let compiled_case_exprs = List.map compile_expr_rec case_exprs in
+      let case_defs =
+        List.map (fun (defs, _, _) -> defs) compiled_case_exprs |> List.flatten
+      in
+
+      let case_code_with_labels =
+        List.map (fun (_, code, _) -> code) compiled_case_exprs
+        |> List.map (fun code ->
+               let label = label_gen.ctrl_label () in
+               (label, [ LABEL label ] @ code @ [ GOTO after_label ]))
+      in
+
+      let case_code =
+        case_code_with_labels
+        |> List.map (fun (_, code) -> code)
+        |> List.flatten
+      in
+
+      let case_smethods =
+        List.map (fun (_, _, smethods) -> smethods) compiled_case_exprs
+        |> List.flatten
+      in
+
+      let index_labels =
+        List.map (fun (label, _) -> label) case_code_with_labels
+        |> List.combine (List.map (fun (con, _) -> con_index con) cases)
+      in
+
+      let index_getter = get_index (get_expr_type e0) in
+
+      match fallback_opt with
+      | None ->
+          (* because java requires a default case, we must be crafty and replace the last case with default *)
+          let last_case_label =
+            List.rev index_labels |> List.hd |> fun (_, l) -> l
+          in
+          let other_index_labels =
+            List.rev index_labels |> List.tl |> List.rev
+          in
+          ( defs0 @ case_defs,
+            code0 @ index_getter
+            @ [ LOOKUP_SWITCH (other_index_labels, last_case_label) ]
+            @ case_code @ [ LABEL after_label ],
+            static_methods0 @ case_smethods )
+      | Some fallback_expr ->
+          let default_defs, default_code, default_static_methods =
+            compile_expr_rec fallback_expr
+          in
+          let default_label = label_gen.ctrl_label () in
+          let default_code = [ LABEL default_label ] @ default_code in
+          ( defs0 @ case_defs @ default_defs,
+            code0 @ index_getter
+            @ [ LOOKUP_SWITCH (index_labels, default_label) ]
+            @ case_code @ default_code @ [ LABEL after_label ],
+            static_methods0 @ case_smethods @ default_static_methods )
+      (*
+      let (default_label_opt, default_defs, default_code, default_static_methods) =
+        fallback_opt
+        |> Option.map (fun fallback -> let defs, code, s = compile_expr_rec fallback in
+        let label = label_gen.ctrl_label () in
+        (Some label, defs, [LABEL label] @ code, s)
+        )
+        |> Option.value ~default:(None, [], [], [])
+      in
+
+    let index_getter = get_index (get_expr_type e0) in
+    *)
+      )
+  | Match_Failure -> ([], [ MATCH_FAILURE ], [])
 
 and compile_bop label_gen env top_level_bindings e0 e1 =
   let compile_expr_rec = compile_expr label_gen env top_level_bindings in
@@ -367,9 +466,9 @@ and lower_tuple_eles_to_array label_gen env top_level_bindings es =
   (defs, prelude @ maincode, smethods)
 
 let lower_type_constructor tname
-    (Desugared_ast.DeclConstr (cname, _, type_expr_opt)) =
+    (Desugared_ast.DeclConstr (cname, tag, type_expr_opt)) =
   Constructor
-    { name = cname; tname; arg = Option.map convert_type type_expr_opt }
+    { name = cname; tag; tname; arg = Option.map convert_type type_expr_opt }
 
 let lambda_for_constructor label_gen env cname typedef_texpr arg =
   match arg with
@@ -393,9 +492,11 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
           (ty, typedef_texpr, body) []
       in
       ( defs,
-        code @ [ STORE_STATIC ("Foo", cname, typedef_texpr) ],
+        code @ [ STORE_STATIC ("Foo", cname, TyFun (ty, typedef_texpr)) ],
         smethods,
-        Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
+        Value_env.add_static_field cname
+          ("Foo", cname, TyFun (ty, typedef_texpr))
+          env )
 
 let compile_decl label_gen env toplevel = function
   | Desugared_ast.Val (ty, x, e) ->

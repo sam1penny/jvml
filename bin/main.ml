@@ -1,15 +1,13 @@
 let () =
   let string_program =
     {|
-    type 'a list = N | C of 'a * 'a list
-    val rec doublelist = fun l ->
-      match l with
-        | N -> N
-        | C (hd, N) -> C (2 * hd, N)
-        | C (hd, tl) -> C (3 * hd, tl)
+    val x = match 1 with
+        | 0 -> 0
+        | 1 -> 0
+        | x -> x - 1
     |}
   in
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string string_program
-  |> Desugar.desugar_program
-  |> List.iter (fun decl -> Desugar.Desugared_ast.pp_decl decl)
+  |> Desugar.desugar_program |> Linear.Driver.lower_program_to_linear_ir
+  |> Linear.Instruction.show_program |> print_endline

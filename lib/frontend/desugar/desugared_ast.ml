@@ -25,7 +25,7 @@ type expr =
   | Constr of Typed_ast.type_expr * string
   | Seq of Typed_ast.type_expr * expr list
   | TupleGet of Typed_ast.type_expr * int * expr
-  | ConstructorGet of Typed_ast.type_expr * expr
+  | ConstructorGet of Typed_ast.type_expr * string * expr
   (* switch branch_var, constructor + decision list, fallback_opt *)
   | Switch of Typed_ast.type_expr * expr * (con * expr) list * expr option
   | Match_Failure
@@ -58,7 +58,7 @@ let get_expr_type = function
   | Constr (t, _) -> t
   | Seq (t, _) -> t
   | TupleGet (t, _, _) -> t
-  | ConstructorGet (t, _) -> t
+  | ConstructorGet (t, _, _) -> t
   | Switch (t, _, _, _) -> t
   | Match_Failure -> TyVar (desugared_tvar_cnter ())
 (* huge bodge to get match_failure working
@@ -137,7 +137,7 @@ let rec pp_expr ?(indent = "") expr =
   | TupleGet (_, _, e) ->
       pp_node expr;
       pp_rec_expr e
-  | ConstructorGet (_, e) ->
+  | ConstructorGet (_, _, e) ->
       pp_node expr;
       pp_rec_expr e
   | Switch (_, e, cases, fallback) -> (

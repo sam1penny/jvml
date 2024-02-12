@@ -93,7 +93,8 @@ and compile_constructor_match constructors (clauses : clause list)
           let maybe_extra_test =
             Option.map
               (fun parg ->
-                (ConstructorGet (Infer.get_pattern_type parg, branch_var), parg))
+                ( ConstructorGet (Infer.get_pattern_type parg, cname, branch_var),
+                  parg ))
               parg_opt
             |> Option.to_list
           in
