@@ -8,7 +8,7 @@ open Printf
 open Common
 
 type loc = Lexing.position * Lexing.position
-type con = IntCon of int | AdtCon of string * int
+type con = IntCon of int | BoolCon of bool | UnitCon | AdtCon of string * int
 
 type expr =
   | Int of int
@@ -96,6 +96,8 @@ let string_of_expr_node =
 let pp_con ?(indent = "") con =
   match con with
   | IntCon i -> printf "%s└──Int(%i)\n" indent i
+  | BoolCon b -> printf "%s└──Bool(%b)\n" indent b
+  | UnitCon -> printf "%s└──Unit\n" indent
   | AdtCon (cname, tag) -> printf "%s└──%s : tag=%i\n" indent cname tag
 
 let rec pp_expr ?(indent = "") expr =

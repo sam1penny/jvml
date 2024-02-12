@@ -76,6 +76,17 @@ let rec compile_match (constructors : con StringMap.t StringMap.t)
           compile_int_match constructors clauses branch_var return_type
       | Typed_ast.Pat_Tuple _ ->
           compile_tuple_match constructors return_type clauses branch_var
+      | Typed_ast.Pat_Bool _ ->
+          let boolcons =
+            StringMap.of_list
+              [ ("true", BoolCon true); ("false", BoolCon false) ]
+          in
+          compile_constructor_match constructors clauses branch_var boolcons
+            return_type
+      | Typed_ast.Pat_Unit _ ->
+          let unitcons = StringMap.singleton "unit" UnitCon in
+          compile_constructor_match constructors clauses branch_var unitcons
+            return_type
       | _ -> raise @@ Failure "")
 
 and compile_constructor_match constructors (clauses : clause list)
@@ -83,28 +94,36 @@ and compile_constructor_match constructors (clauses : clause list)
     (return_type : Typed_ast.type_expr) =
   List.fold_right
     (fun (Clause (pats, body)) (case_clauses, fallback_clauses) ->
+      let add_case_clause cname nested_match_opt =
+        let con = StringMap.find cname constructors_by_name in
+        let existing_clauses_for_case =
+          List.assoc_opt con case_clauses |> Option.value ~default:[]
+        in
+        let maybe_extra_test =
+          Option.map
+            (fun nested_match ->
+              ( ConstructorGet
+                  (Infer.get_pattern_type nested_match, cname, branch_var),
+                nested_match ))
+            nested_match_opt
+          |> Option.to_list
+        in
+        let new_case_clauses =
+          ( con,
+            Clause (List.remove_assoc branch_var pats @ maybe_extra_test, body)
+            :: existing_clauses_for_case )
+          :: List.remove_assoc con case_clauses
+        in
+        new_case_clauses
+      in
       match List.assoc_opt branch_var pats with
       | None -> (case_clauses, Clause (pats, body) :: fallback_clauses)
       | Some (Typed_ast.Pat_Constr (_, _, cname, parg_opt)) ->
-          let con = StringMap.find cname constructors_by_name in
-          let existing_clauses_for_case =
-            List.assoc_opt con case_clauses |> Option.value ~default:[]
-          in
-          let maybe_extra_test =
-            Option.map
-              (fun parg ->
-                ( ConstructorGet (Infer.get_pattern_type parg, cname, branch_var),
-                  parg ))
-              parg_opt
-            |> Option.to_list
-          in
-          let new_case_clauses =
-            ( con,
-              Clause (List.remove_assoc branch_var pats @ maybe_extra_test, body)
-              :: existing_clauses_for_case )
-            :: List.remove_assoc con case_clauses
-          in
-          (new_case_clauses, fallback_clauses)
+          (add_case_clause cname parg_opt, fallback_clauses)
+      | Some (Typed_ast.Pat_Bool (_, b)) ->
+          (add_case_clause (string_of_bool b) None, fallback_clauses)
+      | Some (Typed_ast.Pat_Unit _) ->
+          (add_case_clause "unit" None, fallback_clauses)
       | _ ->
           raise
           @@ Failure

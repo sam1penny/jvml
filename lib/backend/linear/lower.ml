@@ -107,12 +107,14 @@ let rec convert_type = function
 
 let con_index = function
   | Desugared_ast.IntCon i -> i
+  | Desugared_ast.BoolCon b -> if b then 1 else 0
+  | Desugared_ast.UnitCon -> 0
   | Desugared_ast.AdtCon (_, tag) -> tag
 
 let get_index = function
   | Typed_ast.TyInt -> [ UNBOX_INT ]
   | Typed_ast.TyBool -> [ UNBOX_BOOL ]
-  (*| Typed_ast.TyUnit -> [PUSH_INT 0; UNBOX_INT]*)
+  | Typed_ast.TyUnit -> [ POP; PUSH_INT 0 ]
   | Typed_ast.TyCustom (_, tname) -> [ CONSTRUCTOR_INDEX tname ]
   | _ -> raise @@ Failure "attempted to match on unsupported type"
 
