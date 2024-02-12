@@ -165,6 +165,7 @@ let lower_instruction ctrl_gen clazz = function
         sprintf "checkcast %s" (lower_type ty);
       ]
   | CONSTRUCTOR_GET (ty, cname) ->
+      (* todo - cast once on switch case entry rather than on each get *)
       [
         sprintf "checkcast %s" cname;
         sprintf "getfield Field %s val L%s;" cname (lower_type ty);
