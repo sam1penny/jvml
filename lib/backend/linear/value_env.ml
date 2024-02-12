@@ -1,5 +1,5 @@
 open Instruction
-module StringMap = Map.Make (String)
+open Common
 
 type source =
   | Local_var of int

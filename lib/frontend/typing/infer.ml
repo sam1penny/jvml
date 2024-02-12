@@ -36,9 +36,6 @@ module Unifications = Disjoint_set.Make (struct
     | _, _ -> true (* arbitrary tie-breaking *)
 end)
 
-module StringSet = Set.Make (String)
-module StringMap = Map.Make (String)
-
 (* environment stuff *)
 let rec tyvars_from_type ty =
   let open Typed_ast in

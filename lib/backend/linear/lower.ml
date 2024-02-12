@@ -2,8 +2,6 @@ open Instruction
 open Common
 open Typing
 open Desugar
-module StringSet = Set.Make (String)
-module StringMap = Map.Make (String)
 
 type label_generators = {
   ctrl_label : unit -> string;
