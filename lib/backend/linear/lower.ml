@@ -116,6 +116,13 @@ let get_index = function
   | Typed_ast.TyCustom (_, tname) -> [ CONSTRUCTOR_INDEX tname ]
   | _ -> raise @@ Failure "attempted to match on unsupported type"
 
+(* todo - consider using tableswitch for an int switch if it is sufficiently dense *)
+let determine_switch_strategy arg_type =
+  match arg_type with
+  | Typed_ast.TyBool | Typed_ast.TyUnit | Typed_ast.TyCustom _ -> TABLE 0
+  | Typed_ast.TyInt -> LOOKUP
+  | _ -> raise @@ Failure "attempted to switch on unsupported type"
+
 let rec compile_expr label_gen env top_level_bindings e =
   let open Desugared_ast in
   (* curried for convenience *)
@@ -233,7 +240,10 @@ let rec compile_expr label_gen env top_level_bindings e =
         |> List.combine (List.map (fun (con, _) -> con_index con) cases)
       in
 
-      let index_getter = get_index (get_expr_type e0) in
+      let switch_arg_type = get_expr_type e0 in
+
+      let index_getter = get_index switch_arg_type in
+      let switch_strategy = determine_switch_strategy switch_arg_type in
 
       match fallback_opt with
       | None ->
@@ -246,7 +256,7 @@ let rec compile_expr label_gen env top_level_bindings e =
           in
           ( defs0 @ case_defs,
             code0 @ index_getter
-            @ [ LOOKUP_SWITCH (other_index_labels, last_case_label) ]
+            @ [ SWITCH (switch_strategy, other_index_labels, last_case_label) ]
             @ case_code @ [ LABEL after_label ],
             static_methods0 @ case_smethods )
       | Some fallback_expr ->
@@ -257,7 +267,7 @@ let rec compile_expr label_gen env top_level_bindings e =
           let default_code = [ LABEL default_label ] @ default_code in
           ( defs0 @ case_defs @ default_defs,
             code0 @ index_getter
-            @ [ LOOKUP_SWITCH (index_labels, default_label) ]
+            @ [ SWITCH (switch_strategy, index_labels, default_label) ]
             @ case_code @ default_code @ [ LABEL after_label ],
             static_methods0 @ case_smethods @ default_static_methods )
       (*

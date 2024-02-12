@@ -26,7 +26,7 @@ let stack_size_change = function
      may push multiple values onto the stack.
   *)
   | TUPLE_GET _ | CONSTRUCTOR_GET _ -> 0
-  | LOOKUP_SWITCH _ -> -1
+  | SWITCH _ -> -1
   | MATCH_FAILURE -> 0
   | CONSTRUCTOR_INDEX _ -> 0
 
@@ -110,6 +110,17 @@ let lower_dyn_closure lifted captured_tys arg_type return_type =
       (lower_type_list captured_tys);
   ]
 
+let lower_switch switch_type cases default_lab =
+  match switch_type with
+  | LOOKUP ->
+      [ "lookupswitch" ]
+      @ List.map (fun (index, lab) -> sprintf "%i : %s" index lab) cases
+      @ [ sprintf "default : %s" default_lab ]
+  | TABLE i ->
+      [ sprintf "tableswitch %i" i ]
+      @ List.map (fun (_, lab) -> lab) cases
+      @ [ sprintf "default : %s" default_lab ]
+
 let lower_instruction ctrl_gen clazz = function
   | PUSH_INT i -> [ load_int i ]
   | BOX_INT ->
@@ -170,10 +181,8 @@ let lower_instruction ctrl_gen clazz = function
         sprintf "checkcast %s" cname;
         sprintf "getfield Field %s val L%s;" cname (lower_type ty);
       ]
-  | LOOKUP_SWITCH (cases, default_lab) ->
-      [ "lookupswitch" ]
-      @ List.map (fun (index, lab) -> sprintf "%i : %s" index lab) cases
-      @ [ sprintf "default : %s" default_lab ]
+  | SWITCH (switch_type, cases, default_lab) ->
+      lower_switch switch_type cases default_lab
   | CONSTRUCTOR_INDEX tname ->
       [ sprintf "getfield Field %s tag I" (String.capitalize_ascii tname) ]
   | MATCH_FAILURE ->
@@ -192,7 +201,9 @@ let lower_body indent clazz b =
   |> List.flatten
   (* slightly dodgy bodge to only apply indent to labels *)
   |> List.map (fun i ->
-         if String.starts_with ~prefix:"L" i then i else indent ^ i)
+         if String.starts_with ~prefix:"L" i && String.ends_with ~suffix:":" i
+         then i
+         else indent ^ i)
   |> String.concat "\n"
 
 let lower_constructor_args args =

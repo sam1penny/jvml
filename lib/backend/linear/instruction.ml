@@ -12,6 +12,8 @@ type type_expr =
   | TyArray of type_expr
 [@@deriving show]
 
+type switch_type = LOOKUP | TABLE of int [@@deriving show]
+
 type instruction =
   | PUSH_INT of int
   | BOX_INT
@@ -45,8 +47,8 @@ type instruction =
   | CREATE_DYNAMIC_CLOSURE of string * type_expr list * type_expr * type_expr
   | TUPLE_GET of type_expr * int
   | CONSTRUCTOR_GET of type_expr * string
-  | LOOKUP_SWITCH of
-      (int * string) list * string (* (int_to_test, label), default label *)
+  (* (int_to_test, label), default label *)
+  | SWITCH of switch_type * (int * string) list * string
   | MATCH_FAILURE
   | CONSTRUCTOR_INDEX of string
 [@@deriving show]
