@@ -116,10 +116,16 @@ let get_index = function
   | Typed_ast.TyCustom (_, tname) -> [ CONSTRUCTOR_INDEX tname ]
   | _ -> raise @@ Failure "attempted to match on unsupported type"
 
-(* todo - consider using tableswitch for an int switch if it is sufficiently dense *)
+(* todo
+   - consider using tableswitch for an int switch if it is sufficiently dense
+   - FIX REQUIRED : if tableswitch used, must put cases in the right place and
+     fill with noops if nonexhaustive.
+
+     JVM may JIT optimise this away, anyway. So low priority.
+*)
 let determine_switch_strategy arg_type =
   match arg_type with
-  | Typed_ast.TyBool | Typed_ast.TyUnit | Typed_ast.TyCustom _ -> TABLE 0
+  | Typed_ast.TyBool | Typed_ast.TyUnit | Typed_ast.TyCustom _ -> LOOKUP
   | Typed_ast.TyInt -> LOOKUP
   | _ -> raise @@ Failure "attempted to switch on unsupported type"
 

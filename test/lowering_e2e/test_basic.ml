@@ -190,3 +190,108 @@ let%expect_test "test let rec" =
   120
   720
   |}]
+
+let%expect_test "test basic int match" =
+  let program =
+    {|
+  val sub = fun x -> match x with 0 -> 0 | n -> (n - 1)
+  val test = do {
+    print(sub 0);
+    print(sub 1);
+    print(sub 2)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    0
+    0
+    1 |}]
+
+let%expect_test "test basic boolean match" =
+  let program =
+    {|
+  val flip = fun x -> match x with true -> false | false -> true
+  val test = do {
+    print(flip true);
+    print(flip false)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    false
+    true |}]
+
+let%expect_test "test basic unit match" =
+  let program =
+    {|
+  val matchunit = fun x -> match x with () -> ()
+  val test = print(matchunit ())
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|()|}]
+
+let%expect_test "test basic no arg ADT (tag) match" =
+  let program =
+    {|
+  type either = X | Y
+  val to_int = fun x -> match x with X -> 10 | Y -> 20
+  val test = do {
+    print(to_int X);
+    print(to_int Y)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    10
+    20|}]
+
+let%expect_test "test basic ADT match with args" =
+  let program =
+    {|
+    type either = X of int | Y
+    val to_int = fun x -> match x with X x -> x | Y -> 20
+    val test = do {
+      print(to_int (X 1));
+      print(to_int (X 2));
+      print(to_int Y)
+    }
+    |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+      1
+      2
+      20|}]
+
+let%expect_test "test deeply nested ADT match" =
+  let program =
+    {|
+    type nat = Z | S of nat
+    val to_int = fun x -> match x with
+      | Z -> 10
+      | S Z -> 20
+      | S S Z -> 30
+      | S S S Z -> 40
+      | x -> 50
+
+    val test = do {
+      print(to_int(S(S (S (S (Z))))));
+      print(to_int(S (S (S (Z)))));
+      print(to_int(S (S (Z))));
+      print(to_int(S (Z)));
+      print(to_int(Z))
+    }
+
+    |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+      50
+      40
+      30
+      20
+      10|}]
