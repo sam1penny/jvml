@@ -24,7 +24,7 @@ and pattern =
   | Pat_Bool of loc * bool
   | Pat_Unit of loc
   | Pat_Any of loc
-  | Pat_Or of loc * pattern * pattern
+  | Pat_Or of loc * pattern list
   | Pat_Tuple of loc * pattern list
   | Pat_Constr of loc * string * pattern option
 
@@ -66,7 +66,7 @@ let get_pattern_loc = function
   | Pat_Bool (loc, _) -> loc
   | Pat_Unit loc -> loc
   | Pat_Any loc -> loc
-  | Pat_Or (loc, _, _) -> loc
+  | Pat_Or (loc, _) -> loc
   | Pat_Tuple (loc, _) -> loc
   | Pat_Constr (loc, _, _) -> loc
 
@@ -128,10 +128,9 @@ let rec pp_pattern ?(indent = "") pat =
   let pp_rec_pattern = pp_pattern ~indent:(indent ^ "   ") in
   match pat with
   | Pat_Int _ | Pat_Ident _ | Pat_Bool _ | Pat_Unit _ | Pat_Any _ -> pp_node pat
-  | Pat_Or (_, p1, p2) ->
+  | Pat_Or (_, pats) ->
       pp_node pat;
-      pp_rec_pattern p1;
-      pp_rec_pattern p2
+      List.iter pp_rec_pattern pats
   | Pat_Tuple (_, ps) ->
       pp_node pat;
       List.iter pp_rec_pattern ps

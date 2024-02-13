@@ -72,7 +72,7 @@ let get_pattern_type = function
   | Typed_ast.Pat_Bool _ -> Typed_ast.TyBool
   | Typed_ast.Pat_Unit _ -> Typed_ast.TyUnit
   | Typed_ast.Pat_Any (_, t) -> t
-  | Typed_ast.Pat_Or (_, t, _, _) -> t
+  | Typed_ast.Pat_Or (_, t, _) -> t
   | Typed_ast.Pat_Tuple (_, t, _) -> t
   | Typed_ast.Pat_Constr (_, t, _, _) -> t
 
@@ -95,11 +95,9 @@ let rec map_over_pat_texprs f pat =
   | Pat_Int _ | Pat_Bool _ | Pat_Unit _ -> pat
   | Pat_Ident (loc, ty, x) -> Pat_Ident (loc, f ty, x)
   | Pat_Any (loc, ty) -> Pat_Any (loc, f ty)
-  | Pat_Or (loc, ty, p0, p1) ->
+  | Pat_Or (loc, ty, pats) ->
       let ty' = f ty in
-      let p0' = map_over_pat_texprs f p0 in
-      let p1' = map_over_pat_texprs f p1 in
-      Pat_Or (loc, ty', p0', p1')
+      Pat_Or (loc, ty', List.map (map_over_pat_texprs f) pats)
   | Pat_Tuple (loc, ty, pats) ->
       let ty' = f ty in
       Pat_Tuple (loc, ty', List.map (map_over_pat_texprs f) pats)
@@ -259,28 +257,34 @@ let rec validate_pattern unifications env nt =
         else Ok (StringMap.union (fun _ x _ -> Some x) acc map))
       (Ok StringMap.empty) maps
   in
-  let verify_same_bindings_same_types unifications loc m1 m2 =
-    StringMap.fold
-      (fun x _ acc ->
-        acc >>=? fun _ ->
-        if StringMap.mem x m1 then Ok ()
-        else
-          Error
-            ( loc,
-              sprintf "Variable %s must occur on both sides of the pattern" x ))
-      m2 (Ok ())
-    >>=? fun _ ->
-    StringMap.fold
-      (fun x (ty2, _) acc ->
-        acc >>=? fun _ ->
-        match StringMap.find_opt x m1 with
-        | None ->
-            Error
-              ( loc,
-                sprintf "Variable %s must occur on both sides of the pattern" x
-              )
-        | Some (ty1, _) -> unify unifications ty1 ty2 loc)
-      m2 (Ok ())
+  let verify_same_bindings_same_types unifications loc maps =
+    let first_map, other_maps = (List.hd maps, List.tl maps) in
+    List.map
+      (fun other_map ->
+        StringMap.fold
+          (fun x _ acc ->
+            acc >>=? fun _ ->
+            if StringMap.mem x other_map then Ok ()
+            else
+              Error
+                ( loc,
+                  sprintf "Variable %s must occur on both sides of the pattern"
+                    x ))
+          first_map (Ok ())
+        >>=? fun _ ->
+        StringMap.fold
+          (fun x (ty2, _) acc ->
+            acc >>=? fun _ ->
+            match StringMap.find_opt x first_map with
+            | None ->
+                Error
+                  ( loc,
+                    sprintf
+                      "Variable %s must occur on both sides of the pattern" x )
+            | Some (ty1, _) -> unify unifications ty1 ty2 loc)
+          other_map (Ok ()))
+      other_maps
+    |> collect_result
   in
   let open Parsing in
   function
@@ -297,16 +301,21 @@ let rec validate_pattern unifications env nt =
   | Parsed_ast.Pat_Any loc ->
       Ok (Typed_ast.Pat_Any (loc, nt ()), StringMap.empty)
       (* think about this more, but seems legit *)
-  | Parsed_ast.Pat_Or (loc, p1, p2) ->
-      validate_pattern unifications env nt p1 >>=? fun (p1node, p1bindings) ->
-      validate_pattern unifications env nt p2 >>=? fun (p2node, p2bindings) ->
-      verify_same_bindings_same_types unifications loc p1bindings p2bindings
+  | Parsed_ast.Pat_Or (loc, pats) ->
+      List.map (validate_pattern unifications env nt) pats |> collect_result
+      >>=? fun recursive_calls ->
+      let pat_nodes = List.map (fun (x, _) -> x) recursive_calls in
+      let bindings = List.map (fun (_, y) -> y) recursive_calls in
+      let first_node, other_nodes = (List.hd pat_nodes, List.tl pat_nodes) in
+      List.map get_pattern_type other_nodes
+      |> List.map (fun ty ->
+             unify unifications (get_pattern_type first_node) ty loc)
+      |> collect_result
       >>=? fun _ ->
-      unify unifications (get_pattern_type p1node) (get_pattern_type p2node) loc
-      >>=? fun _ ->
+      verify_same_bindings_same_types unifications loc bindings >>=? fun _ ->
       Ok
-        ( Typed_ast.Pat_Or (loc, get_pattern_type p1node, p1node, p2node),
-          p1bindings )
+        ( Typed_ast.Pat_Or (loc, get_pattern_type first_node, pat_nodes),
+          StringMap.empty )
   | Parsed_ast.Pat_Tuple (loc, ps) ->
       List.map (validate_pattern unifications env nt) ps |> collect_result
       >>=? fun recursive_calls ->

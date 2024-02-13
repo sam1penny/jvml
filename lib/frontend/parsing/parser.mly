@@ -96,7 +96,7 @@ pattern1:
 
 pattern:
   | p = pattern1 { p }
-  | p1 = pattern; BAR; p2 = pattern {Parsed_ast.Pat_Or ($sloc, p1, p2)}
+  | pats = tuple_sep(BAR, pattern1) { Parsed_ast.Pat_Or ($sloc, pats)}
 
 case:
   (* removes ambiguity of nested matches *)

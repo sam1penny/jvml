@@ -31,7 +31,7 @@ and pattern =
   | Pat_Bool of bool
   | Pat_Unit
   | Pat_Any
-  | Pat_Or of pattern * pattern
+  | Pat_Or of pattern list
   | Pat_Tuple of pattern list
   | Pat_Constr of string * pattern option
 
@@ -100,8 +100,7 @@ and add_dummy_loc_pat =
   | Pat_Bool b -> Parsed_ast.Pat_Bool (dummy, b)
   | Pat_Unit -> Parsed_ast.Pat_Unit dummy
   | Pat_Any -> Parsed_ast.Pat_Any dummy
-  | Pat_Or (p0, p1) ->
-      Parsed_ast.Pat_Or (dummy, add_dummy_loc_pat p0, add_dummy_loc_pat p1)
+  | Pat_Or pats -> Parsed_ast.Pat_Or (dummy, List.map add_dummy_loc_pat pats)
   | Pat_Tuple ps -> Parsed_ast.Pat_Tuple (dummy, List.map add_dummy_loc_pat ps)
   | Pat_Constr (c, None) -> Parsed_ast.Pat_Constr (dummy, c, None)
   | Pat_Constr (c, Some p) ->

@@ -169,7 +169,7 @@ let%expect_test "test invalid polymorphic equals" =
   [%expect {|Error|}]
 
 let%expect_test "test ored pattern" =
-  let x = Match (Int 3, [ (Pat_Or (Pat_Int 0, Pat_Int 1), Int 1) ]) in
+  let x = Match (Int 3, [ (Pat_Or [ Pat_Int 0; Pat_Int 1 ], Int 1) ]) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
@@ -197,8 +197,10 @@ let%expect_test "test matched pattern bindings ok" =
           ( Ident "x",
             [
               ( Pat_Or
-                  ( Pat_Tuple [ Pat_Int 3; Pat_Ident "x" ],
-                    Pat_Tuple [ Pat_Ident "x"; Pat_Int 3 ] ),
+                  [
+                    Pat_Tuple [ Pat_Int 3; Pat_Ident "x" ];
+                    Pat_Tuple [ Pat_Ident "x"; Pat_Int 3 ];
+                  ],
                 Bool true );
             ] ) )
   in
@@ -215,8 +217,10 @@ let%expect_test "test uncorresponding types in pattern bindings fails" =
           ( Ident "x",
             [
               ( Pat_Or
-                  ( Pat_Tuple [ Pat_Int 3; Pat_Ident "x" ],
-                    Pat_Tuple [ Pat_Ident "x"; Pat_Bool true ] ),
+                  [
+                    Pat_Tuple [ Pat_Int 3; Pat_Ident "x" ];
+                    Pat_Tuple [ Pat_Ident "x"; Pat_Bool true ];
+                  ],
                 Bool true );
             ] ) )
   in
@@ -229,7 +233,8 @@ let%expect_test "test unmatched pattern bindings fails" =
   let x =
     Fun
       ( "x",
-        Match (Ident "x", [ (Pat_Or (Pat_Ident "x", Pat_Ident "y"), Bool true) ])
+        Match
+          (Ident "x", [ (Pat_Or [ Pat_Ident "x"; Pat_Ident "y" ], Bool true) ])
       )
   in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr

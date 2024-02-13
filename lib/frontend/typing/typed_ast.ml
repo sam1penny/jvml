@@ -34,7 +34,7 @@ and pattern =
   | Pat_Bool of loc * bool
   | Pat_Unit of loc
   | Pat_Any of loc * type_expr
-  | Pat_Or of loc * type_expr * pattern * pattern
+  | Pat_Or of loc * type_expr * pattern list
   | Pat_Tuple of loc * type_expr * pattern list
   | Pat_Constr of loc * type_expr * string * pattern option
 
@@ -122,10 +122,9 @@ let rec pp_pattern ?(indent = "") pat =
   let pp_rec_pattern = pp_pattern ~indent:(indent ^ "   ") in
   match pat with
   | Pat_Int _ | Pat_Ident _ | Pat_Bool _ | Pat_Unit _ | Pat_Any _ -> pp_node pat
-  | Pat_Or (_, _, p1, p2) ->
+  | Pat_Or (_, _, pats) ->
       pp_node pat;
-      pp_rec_pattern p1;
-      pp_rec_pattern p2
+      List.iter pp_rec_pattern pats
   | Pat_Tuple (_, _, ps) ->
       pp_node pat;
       List.iter pp_rec_pattern ps
