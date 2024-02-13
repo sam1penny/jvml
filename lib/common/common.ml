@@ -25,6 +25,6 @@ let collect_result l =
       x >>=? fun x -> Ok (x :: acc))
     l (Ok [])
 
-(* todo - make all files use these modules *)
+
 module StringMap = Map.Make (String)
 module StringSet = Set.Make (String)
