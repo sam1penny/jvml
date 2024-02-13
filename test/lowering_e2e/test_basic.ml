@@ -274,8 +274,8 @@ let%expect_test "test deeply nested ADT match" =
     val to_int = fun x -> match x with
       | Z -> 10
       | S Z -> 20
-      | S S Z -> 30
-      | S S S Z -> 40
+      | S (S Z) -> 30
+      | S (S (S Z)) -> 40
       | x -> 50
 
     val test = do {

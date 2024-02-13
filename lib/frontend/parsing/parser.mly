@@ -93,6 +93,7 @@ pattern1:
   | UNDERSCORE {Parsed_ast.Pat_Any $sloc}
   | LPAREN; pats = tuple_sep(COMMA, pattern1); RPAREN {Parsed_ast.Pat_Tuple ($sloc, pats)}
   | cname = UPPERCASE_IDENT; p = pattern1 {Parsed_ast.Pat_Constr ($sloc, cname, Some p)}
+  | LPAREN; pat = pattern; RPAREN { pat }
 
 pattern:
   | p = pattern1 { p }
