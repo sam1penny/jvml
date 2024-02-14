@@ -89,6 +89,7 @@ let free_vars_with_types_expr bound e =
              (Option.map (fun e -> aux bound free e) fallback_opt
              |> Option.value ~default:StringMap.empty)
     | Match_Failure -> StringMap.empty
+    | Shared_Expr (e, _) -> aux bound free !e
   in
 
   aux bound StringMap.empty e
@@ -270,7 +271,9 @@ let rec compile_expr label_gen env top_level_bindings e =
             compile_expr_rec fallback_expr
           in
           let default_label = label_gen.ctrl_label () in
-          let default_code = [ LABEL default_label ] @ default_code in
+          let default_code =
+            [ LABEL default_label ] @ default_code @ [ GOTO after_label ]
+          in
           ( defs0 @ case_defs @ default_defs,
             code0 @ index_getter
             @ [ SWITCH (switch_strategy, index_labels, default_label) ]
@@ -290,6 +293,16 @@ let rec compile_expr label_gen env top_level_bindings e =
     *)
       )
   | Match_Failure -> ([], [ MATCH_FAILURE ], [])
+  | Shared_Expr (e, lab_opt) -> (
+      match !lab_opt with
+      | None ->
+          let lab = label_gen.ctrl_label () in
+          let defs, code, static_methods = compile_expr_rec !e in
+          lab_opt := Some lab;
+          (defs, [ LABEL lab ] @ code, static_methods)
+      (* actually not sure if this is correct in the general case -- where do we go after the code?
+         kind of need to 'jump back' *)
+      | Some lab -> ([], [ GOTO lab ], []))
 
 and compile_bop label_gen env top_level_bindings e0 e1 =
   let compile_expr_rec = compile_expr label_gen env top_level_bindings in

@@ -33,11 +33,13 @@ let rec desugar_expr constructors_by_type expr =
           (Compile_patterns.clause_of_case (Ident (Infer.get_expr_type e, var)))
           desugared_cases
       in
+      let table = Hashtbl.create 10 in
       Let
         ( ty,
           var,
           rec_desugar e,
-          Compile_patterns.compile_match constructors_by_type ty clauses )
+          Compile_patterns.compile_match table constructors_by_type ty clauses
+        )
   | Typed_ast.Tuple (_, ty, es) -> Tuple (ty, List.map rec_desugar es)
   | Typed_ast.Let (_, ty, x, e0, e1) ->
       Let (ty, x, rec_desugar e0, rec_desugar e1)

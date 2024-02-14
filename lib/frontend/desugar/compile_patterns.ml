@@ -24,6 +24,18 @@ module ConSet = Set.Make (struct
   let compare = compare
 end)
 
+type shared_expr = { expr : expr; ref_count : int ref }
+
+let make_shared table expr =
+  match Hashtbl.find_opt table expr with
+  | None ->
+      let shared = Shared_Expr (ref expr, ref None) in
+      Hashtbl.add table expr { expr = shared; ref_count = ref 0 };
+      shared
+  | Some { expr = e; ref_count = rc } ->
+      rc := !rc + 1;
+      e
+
 let clause_of_case e (pattern, case_expr) = Clause ([ (e, pattern) ], case_expr)
 
 let get_tname = function
@@ -104,14 +116,15 @@ todos:
 - Add better logic for binding variables to avoid redundant tuple_get/constructor_get
 - Consider refactoring to inner methods to avoid passing (constructors & return_type) to every method
 *)
-let rec compile_match (constructors : con StringMap.t StringMap.t)
+let rec compile_match (table : (expr, shared_expr) Hashtbl.t)
+    (constructors : con StringMap.t StringMap.t)
     (return_type : Typed_ast.type_expr) (clauses : clause list) : expr =
   let clauses = expand_or_patterns clauses in
   let clauses = List.map move_variable_patterns clauses in
   let clauses = List.map move_wildcard_patterns clauses in
   match clauses with
   | [] -> Match_Failure
-  | Clause ([], body) :: _ -> body
+  | Clause ([], body) :: _ -> make_shared table body
   | Clause (pats, _) :: _ -> (
       let branch_var = List.hd pats |> fun (x, _) -> x in
       match List.assoc branch_var pats with
@@ -126,27 +139,27 @@ let rec compile_match (constructors : con StringMap.t StringMap.t)
                "illegal state - move_variable_patterns should have moved all \
                 variables inside"
       | Typed_ast.Pat_Constr (_, ty, _, _) ->
-          compile_constructor_match constructors clauses branch_var
+          compile_constructor_match table constructors clauses branch_var
             (StringMap.find (get_tname ty) constructors)
             return_type
       | Typed_ast.Pat_Int _ ->
-          compile_int_match constructors clauses branch_var return_type
+          compile_int_match table constructors clauses branch_var return_type
       | Typed_ast.Pat_Tuple _ ->
-          compile_tuple_match constructors return_type clauses branch_var
+          compile_tuple_match table constructors return_type clauses branch_var
       | Typed_ast.Pat_Bool _ ->
           let boolcons =
             StringMap.of_list
               [ ("true", BoolCon true); ("false", BoolCon false) ]
           in
-          compile_constructor_match constructors clauses branch_var boolcons
-            return_type
+          compile_constructor_match table constructors clauses branch_var
+            boolcons return_type
       | Typed_ast.Pat_Unit _ ->
           let unitcons = StringMap.singleton "unit" UnitCon in
-          compile_constructor_match constructors clauses branch_var unitcons
-            return_type
+          compile_constructor_match table constructors clauses branch_var
+            unitcons return_type
       | _ -> raise @@ Failure "")
 
-and compile_constructor_match constructors (clauses : clause list)
+and compile_constructor_match table constructors (clauses : clause list)
     (branch_var : expr) (constructors_by_name : con StringMap.t)
     (return_type : Typed_ast.type_expr) =
   List.fold_right
@@ -191,7 +204,7 @@ and compile_constructor_match constructors (clauses : clause list)
     List.map
       (fun (con, nested_match) ->
         ( con,
-          compile_match constructors return_type
+          compile_match table constructors return_type
             (nested_match @ fallback_clauses) ))
       case_clauses
   in
@@ -205,12 +218,12 @@ and compile_constructor_match constructors (clauses : clause list)
   in
   let fallback_clauses_opt =
     if ConSet.equal constructors_in_switch all_constructors then None
-    else Some (compile_match constructors return_type fallback_clauses)
+    else Some (compile_match table constructors return_type fallback_clauses)
   in
   Switch (return_type, branch_var, compiled_cases, fallback_clauses_opt)
 
-and compile_int_match constructors (clauses : clause list) (branch_var : expr)
-    (return_type : Typed_ast.type_expr) =
+and compile_int_match table constructors (clauses : clause list)
+    (branch_var : expr) (return_type : Typed_ast.type_expr) =
   List.fold_right
     (fun (Clause (pats, body)) (case_clauses, fallback_clauses) ->
       match List.assoc_opt branch_var pats with
@@ -237,7 +250,7 @@ and compile_int_match constructors (clauses : clause list) (branch_var : expr)
     List.map
       (fun (con, nested_match) ->
         ( con,
-          compile_match constructors return_type
+          compile_match table constructors return_type
             (nested_match @ fallback_clauses) ))
       case_clauses
   in
@@ -245,9 +258,9 @@ and compile_int_match constructors (clauses : clause list) (branch_var : expr)
     ( return_type,
       branch_var,
       compiled_cases,
-      Some (compile_match constructors return_type fallback_clauses) )
+      Some (compile_match table constructors return_type fallback_clauses) )
 
-and compile_tuple_match constructors return_type (clauses : clause list)
+and compile_tuple_match table constructors return_type (clauses : clause list)
     (branch_var : expr) =
   List.map
     (fun (Clause (pats, body)) ->
@@ -269,4 +282,4 @@ and compile_tuple_match constructors return_type (clauses : clause list)
                "illegal state - all cells in a column must be of the same \
                 constructor")
     clauses
-  |> compile_match constructors return_type
+  |> compile_match table constructors return_type

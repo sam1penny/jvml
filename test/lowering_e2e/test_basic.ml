@@ -252,12 +252,12 @@ let%expect_test "test basic no arg ADT (tag) match" =
 let%expect_test "test basic ADT match with args" =
   let program =
     {|
-    type either = X of int | Y
-    val to_int = fun x -> match x with X x -> x | Y -> 20
+    type either = A of int | B
+    val to_int = fun x -> match x with A x -> x | B -> 20
     val test = do {
-      print(to_int (X 1));
-      print(to_int (X 2));
-      print(to_int Y)
+      print(to_int (A 1));
+      print(to_int (A 2));
+      print(to_int B)
     }
     |}
   in

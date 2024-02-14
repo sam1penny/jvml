@@ -7,4 +7,4 @@ unzip -u Foo >/dev/null
 java -jar ../../../../../scripts/stackmap_gen.jar Foo.class
 java Foo
 cd ..
-rm -rf tmp
+rm -rf tmp/

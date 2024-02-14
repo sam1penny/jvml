@@ -29,6 +29,8 @@ type expr =
   (* switch branch_var, constructor + decision list, fallback_opt *)
   | Switch of Typed_ast.type_expr * expr * (con * expr) list * expr option
   | Match_Failure
+  (* ref to expr, label (in compiled repr) *)
+  | Shared_Expr of expr ref * string option ref
 
 type type_constr = DeclConstr of string * int * Typed_ast.type_expr option
 
@@ -44,7 +46,7 @@ let desugared_tvar_cnter =
     n := x + 1;
     "match_failure_tvar" ^ string_of_int x
 
-let get_expr_type = function
+let rec get_expr_type = function
   | Int _ -> Typed_ast.TyInt
   | Ident (t, _) -> t
   | Bool _ -> Typed_ast.TyBool
@@ -61,6 +63,7 @@ let get_expr_type = function
   | ConstructorGet (t, _, _) -> t
   | Switch (t, _, _, _) -> t
   | Match_Failure -> TyVar (desugared_tvar_cnter ())
+  | Shared_Expr ({ contents = e }, _) -> get_expr_type e
 (* huge bodge to get match_failure working
 
    todo - think of an alternative to get this working
@@ -92,6 +95,7 @@ let string_of_expr_node =
   | ConstructorGet _ -> "GetArg"
   | Switch _ -> "Switch"
   | Match_Failure -> "Match_Failure"
+  | Shared_Expr (_, _) -> "Shared"
 
 let pp_con ?(indent = "") con =
   match con with
@@ -153,6 +157,9 @@ let rec pp_expr ?(indent = "") expr =
           printf "%s└── <fallback>\n" case_indent;
           pp_expr ~indent:(case_indent ^ "   ") expr)
   | Match_Failure -> pp_node expr
+  | Shared_Expr ({ contents = shared }, _) ->
+      pp_node expr;
+      pp_rec_expr shared
 
 and pp_case indent (pattern, expr) =
   printf "%s└── <case>\n" indent;

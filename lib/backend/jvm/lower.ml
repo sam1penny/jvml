@@ -25,9 +25,10 @@ let stack_size_change = function
      into multiple bytecode instructions that, during execution,
      may push multiple values onto the stack.
   *)
-  | TUPLE_GET _ | CONSTRUCTOR_GET _ -> 0
+  | TUPLE_GET _ -> 2
+  | CONSTRUCTOR_GET _ -> 0
   | SWITCH _ -> -1
-  | MATCH_FAILURE -> 0
+  | MATCH_FAILURE -> 2
   | CONSTRUCTOR_INDEX _ -> 0
 
 let max_stack_depth prog =
