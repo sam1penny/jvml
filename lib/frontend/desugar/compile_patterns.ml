@@ -5,6 +5,19 @@ open Common
 type clause =
   | Clause of (Desugared_ast.expr * Typed_ast.pattern) list * Desugared_ast.expr
 
+let pp_clause (Clause (pats, body)) =
+  print_newline ();
+  print_endline "begin clause";
+  List.iter
+    (fun (e, p) ->
+      pp_expr e;
+      Typed_ast.pp_pattern p;
+      print_endline "")
+    pats;
+  pp_expr body;
+  print_endline "end clause";
+  print_newline ()
+
 module ConSet = Set.Make (struct
   type t = con
 
@@ -16,6 +29,50 @@ let clause_of_case e (pattern, case_expr) = Clause ([ (e, pattern) ], case_expr)
 let get_tname = function
   | Typed_ast.TyCustom (_, tname) -> tname
   | _ -> raise @@ Failure "called get_tname on type_expr that is not TyCustom"
+
+let rec take list i =
+  match list with
+  | [] -> []
+  | x :: xs -> if i = 0 then [] else x :: take xs (i - 1)
+
+let rec drop list i =
+  match list with [] -> [] | _ :: xs -> if i = 0 then xs else drop xs (i - 1)
+
+let expand_or_patterns clauses =
+  let expand_first_or_pattern (Clause (pats, body)) =
+    match
+      List.find_index
+        (function _, Typed_ast.Pat_Or _ -> true | _ -> false)
+        pats
+    with
+    | None -> (false, [ Clause (pats, body) ])
+    | Some i ->
+        let before_pats = take pats i in
+        let after_pats = drop pats i in
+        let or_getter, or_pats =
+          List.nth pats i |> function
+          | e, Typed_ast.Pat_Or (_, _, pats) -> (e, pats)
+          | _ -> raise @@ Failure "illegal state"
+        in
+        List.fold_left
+          (fun clauses pat ->
+            Clause (before_pats @ ((or_getter, pat) :: after_pats), body)
+            :: clauses)
+          [] or_pats
+        |> List.rev
+        |> fun new_clauses -> (true, new_clauses)
+  in
+  let rec expand_until_done clauses =
+    let r = List.map expand_first_or_pattern clauses in
+    List.fold_left
+      (fun acc (expansion_happened, new_clauses) ->
+        if expansion_happened then expand_until_done new_clauses :: acc
+        else new_clauses :: acc)
+      [] r
+    |> List.rev |> List.flatten
+  in
+
+  List.map (fun clause -> expand_until_done [ clause ]) clauses |> List.flatten
 
 let move_variable_patterns (Clause (pats, body)) =
   let bindings =
@@ -46,10 +103,10 @@ todos:
 - Report warning on missing/redundant cases
 - Add better logic for binding variables to avoid redundant tuple_get/constructor_get
 - Consider refactoring to inner methods to avoid passing (constructors & return_type) to every method
-- Handle other cases (bool/unit/or)
 *)
 let rec compile_match (constructors : con StringMap.t StringMap.t)
     (return_type : Typed_ast.type_expr) (clauses : clause list) : expr =
+  let clauses = expand_or_patterns clauses in
   let clauses = List.map move_variable_patterns clauses in
   let clauses = List.map move_wildcard_patterns clauses in
   match clauses with
