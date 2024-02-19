@@ -40,6 +40,8 @@ type instruction =
   | POP
   (* save return type in order to cast *)
   | APPLY of type_expr
+  (* method(name, args, return type), actual return type (unerased) *)
+  | STATIC_APPLY of string * type_expr list * type_expr * type_expr
   (* class, field, type *)
   | LOAD_STATIC of string * string * type_expr
   | STORE_STATIC of string * string * type_expr

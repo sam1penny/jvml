@@ -130,6 +130,31 @@ let determine_switch_strategy arg_type =
   | Typed_ast.TyInt -> LOOKUP
   | _ -> raise @@ Failure "attempted to switch on unsupported type"
 
+let maybe_transform_direct env e =
+  let rec maybe_transform_direct_inner nargs e =
+    let open Desugared_ast in
+    match e with
+    | Ident (_, x) ->
+        Value_env.lookup_static_method x env
+        >>= fun (name, num, ty_args, ty_ret) ->
+        if nargs = num then Some (name, num, ty_args, ty_ret, []) else None
+    | App (_, e0, e1) -> (
+        match maybe_transform_direct_inner (nargs + 1) e0 with
+        | None -> None
+        | Some (name, num, ty_args, ty_ret, args) ->
+            Some (name, num - 1, ty_args, ty_ret, args @ [ e1 ])
+            (* todo - transform for tr *))
+    | _ -> None
+  in
+  maybe_transform_direct_inner 0 e
+
+let compile_expr_list compile_func es =
+  let linear_es = List.map compile_func es in
+  let defs = List.map (fun (defs, _, _) -> defs) linear_es in
+  let ecode = List.map (fun (_, code, _) -> code) linear_es in
+  let smethods = List.map (fun (_, _, smethods) -> smethods) linear_es in
+  (defs, ecode, smethods)
+
 let rec compile_expr label_gen env top_level_bindings e =
   let open Desugared_ast in
   (* curried for convenience *)
@@ -157,10 +182,18 @@ let rec compile_expr label_gen env top_level_bindings e =
   | Fun (t0, t1, x, e) ->
       compile_anon_lambda_expr label_gen env top_level_bindings
         (convert_type t0, convert_type t1, x, e)
-  | App (ty, e0, e1) ->
-      let defs0, c0, s0 = compile_expr_rec e0 in
-      let defs1, c1, s1 = compile_expr_rec e1 in
-      (defs0 @ defs1, c0 @ c1 @ [ APPLY (convert_type ty) ], s0 @ s1)
+  | App (ty, e0, e1) as e_app -> (
+      match maybe_transform_direct env e_app with
+      | None ->
+          let defs0, c0, s0 = compile_expr_rec e0 in
+          let defs1, c1, s1 = compile_expr_rec e1 in
+          (defs0 @ defs1, c0 @ c1 @ [ APPLY (convert_type ty) ], s0 @ s1)
+      | Some (name, _, ty_args, ty_ret, es) ->
+          let defs, ecode, smethods = compile_expr_list compile_expr_rec es in
+          ( List.flatten defs,
+            List.flatten ecode
+            @ [ STATIC_APPLY (name, ty_args, ty_ret, convert_type ty) ],
+            List.flatten smethods ))
   | Let (_, x, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in
       let x_label = label_gen.ref_label () in
@@ -199,16 +232,9 @@ let rec compile_expr label_gen env top_level_bindings e =
         @ [ CONSTRUCT_OBJ ("Tuple", [ TyArray TyAny ]) ],
         smethods )
   | Seq (_, es) ->
-      let linear_es = List.map compile_expr_rec es in
-      let defs =
-        List.map (fun (defs, _, _) -> defs) linear_es |> List.flatten
-      in
-      let ecode = List.map (fun (_, code, _) -> code) linear_es in
-      let smethods =
-        List.map (fun (_, _, smethods) -> smethods) linear_es |> List.flatten
-      in
+      let defs, ecode, smethods = compile_expr_list compile_expr_rec es in
       let pop_throwaways = intersperse [ POP ] ecode in
-      (defs, List.flatten pop_throwaways, smethods)
+      (List.flatten defs, List.flatten pop_throwaways, List.flatten smethods)
   | TupleGet (ty, i, e) ->
       let defs, code, static_methods = compile_expr_rec e in
       (defs, code @ [ TUPLE_GET (convert_type ty, i) ], static_methods)
@@ -278,20 +304,7 @@ let rec compile_expr label_gen env top_level_bindings e =
             code0 @ index_getter
             @ [ SWITCH (switch_strategy, index_labels, default_label) ]
             @ case_code @ default_code @ [ LABEL after_label ],
-            static_methods0 @ case_smethods @ default_static_methods )
-      (*
-      let (default_label_opt, default_defs, default_code, default_static_methods) =
-        fallback_opt
-        |> Option.map (fun fallback -> let defs, code, s = compile_expr_rec fallback in
-        let label = label_gen.ctrl_label () in
-        (Some label, defs, [LABEL label] @ code, s)
-        )
-        |> Option.value ~default:(None, [], [], [])
-      in
-
-    let index_getter = get_index (get_expr_type e0) in
-    *)
-      )
+            static_methods0 @ case_smethods @ default_static_methods ))
   | Match_Failure -> ([], [ MATCH_FAILURE ], [])
   | Shared_Expr (e, lab_opt) -> (
       match !lab_opt with
@@ -527,6 +540,12 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
           ("Foo", cname, TyFun (ty, typedef_texpr))
           env )
 
+let rec collect_funargs = function
+  | Desugared_ast.Fun (t0, _, x, e) ->
+      let funargs, e = collect_funargs e in
+      ((x, t0) :: funargs, e)
+  | e -> ([], e)
+
 let compile_decl label_gen env toplevel = function
   | Desugared_ast.Val (ty, x, e) ->
       let defs, c, smethods = compile_expr label_gen env toplevel e in
@@ -540,17 +559,58 @@ let compile_decl label_gen env toplevel = function
         smethods,
         env',
         new_toplevel )
+  (*
+  Compile two versions of the function - one static method, and one closure.
+  Usage depends on whether all arguments are supplied.
+  *)
   | Desugared_ast.ValRec (ty, x, e) ->
-      (* make value available in e for compiling recursion *)
-      let x_label = label_gen.static_label () in
+      (* generate labels for handling recursion *)
+      let closure_label = label_gen.static_label () in
+      let static_label = label_gen.static_label () in
+
+      let funargs, body = collect_funargs e in
+      let static_label_gen = reset_for_static_func_generators label_gen in
+
+      let num_funargs = List.length funargs in
+      let converted_funargs =
+        List.map (fun (_, ty) -> convert_type ty) funargs
+      in
+      let converted_ret_ty = Desugared_ast.get_expr_type body |> convert_type in
+      let static_method_details =
+        (static_label, num_funargs, converted_funargs, converted_ret_ty)
+      in
+
+      let closure_details = ("Foo", closure_label, convert_type ty) in
+
+      let static_env =
+        Value_env.strip_nonstatic env |> fun env ->
+        List.fold_left
+          (fun env (name, _) ->
+            Value_env.add_local_var name (static_label_gen.ref_label ()) env)
+          env funargs
+        |> Value_env.add_static_method x static_method_details
+        |> Value_env.add_static_field x closure_details
+      in
+      (* todo - verify it is correct to throw away defs and staticmethods *)
+      let _, c, _ = compile_expr static_label_gen static_env toplevel body in
+
+      let static_method =
+        {
+          name = static_label;
+          args = List.map (fun (_, ty) -> convert_type ty) funargs;
+          return_type = Desugared_ast.get_expr_type body |> convert_type;
+          body = c;
+        }
+      in
       let env' =
-        Value_env.add_static_field x ("Foo", x_label, convert_type ty) env
+        Value_env.add_static_field x closure_details env
+        |> Value_env.add_static_method x static_method_details
       in
       let new_toplevel = StringSet.add x toplevel in
       let defs, c, smethods = compile_expr label_gen env' new_toplevel e in
       ( defs,
-        c @ [ STORE_STATIC ("Foo", x_label, convert_type ty) ],
-        smethods,
+        c @ [ STORE_STATIC ("Foo", closure_label, convert_type ty) ],
+        [ static_method ] @ smethods,
         env',
         new_toplevel )
   | Desugared_ast.Type (ty, _, tname, type_constructors) ->

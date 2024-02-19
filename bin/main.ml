@@ -1,8 +1,7 @@
 let () =
   let string_program =
     {|
-    type either = X of int | Y
-    val to_int = fun x -> match x with X x -> x | Y -> 20
+    val rec iter = fun x -> fun y -> if x = 0 then y else iter (x - 1) y
     |}
   in
   Parsing.Driver.parse_string string_program

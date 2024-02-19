@@ -30,6 +30,7 @@ let stack_size_change = function
   | SWITCH _ -> -1
   | MATCH_FAILURE -> 2
   | CONSTRUCTOR_INDEX _ -> 0
+  | STATIC_APPLY (_, ty_args, _, _) -> 1 - List.length ty_args
 
 let max_stack_depth prog =
   List.map stack_size_change prog
@@ -192,6 +193,12 @@ let lower_instruction ctrl_gen clazz = function
         "dup";
         "invokespecial Method MatchFailure <init> ()V";
         "athrow";
+      ]
+  | STATIC_APPLY (name, arg_tys, ret_ty, actual_return_ty) ->
+      [
+        sprintf "invokestatic Method Foo %s (%s)L%s;" name
+          (lower_type_list arg_tys) (lower_type ret_ty);
+        sprintf "checkcast %s" (lower_type actual_return_ty);
       ]
 
 let should_indent = function LABEL _ -> false | _ -> true
