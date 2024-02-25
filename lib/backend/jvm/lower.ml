@@ -426,7 +426,7 @@ let lower_declaration = function
 let lower_static_method static_method =
   sprintf
     {|
-.method private static synthetic %s : (%s)L%s;
+.method public static synthetic %s : (%s)L%s;
   .code stack 10 locals 10
 %s
     areturn

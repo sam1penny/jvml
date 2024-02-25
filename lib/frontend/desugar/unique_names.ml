@@ -54,6 +54,8 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
       let e0' = rec_rename_expr e0 in
       let e1' = rec_rename_expr e1 in
       App (ty, e0', e1')
+  | Direct_app _ ->
+      raise @@ Failure "invalid ordering - run Unique_names before Direct_calls"
   | Tuple (ty, es) -> Tuple (ty, List.map rec_rename_expr es)
   | Let (ty, x, e0, e1) ->
       let e0' = rec_rename_expr e0 in

@@ -1,8 +1,12 @@
 let () =
-  let string_program = {|
-    val x = print(3)
-    val y = x
-    |} in
+  let string_program =
+    {|
+    val add = fun x -> fun y -> x + y
+    val z = add 3 4
+    val p = let add3 = add 3 in add3 4
+    val rec fact = fun x -> if x = 0 then 1 else x * fact (x - 1)
+    |}
+  in
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string string_program
   (*|> Desugar.desugar_program
@@ -10,5 +14,4 @@ let () =
     |> List.hd
   *)
   |> Desugar.desugar_program
-  |> Linear.Driver.lower_program_to_linear_ir |> Jvm.Driver.lower_ir
-  |> print_endline
+  |> List.iter Desugar.Desugared_ast.pp_decl

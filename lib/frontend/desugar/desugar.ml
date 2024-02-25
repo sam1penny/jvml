@@ -86,7 +86,8 @@ let desugared_ast_of_program program =
   |> fun (_, reversed_program) -> List.rev reversed_program
 
 let desugar_program program =
-  desugared_ast_of_program program |> Unique_names.rename_program
+  desugared_ast_of_program program
+  |> Unique_names.rename_program |> Direct_calls.transform_direct_call_program
 
 module Desugared_ast = Desugared_ast
 module Compile_patterns = Compile_patterns
