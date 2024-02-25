@@ -16,7 +16,7 @@ let empty = StringMap.empty
 let stdlib =
   {
     fields =
-      StringMap.singleton "print"
+      StringMap.singleton "print_$0"
         (Static_field ("Std", "print", TyFun (TyAny, TyUnit)));
     static_methods = StringMap.empty;
   }

@@ -10,8 +10,8 @@ let desugared_temp_var =
     n := x + 1;
     "desugar_t" ^ string_of_int x
 
-let rec desugar_expr constructors_by_type expr =
-  let rec_desugar = desugar_expr constructors_by_type in
+let rec desugared_ast_of_expr constructors_by_type expr =
+  let rec_desugar = desugared_ast_of_expr constructors_by_type in
   match expr with
   | Typed_ast.Int (_, i) -> Int i
   | Typed_ast.Ident (_, ty, x) -> Ident (ty, x)
@@ -48,17 +48,19 @@ let rec desugar_expr constructors_by_type expr =
   | Typed_ast.Constr (_, ty, cname) -> Constr (ty, cname)
   | Typed_ast.Seq (_, ty, es) -> Seq (ty, List.map rec_desugar es)
 
-let desugar_type_constructor tag = function
+let desugared_ast_of_type_constructor tag = function
   | Typed_ast.DeclConstr (_, cname, ty_opt) -> DeclConstr (cname, tag, ty_opt)
 
-let desugar_decl constructors_by_type = function
+let desugared_ast_of_decl constructors_by_type = function
   | Typed_ast.Val (_, ty, x, e) ->
-      (constructors_by_type, Val (ty, x, desugar_expr constructors_by_type e))
+      ( constructors_by_type,
+        Val (ty, x, desugared_ast_of_expr constructors_by_type e) )
   | Typed_ast.ValRec (_, ty, x, e) ->
-      (constructors_by_type, ValRec (ty, x, desugar_expr constructors_by_type e))
+      ( constructors_by_type,
+        ValRec (ty, x, desugared_ast_of_expr constructors_by_type e) )
   | Typed_ast.Type (_, ty, params, tname, constructors) ->
       let desugared_constructors =
-        List.mapi desugar_type_constructor constructors
+        List.mapi desugared_ast_of_type_constructor constructors
       in
       let casecons_by_name =
         List.fold_left
@@ -69,15 +71,23 @@ let desugar_decl constructors_by_type = function
       ( StringMap.add tname casecons_by_name constructors_by_type,
         Type (ty, params, tname, desugared_constructors) )
 
-let desugar_program program =
+(*
+- compile patterns and desugar constructors
+- necessary desugaring to use desugared_ast
+*)
+let desugared_ast_of_program program =
   List.fold_left
     (fun (constructors_by_type, desugared_program_rev) decl ->
       let constructors_by_type, desugared_decl =
-        desugar_decl constructors_by_type decl
+        desugared_ast_of_decl constructors_by_type decl
       in
       (constructors_by_type, desugared_decl :: desugared_program_rev))
     (StringMap.empty, []) program
   |> fun (_, reversed_program) -> List.rev reversed_program
 
+let desugar_program program =
+  desugared_ast_of_program program |> Unique_names.rename_program
+
 module Desugared_ast = Desugared_ast
 module Compile_patterns = Compile_patterns
+module Unique_names = Unique_names
