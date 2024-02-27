@@ -33,6 +33,8 @@ let fetch_current_version table key =
   Hashtbl.find_opt table key |> Option.value ~default:0
   |> fun next_version_num -> key ^ "_$" ^ string_of_int next_version_num
 
+let restore_previous_version table key = Hashtbl.remove table key
+
 let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
   let rec_rename_expr = rename_expr most_recent_version in
   match e with
@@ -49,7 +51,9 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
       If (ty, e0', e1', e2')
   | Fun (t0, t1, x, e) ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
-      Fun (t0, t1, x_versioned, rec_rename_expr e)
+      let e' = rec_rename_expr e in
+      restore_previous_version most_recent_version x;
+      Fun (t0, t1, x_versioned, e')
   | App (ty, e0, e1) ->
       let e0' = rec_rename_expr e0 in
       let e1' = rec_rename_expr e1 in
@@ -61,11 +65,13 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
       let e0' = rec_rename_expr e0 in
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let e1' = rec_rename_expr e1 in
+      restore_previous_version most_recent_version x;
       Let (ty, x_versioned, e0', e1')
   | LetRec (ty, x, e0, e1) ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let e0' = rec_rename_expr e0 in
       let e1' = rec_rename_expr e1 in
+      restore_previous_version most_recent_version x;
       LetRec (ty, x_versioned, e0', e1')
   | Constr (ty, cname) -> Constr (ty, cname)
   | Seq (ty, es) -> Seq (ty, List.map rec_rename_expr es)
