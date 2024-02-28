@@ -105,6 +105,44 @@ let free_vars_with_types_expr bound e =
 
   aux bound StringMap.empty e
 
+(*
+the 'sharing' in shared expr is implemented with a GOTO instruction to
+the already compiled code.
+
+this must be reset on exiting a scope (e.g when compiling a method twice).
+*)
+let rec clear_shared_expr_labels e =
+  let open Desugared_ast in
+  match e with
+  | Int _ | Bool _ | Unit | Constr _ | Ident _ | Match_Failure -> ()
+  | Bop (_, e0, _, e1) ->
+      clear_shared_expr_labels e0;
+      clear_shared_expr_labels e1
+  | If (_, e0, e1, e2) ->
+      clear_shared_expr_labels e0;
+      clear_shared_expr_labels e1;
+      clear_shared_expr_labels e2
+  | Fun (_, _, _, e) -> clear_shared_expr_labels e
+  | App (_, e0, e1) ->
+      clear_shared_expr_labels e0;
+      clear_shared_expr_labels e1
+  | Direct_app (_, _, _, es) -> List.iter clear_shared_expr_labels es
+  | Tuple (_, es) -> List.iter clear_shared_expr_labels es
+  | Let (_, _, e0, e1) ->
+      clear_shared_expr_labels e0;
+      clear_shared_expr_labels e1
+  | LetRec (_, _, e0, e1) ->
+      clear_shared_expr_labels e0;
+      clear_shared_expr_labels e1
+  | Seq (_, es) -> List.iter clear_shared_expr_labels es
+  | TupleGet (_, _, e) -> clear_shared_expr_labels e
+  | ConstructorGet (_, _, e) -> clear_shared_expr_labels e
+  | Switch (_, e, cases, fallback_opt) ->
+      clear_shared_expr_labels e;
+      List.iter (fun (_, case_expr) -> clear_shared_expr_labels case_expr) cases;
+      Option.iter clear_shared_expr_labels fallback_opt
+  | Shared_Expr (_, lab_opt_ref) -> lab_opt_ref := None
+
 let con_index = function
   | Desugared_ast.IntCon i -> i
   | Desugared_ast.BoolCon b -> if b then 1 else 0
@@ -535,12 +573,50 @@ let rec collect_funargs = function
 
 let compile_decl label_gen env toplevel = function
   | Desugared_ast.Val (ty, x, e) ->
+      (* compile static method *)
+      let funargs, body = collect_funargs e in
+      let static_label_gen = reset_for_static_func_generators label_gen in
+      let num_funargs = List.length funargs in
+      let converted_funargs =
+        List.map (fun (_, ty) -> convert_type ty) funargs
+      in
+      let converted_ret_ty = Desugared_ast.get_expr_type body |> convert_type in
+      let static_method_details =
+        (x, num_funargs, converted_funargs, converted_ret_ty)
+      in
+      let closure_details = ("Foo", x, convert_type ty) in
+
+      let static_env =
+        Value_env.strip_nonstatic env |> fun env ->
+        List.fold_left
+          (fun env (name, _) ->
+            Value_env.add_local_var name (static_label_gen.ref_label ()) env)
+          env funargs
+        |> Value_env.add_static_method x static_method_details
+        |> Value_env.add_static_field x closure_details
+      in
+
+      (* todo - verify it is correct to throw away defs and staticmethods *)
+      let _, c, _ = compile_expr static_label_gen static_env toplevel body in
+
+      let static_method =
+        {
+          name = x;
+          args = List.map (fun (_, ty) -> convert_type ty) funargs;
+          return_type = Desugared_ast.get_expr_type body |> convert_type;
+          body = c;
+        }
+      in
+
+      clear_shared_expr_labels body;
+
+      (* compile closure *)
       let defs, c, smethods = compile_expr label_gen env toplevel e in
       let env' = Value_env.add_static_field x ("Foo", x, convert_type ty) env in
       let new_toplevel = StringSet.add x toplevel in
       ( defs,
         c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
-        smethods,
+        [ static_method ] @ smethods,
         env',
         new_toplevel )
   (*
@@ -583,6 +659,9 @@ let compile_decl label_gen env toplevel = function
           body = c;
         }
       in
+
+      clear_shared_expr_labels body;
+
       let env' =
         Value_env.add_static_field x closure_details env
         |> Value_env.add_static_method x static_method_details

@@ -295,3 +295,42 @@ let%expect_test "test deeply nested ADT match" =
       30
       20
       10|}]
+
+let%expect_test "test multiple nested lambdas for lifting" =
+  let program =
+    {|
+    val run_quad =
+      let double = fun x -> x * 2 in
+      let quad = fun y -> double y * double y in
+      quad 4
+    val test = print(run_quad)
+    |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+  64
+  |}]
+
+(*
+currently broken -- requires me to implement AND
+
+let%expect_test "test lambda lift mutual recursion" =
+  let program =
+    {|
+    val rec iseven = fun x ->
+      let rec isodd = fun y -> if y = 0 then false else iseven (y - 1) in
+      if x = 0 then true else isodd (x - 1)
+    val test = do {
+      print(iseven 10);
+      print(iseven 11);
+      print(iseven 12)
+    }
+    |}
+    in
+  let _ = build_and_run program in
+  [%expect {|
+    true
+    false
+    true
+  |}]
+*)

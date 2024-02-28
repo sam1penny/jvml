@@ -1,10 +1,11 @@
 let () =
   let string_program =
     {|
-    val add = fun x -> fun y -> x + y
-    val z = add 3 4
-    val p = let add3 = add 3 in add3 4
-    val rec fact = fun x -> if x = 0 then 1 else x * fact (x - 1)
+    val run_quad =
+      let double = fun x -> x * 2 in
+      let quad = fun y -> double y * double y in
+      quad 4
+    val test = print(run_quad)
     |}
   in
   Parsing.Driver.parse_string string_program
