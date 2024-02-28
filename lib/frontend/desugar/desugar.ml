@@ -94,3 +94,4 @@ module Desugared_ast = Desugared_ast
 module Compile_patterns = Compile_patterns
 module Unique_names = Unique_names
 module Lambda_lift = Lambda_lift
+module Tail_call_optimise = Tail_call_optimise

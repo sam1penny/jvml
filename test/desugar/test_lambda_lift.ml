@@ -15,7 +15,8 @@ let%expect_test "test add captured lifted arguments" =
   |}
   in
   let _ = parse_type_desugar_print program in
-  [%expect {|
+  [%expect
+    {|
     └──Val foo_$0
        └──Fun x_$0 : int -> int -> int -> int
           └──Fun y_$0 : int -> int -> int
@@ -78,7 +79,8 @@ let%expect_test "test capturing recursive inner function" =
   |}
   in
   let _ = parse_type_desugar_print program in
-  [%expect {|
+  [%expect
+    {|
     └──ValRec fact_$0
        └──Fun z_$0 : int -> int -> int
           └──Fun x_$0 : int -> int
