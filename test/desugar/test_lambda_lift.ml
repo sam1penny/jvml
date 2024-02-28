@@ -15,7 +15,26 @@ let%expect_test "test add captured lifted arguments" =
   |}
   in
   let _ = parse_type_desugar_print program in
-  [%expect {||}]
+  [%expect {|
+    └──Val foo_$0
+       └──Fun x_$0 : int -> int -> int -> int
+          └──Fun y_$0 : int -> int -> int
+             └──Fun z_$0 : int -> int
+                └──Bop + : int
+                   └──Bop + : int
+                      └──Ident x_$0 : int
+                      └──Ident y_$0 : int
+                   └──Ident z_$0 : int
+    └──Val test_$0
+       └──Let x_$0
+          └──Int 1
+          └──Let y_$0
+             └──Int 2
+             └──App
+                └──App
+                   └──Ident foo_$0 : int -> int
+                   └──Ident x_$0 : int
+                └──Ident y_$0 : int |}]
 
 let%expect_test "test avoid capturing of already lifted argument" =
   let program =
@@ -59,4 +78,23 @@ let%expect_test "test capturing recursive inner function" =
   |}
   in
   let _ = parse_type_desugar_print program in
-  [%expect {||}]
+  [%expect {|
+    └──ValRec fact_$0
+       └──Fun z_$0 : int -> int -> int
+          └──Fun x_$0 : int -> int
+             └──If
+                └──Bop = : bool
+                   └──Ident x_$0 : int
+                   └──Int 0
+                └──Ident z_$0 : int
+                └──App
+                   └──Ident fact_$0 : int -> int
+                   └──Bop - : int
+                      └──Ident x_$0 : int
+                      └──Int 1
+    └──Val test_$0
+       └──Let z_$0
+          └──Int 3
+          └──Direct_app : fact_$0
+             └──Ident z_$0 : int
+             └──Int 5 |}]
