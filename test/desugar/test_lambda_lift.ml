@@ -5,25 +5,30 @@ let parse_type_desugar_print s =
   |> List.iter Desugar.Desugared_ast.pp_decl
 
 let%expect_test "test add captured lifted arguments" =
-  let program = {|
+  let program =
+    {|
     val test =
       let x = 1 in
       let y = 2 in
       let foo = fun z -> x + y + z in
       foo
-  |} in
+  |}
+  in
   let _ = parse_type_desugar_print program in
   [%expect {||}]
 
 let%expect_test "test avoid capturing of already lifted argument" =
-  let program = {|
+  let program =
+    {|
     val test =
       let double = fun x -> x * 2 in
       let quad = fun x -> double x * double x in
       print (quad 4)
-  |} in
+  |}
+  in
   let _ = parse_type_desugar_print program in
-  [%expect {|
+  [%expect
+    {|
     └──Val double_$0
        └──Fun x_$0 : int -> int
           └──Bop * : int
@@ -44,7 +49,8 @@ let%expect_test "test avoid capturing of already lifted argument" =
              └──Int 4 |}]
 
 let%expect_test "test capturing recursive inner function" =
-  let program = {|
+  let program =
+    {|
   val test =
     let z = 3 in
     let rec fact = fun x -> if x = 0 then z else fact (x - 1)
