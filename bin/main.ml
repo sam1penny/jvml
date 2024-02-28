@@ -9,7 +9,7 @@ let () =
     |}
   in
   Parsing.Driver.parse_string string_program
-  |> Typing.Infer.type_program_exn_from_string string_program
+  |> Typing.Infer.type_program_exn_from_string "test_env"
   (*|> Desugar.desugar_program
     |> List.map Desugar.Desugared_ast.pp_decl
     |> List.hd
