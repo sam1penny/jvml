@@ -152,15 +152,15 @@ let free_vars_with_types_program program =
   |> fun (fv_map, _) -> fv_map
 
 let rec collect_funargs = function
-| Desugared_ast.Fun (t0, _, x, e) ->
-    let funargs, e = collect_funargs e in
-    ((x, t0) :: funargs, e)
-| e -> ([], e)
+  | Desugared_ast.Fun (t0, _, x, e) ->
+      let funargs, e = collect_funargs e in
+      ((x, t0) :: funargs, e)
+  | e -> ([], e)
 
 let replace_funargs funargs body =
-List.fold_right
-  (fun (arg, arg_ty) b -> Fun (arg_ty, get_expr_type b, arg, b))
-  funargs body
+  List.fold_right
+    (fun (arg, arg_ty) b -> Fun (arg_ty, get_expr_type b, arg, b))
+    funargs body
 
 let lift_to_valrec name funargs body =
   let fun_body = replace_funargs funargs body in

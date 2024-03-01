@@ -565,7 +565,6 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
           ("Foo", cname, TyFun (ty, typedef_texpr))
           env )
 
-
 let compile_decl label_gen env toplevel = function
   | Desugared_ast.Val (ty, x, e) ->
       (* compile static method *)
