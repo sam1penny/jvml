@@ -1,24 +1,18 @@
 let () =
   let string_program =
     {|
-  val rec x = fun f -> x f
-  val rec y = fun f -> 1 + y f
-  type 'a list = N | C of 'a * 'a list
-  val rec length = fun xs ->
-    match xs with
-      | N -> 0
-      | C(_, xs) -> 1 + length xs
-
-  val rec length_tr = fun xs -> fun acc ->
-    match xs with
-      | N -> acc
-      | C(_, xs) -> length_tr xs (acc+1)
-
+  val foo = fun x -> 1 + x + 3
+  val test = 1 + 4 * 5
+  val test2 = fun x -> 1 + x + x + 3
+  val test3 = fun x -> 1 + x * x + 1 * 3
   |}
   in
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string "test_env"
   |> Desugar.desugar_program
+  |> fun p ->
+  List.iter Desugar.Desugared_ast.pp_decl p;
+  p
   |> List.map Desugar.Tail_call_optimise.has_tail_call_decl
   |> List.iter (fun b -> print_endline @@ string_of_bool b)
 
