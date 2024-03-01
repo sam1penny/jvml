@@ -1,12 +1,7 @@
 let () =
-  let string_program =
-    {|
-  val foo = fun x -> 1 + x + 3
-  val test = 1 + 4 * 5
-  val test2 = fun x -> 1 + x + x + 3
-  val test3 = fun x -> 1 + x * x + 1 * 3
-  |}
-  in
+  let string_program = {|
+  val foo = let x = 3 in let y = x + 1 in y
+  |} in
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string "test_env"
   |> Desugar.desugar_program
