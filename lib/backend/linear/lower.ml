@@ -565,16 +565,11 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
           ("Foo", cname, TyFun (ty, typedef_texpr))
           env )
 
-let rec collect_funargs = function
-  | Desugared_ast.Fun (t0, _, x, e) ->
-      let funargs, e = collect_funargs e in
-      ((x, t0) :: funargs, e)
-  | e -> ([], e)
 
 let compile_decl label_gen env toplevel = function
   | Desugared_ast.Val (ty, x, e) ->
       (* compile static method *)
-      let funargs, body = collect_funargs e in
+      let funargs, body = Lambda_lift.collect_funargs e in
       let static_label_gen = reset_for_static_func_generators label_gen in
       let num_funargs = List.length funargs in
       let converted_funargs =
@@ -625,7 +620,7 @@ let compile_decl label_gen env toplevel = function
   *)
   | Desugared_ast.ValRec (ty, x, e) ->
       (* generate labels for handling recursion *)
-      let funargs, body = collect_funargs e in
+      let funargs, body = Lambda_lift.collect_funargs e in
       let static_label_gen = reset_for_static_func_generators label_gen in
 
       let num_funargs = List.length funargs in

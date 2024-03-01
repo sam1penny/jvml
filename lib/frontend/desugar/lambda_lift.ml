@@ -151,28 +151,23 @@ let free_vars_with_types_program program =
     (StringMap.empty, stdlib) program
   |> fun (fv_map, _) -> fv_map
 
-(* todo - move into one place *)
 let rec collect_funargs = function
-  | Desugared_ast.Fun (t0, _, x, e) ->
-      let funargs, e = collect_funargs e in
-      ((x, t0) :: funargs, e)
-  | e -> ([], e)
+| Desugared_ast.Fun (t0, _, x, e) ->
+    let funargs, e = collect_funargs e in
+    ((x, t0) :: funargs, e)
+| e -> ([], e)
 
-(* todo - merge into one function refactoring *)
+let replace_funargs funargs body =
+List.fold_right
+  (fun (arg, arg_ty) b -> Fun (arg_ty, get_expr_type b, arg, b))
+  funargs body
+
 let lift_to_valrec name funargs body =
-  let fun_body =
-    List.fold_right
-      (fun (arg, arg_ty) b -> Fun (arg_ty, get_expr_type b, arg, b))
-      funargs body
-  in
+  let fun_body = replace_funargs funargs body in
   ValRec (get_expr_type fun_body, name, fun_body)
 
 let lift_to_val name funargs body =
-  let fun_body =
-    List.fold_right
-      (fun (arg, arg_ty) b -> Fun (arg_ty, get_expr_type b, arg, b))
-      funargs body
-  in
+  let fun_body = replace_funargs funargs body in
   Val (get_expr_type fun_body, name, fun_body)
 
 let apply_captured_vars lifted_fun free_vars =
@@ -250,7 +245,6 @@ let rec lift_lambdas_expr free_var_tbl e =
       remove_from_fv_tbls x free_var_tbl;
       let defs1, e1 = rec_lift_lambdas_expr e1 in
       ([ lifted_valrec ] @ defs1, e1)
-  (* todo - merge cases*)
   | Tuple (ty, es) ->
       let lifted_defs, lifted_es = rec_lift_list es in
       (lifted_defs, Tuple (ty, lifted_es))
