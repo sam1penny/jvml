@@ -42,14 +42,6 @@ let get_tname = function
   | Typed_ast.TyCustom (_, tname) -> tname
   | _ -> raise @@ Failure "called get_tname on type_expr that is not TyCustom"
 
-let rec take list i =
-  match list with
-  | [] -> []
-  | x :: xs -> if i = 0 then [] else x :: take xs (i - 1)
-
-let rec drop list i =
-  match list with [] -> [] | _ :: xs -> if i = 0 then xs else drop xs (i - 1)
-
 let expand_or_patterns clauses =
   let expand_first_or_pattern (Clause (pats, body)) =
     match

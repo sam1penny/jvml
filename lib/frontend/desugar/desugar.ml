@@ -87,14 +87,10 @@ let desugared_ast_of_program program =
 
 let desugar_program program =
   desugared_ast_of_program program
-  |> Unique_names.rename_program |> Constant_fold.constant_fold_program
-  |> Constant_propagate.const_prop_program |> Lambda_lift.lift_lambdas_program
-  |> Direct_calls.transform_direct_call_program
+  |> Unique_names.rename_program |> Lambda_lift.lift_lambdas_program
 
 module Desugared_ast = Desugared_ast
 module Compile_patterns = Compile_patterns
-module Unique_names = Unique_names
 module Lambda_lift = Lambda_lift
-module Tail_call_optimise = Tail_call_optimise
-module Constant_fold = Constant_fold
-module Constant_propagate = Constant_propagate
+module Unique_names = Unique_names
+module Utils = Utils

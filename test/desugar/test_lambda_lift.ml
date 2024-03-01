@@ -57,9 +57,11 @@ let%expect_test "test avoid capturing of already lifted argument" =
     └──Val quad_$0
        └──Fun x_$0 : int -> int
           └──Bop * : int
-             └──Direct_app : double_$0
+             └──App
+                └──Ident double_$0 : int -> int
                 └──Ident x_$0 : int
-             └──Direct_app : double_$0
+             └──App
+                └──Ident double_$0 : int -> int
                 └──Ident x_$0 : int
     └──Val test_$0
        └──App
@@ -97,6 +99,8 @@ let%expect_test "test capturing recursive inner function" =
     └──Val test_$0
        └──Let z_$0
           └──Int 3
-          └──Direct_app : fact_$0
-             └──Ident z_$0 : int
+          └──App
+             └──App
+                └──Ident fact_$0 : int -> int
+                └──Ident z_$0 : int
              └──Int 5 |}]

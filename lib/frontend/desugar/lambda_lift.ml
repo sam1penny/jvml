@@ -26,7 +26,6 @@ let print_fv_maps fv_maps =
 let stdlib = StringSet.singleton "print_$0"
 
 let free_vars_with_types_expr bound e =
-  let open Desugared_ast in
   let union_list =
     List.fold_left
       (fun (accfree, acc_by_ident) (free, by_ident) ->
@@ -151,23 +150,12 @@ let free_vars_with_types_program program =
     (StringMap.empty, stdlib) program
   |> fun (fv_map, _) -> fv_map
 
-let rec collect_funargs = function
-  | Desugared_ast.Fun (t0, _, x, e) ->
-      let funargs, e = collect_funargs e in
-      ((x, t0) :: funargs, e)
-  | e -> ([], e)
-
-let replace_funargs funargs body =
-  List.fold_right
-    (fun (arg, arg_ty) b -> Fun (arg_ty, get_expr_type b, arg, b))
-    funargs body
-
 let lift_to_valrec name funargs body =
-  let fun_body = replace_funargs funargs body in
+  let fun_body = Utils.replace_funargs funargs body in
   ValRec (get_expr_type fun_body, name, fun_body)
 
 let lift_to_val name funargs body =
-  let fun_body = replace_funargs funargs body in
+  let fun_body = Utils.replace_funargs funargs body in
   Val (get_expr_type fun_body, name, fun_body)
 
 let apply_captured_vars lifted_fun free_vars =
@@ -222,7 +210,7 @@ let rec lift_lambdas_expr free_var_tbl e =
       @@ Failure
            "illegal state - should have ran lambda_lift before direct_calls"
   | Let (_, x, (Fun _ as e0), e1) ->
-      let funargs, body = collect_funargs e0 in
+      let funargs, body = Utils.collect_funargs e0 in
       let freevars =
         Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
       in
@@ -236,7 +224,7 @@ let rec lift_lambdas_expr free_var_tbl e =
       let defs1, e1 = rec_lift_lambdas_expr e1 in
       (defs0 @ defs1, Let (ty, x, e0, e1))
   | LetRec (_, x, e0, e1) ->
-      let funargs, body = collect_funargs e0 in
+      let funargs, body = Utils.collect_funargs e0 in
       let freevars =
         Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
       in

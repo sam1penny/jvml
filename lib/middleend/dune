@@ -1,7 +1,7 @@
 (library
- (name linear)
+ (name middle_end)
  (preprocess
   (pps ppx_deriving.show))
- (libraries common typing desugar parsing middle_end)
+ (libraries common typing desugar)
  (instrumentation
   (backend bisect_ppx)))

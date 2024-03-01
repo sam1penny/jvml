@@ -1,6 +1,6 @@
 (* todo - move this into backend *)
 
-open Desugared_ast
+open Desugar.Desugared_ast
 
 let rec has_tail_call_expr fn_name e =
   let rec_has_tail_call = has_tail_call_expr fn_name in
@@ -29,6 +29,6 @@ let rec has_tail_call_expr fn_name e =
 let has_tail_call_decl decl =
   match decl with
   | ValRec (_, x, e) ->
-      let _, body = Lambda_lift.collect_funargs e in
+      let _, body = Desugar.Utils.collect_funargs e in
       has_tail_call_expr x body
   | _ -> false

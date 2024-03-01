@@ -568,7 +568,7 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
 let compile_decl label_gen env toplevel = function
   | Desugared_ast.Val (ty, x, e) ->
       (* compile static method *)
-      let funargs, body = Lambda_lift.collect_funargs e in
+      let funargs, body = Desugar.Utils.collect_funargs e in
       let static_label_gen = reset_for_static_func_generators label_gen in
       let num_funargs = List.length funargs in
       let converted_funargs =
@@ -619,7 +619,7 @@ let compile_decl label_gen env toplevel = function
   *)
   | Desugared_ast.ValRec (ty, x, e) ->
       (* generate labels for handling recursion *)
-      let funargs, body = Lambda_lift.collect_funargs e in
+      let funargs, body = Desugar.Utils.collect_funargs e in
       let static_label_gen = reset_for_static_func_generators label_gen in
 
       let num_funargs = List.length funargs in

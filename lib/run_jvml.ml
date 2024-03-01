@@ -16,12 +16,12 @@ let run_frontend_exn filename =
   |> Desugar.desugar_program
 
 let linear_ir_from_string program =
-  run_frontend_exn program |> Linear.Driver.lower_program_to_linear_ir
-  |> Linear.Instruction.show_program
+  run_frontend_exn program |> Middle_end.Driver.run_middleend
+  |> Linear.Driver.lower_program_to_linear_ir |> Linear.Instruction.show_program
 
 let compile_program_from_string program =
-  run_frontend_exn program |> Linear.Driver.lower_program_to_linear_ir
-  |> Jvm.Driver.lower_ir
+  run_frontend_exn program |> Middle_end.Driver.run_middleend
+  |> Linear.Driver.lower_program_to_linear_ir |> Jvm.Driver.lower_ir
 
 let compile_program_from_file file =
   let program_text = file_to_string file in

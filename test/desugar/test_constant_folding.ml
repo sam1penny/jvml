@@ -1,3 +1,9 @@
+let parse_type_desugar_fold_print s =
+  Parsing.Driver.parse_string s
+  |> Typing.Infer.type_program_exn_from_string "test_env"
+  |> Desugar.desugar_program |> Middle_end.Constant_fold.constant_fold_program
+  |> List.iter Desugar.Desugared_ast.pp_decl
+
 let%expect_test "test simple constant folding" =
   let program =
     {|
@@ -11,7 +17,7 @@ let%expect_test "test simple constant folding" =
   val test_or = false || true
   |}
   in
-  let _ = Test_lambda_lift.parse_type_desugar_print program in
+  let _ = parse_type_desugar_fold_print program in
   [%expect
     {|
     └──Val test_add_$0
@@ -36,7 +42,7 @@ let%expect_test "test constant folding does not fold side effect" =
   val test1 = 1 / 0
   val test2 = 1 / (5 - 5)
   |} in
-  let _ = Test_lambda_lift.parse_type_desugar_print program in
+  let _ = parse_type_desugar_fold_print program in
   [%expect
     {|
     └──Val test1_$0
@@ -57,7 +63,7 @@ let%expect_test "test constant folding with long dependencies" =
   val test2 = fun x -> 1 + x + x + x + 4 + x + 3
   |}
   in
-  let _ = Test_lambda_lift.parse_type_desugar_print program in
+  let _ = parse_type_desugar_fold_print program in
   [%expect
     {|
     └──Val test1_$0

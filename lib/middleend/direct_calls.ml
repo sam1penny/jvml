@@ -12,11 +12,10 @@ avoiding the need to create any closures.
 required to spot tail recursion
 *)
 open Common
-open Desugared_ast
+open Desugar.Desugared_ast
 
 let maybe_transform_direct env e =
   let rec maybe_transform_direct_inner nargs e =
-    let open Desugared_ast in
     match e with
     | Ident (_, name) ->
         StringMap.find_opt name env >>= fun ty_args ->
@@ -30,7 +29,7 @@ let maybe_transform_direct env e =
   maybe_transform_direct_inner 0 e
 
 let rec collect_funargs_tys = function
-  | Desugared_ast.Fun (t0, _, _, e) -> t0 :: collect_funargs_tys e
+  | Fun (t0, _, _, e) -> t0 :: collect_funargs_tys e
   | _ -> []
 
 let rec transform_direct_call_expr env e =
