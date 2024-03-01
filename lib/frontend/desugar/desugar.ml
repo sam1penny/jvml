@@ -91,6 +91,8 @@ let desugar_program program =
 
 module Desugared_ast = Desugared_ast
 module Compile_patterns = Compile_patterns
+
+(* todo - consider moving lambda lift into middle_end *)
 module Lambda_lift = Lambda_lift
 module Unique_names = Unique_names
 module Utils = Utils
