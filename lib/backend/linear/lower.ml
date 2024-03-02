@@ -185,6 +185,13 @@ let determine_switch_strategy arg_type =
   | Typed_ast.TyInt -> LOOKUP
   | _ -> raise @@ Failure "attempted to switch on unsupported type"
 
+let expr_is_return e =
+  let open Desugared_ast in
+  match e with
+  | Return _ -> true
+  | Shared_Expr ({ contents = Return _ }, _) -> true
+  | _ -> false
+
 let compile_expr_list compile_func es =
   let linear_es = List.map compile_func es in
   let defs = List.map (fun (defs, _, _) -> defs) linear_es in
@@ -192,7 +199,6 @@ let compile_expr_list compile_func es =
   let smethods = List.map (fun (_, _, smethods) -> smethods) linear_es in
   (defs, ecode, smethods)
 
-(* todo - generate better code for 'if' and 'switch' if a branch has a return statement *)
 let rec compile_expr label_gen env top_level_bindings e =
   let open Desugared_ast in
   (* curried for convenience *)
@@ -206,16 +212,20 @@ let rec compile_expr label_gen env top_level_bindings e =
       compile_bop label_gen env top_level_bindings e0 e1 bop
   | If (_, e0, e1, e2) ->
       let else_label = label_gen.ctrl_label () in
-      let after_label = label_gen.ctrl_label () in
       let defs0, c0, s0 = compile_expr_rec e0 in
       let defs1, c1, s1 = compile_expr_rec e1 in
       let defs2, c2, s2 = compile_expr_rec e2 in
+      let maybe_goto_after, maybe_label_after =
+        match expr_is_return e1 with
+        | true -> ([], [])
+        | false ->
+            let after_label = label_gen.ctrl_label () in
+            ([ GOTO after_label ], [ LABEL after_label ])
+      in
       ( defs0 @ defs1 @ defs2,
         c0
         @ [ UNBOX_BOOL; IFZERO else_label ]
-        @ c1
-        @ [ GOTO after_label; LABEL else_label ]
-        @ c2 @ [ LABEL after_label ],
+        @ c1 @ maybe_goto_after @ [ LABEL else_label ] @ c2 @ maybe_label_after,
         s0 @ s1 @ s2 )
   | Fun (t0, t1, x, e) ->
       compile_anon_lambda_expr label_gen env top_level_bindings
@@ -292,11 +302,16 @@ let rec compile_expr label_gen env top_level_bindings e =
         List.map (fun (defs, _, _) -> defs) compiled_case_exprs |> List.flatten
       in
 
+      let case_is_return = List.map expr_is_return case_exprs in
       let case_code_with_labels =
         List.map (fun (_, code, _) -> code) compiled_case_exprs
-        |> List.map (fun code ->
+        |> List.combine case_is_return
+        |> List.map (fun (is_return, code) ->
                let label = label_gen.ctrl_label () in
-               (label, [ LABEL label ] @ code @ [ GOTO after_label ]))
+               let maybe_goto_after =
+                 if is_return then [] else [ GOTO after_label ]
+               in
+               (label, [ LABEL label ] @ code @ maybe_goto_after))
       in
 
       let case_code =
@@ -339,8 +354,11 @@ let rec compile_expr label_gen env top_level_bindings e =
             compile_expr_rec fallback_expr
           in
           let default_label = label_gen.ctrl_label () in
+          let maybe_goto_after =
+            if expr_is_return fallback_expr then [] else [ GOTO after_label ]
+          in
           let default_code =
-            [ LABEL default_label ] @ default_code @ [ GOTO after_label ]
+            [ LABEL default_label ] @ default_code @ maybe_goto_after
           in
           ( defs0 @ case_defs @ default_defs,
             code0 @ index_getter
