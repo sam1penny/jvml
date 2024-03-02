@@ -85,6 +85,9 @@ let rec transform_direct_call_expr env e =
   | Shared_Expr (expr_ref, maybe_label) ->
       let _ = expr_ref := rec_transform_direct !expr_ref in
       Shared_Expr (expr_ref, maybe_label)
+  | While_true _ | Return _ | Assign_Seq _ ->
+      raise
+      @@ Failure "tail rec constructs should not be present in direct_calls"
 
 let transform_direct_call_decl env decl =
   match decl with

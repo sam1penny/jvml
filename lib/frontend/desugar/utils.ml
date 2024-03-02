@@ -58,3 +58,8 @@ let map_over_sub_expr f e =
       (* todo - add general bool seen flag to avoid unnecessary recomputation *)
       expr_ref := f !expr_ref;
       Shared_Expr (expr_ref, label_opt)
+  | While_true _ | Return _ | Assign_Seq _ ->
+      raise
+      @@ Failure
+           "tail rec constructs should not be present in utils (todo change \
+            this)"

@@ -89,6 +89,9 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
       (* todo - add general bool seen flag to avoid unnecessary recomputation *)
       expr_ref := rec_rename_expr !expr_ref;
       Shared_Expr (expr_ref, label_opt)
+  | While_true _ | Return _ | Assign_Seq _ ->
+      raise
+      @@ Failure "tail rec constructs should not be present in lambda_lift"
 
 let rename_decl most_recent_version d =
   match d with

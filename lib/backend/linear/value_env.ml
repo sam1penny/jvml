@@ -43,6 +43,15 @@ let lookup k env =
                linear_ir"
               k)
 
+let lookup_local_var k env =
+  match StringMap.find_opt k env.fields with
+  | Some (Local_var v) -> v
+  | _ ->
+      raise
+      @@ Failure
+           (Printf.sprintf
+              "looked up unknown local variable %s when lowering to linear_ir" k)
+
 let strip_nonstatic env =
   {
     env with

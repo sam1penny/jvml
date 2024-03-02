@@ -72,9 +72,12 @@ let free_vars_with_types_expr bound e =
     | App (_, e0, e1) ->
         StringMap.union takeleft (aux bound free e0) (aux bound free e1)
     | Direct_app (ret_ty, args_ty, name, es) ->
+        let acc =
+          if StringSet.mem name bound then StringMap.empty
+          else StringMap.singleton name (assemble_fun_ty args_ty ret_ty)
+        in
         List.map (aux bound free) es
-        |> List.fold_left (StringMap.union takeleft)
-             (StringMap.singleton name (assemble_fun_ty args_ty ret_ty))
+        |> List.fold_left (StringMap.union takeleft) acc
     | Tuple (_, es) ->
         List.map (aux bound free) es
         |> List.fold_left (StringMap.union takeleft) StringMap.empty
@@ -101,6 +104,15 @@ let free_vars_with_types_expr bound e =
              |> Option.value ~default:StringMap.empty)
     | Match_Failure -> StringMap.empty
     | Shared_Expr (e, _) -> aux bound free !e
+    | While_true e -> aux bound free e
+    | Return e -> aux bound free e
+    | Assign_Seq assignments ->
+        List.map
+          (fun (x, ty, e) ->
+            aux bound free e |> fun m ->
+            if StringSet.mem x bound then StringMap.add x ty m else m)
+          assignments
+        |> List.fold_left (StringMap.union takeleft) StringMap.empty
   in
 
   aux bound StringMap.empty e
@@ -142,6 +154,10 @@ let rec clear_shared_expr_labels e =
       List.iter (fun (_, case_expr) -> clear_shared_expr_labels case_expr) cases;
       Option.iter clear_shared_expr_labels fallback_opt
   | Shared_Expr (_, lab_opt_ref) -> lab_opt_ref := None
+  | While_true e -> clear_shared_expr_labels e
+  | Return e -> clear_shared_expr_labels e
+  | Assign_Seq assignments ->
+      List.iter (fun (_, _, e) -> clear_shared_expr_labels e) assignments
 
 let con_index = function
   | Desugared_ast.IntCon i -> i
@@ -176,6 +192,7 @@ let compile_expr_list compile_func es =
   let smethods = List.map (fun (_, _, smethods) -> smethods) linear_es in
   (defs, ecode, smethods)
 
+(* todo - generate better code for 'if' and 'switch' if a branch has a return statement *)
 let rec compile_expr label_gen env top_level_bindings e =
   let open Desugared_ast in
   (* curried for convenience *)
@@ -341,6 +358,30 @@ let rec compile_expr label_gen env top_level_bindings e =
       (* actually not sure if this is correct in the general case -- where do we go after the code?
          kind of need to 'jump back' *)
       | Some lab -> ([], [ GOTO lab ], []))
+  | While_true e ->
+      let loop_lab = label_gen.ctrl_label () in
+      let defs, code, static_methods = compile_expr_rec e in
+      (defs, [ LABEL loop_lab ] @ code @ [ GOTO loop_lab ], static_methods)
+  | Return e ->
+      let defs, code, static_methods = compile_expr_rec e in
+      (defs, code @ [ RETURN ], static_methods)
+  | Assign_Seq assignments ->
+      let compiled =
+        List.map
+          (fun (x, _, e) ->
+            let defs, code, static_methods = compile_expr_rec e in
+            ( defs,
+              code @ [ STORE_REF (Value_env.lookup_local_var x env) ],
+              static_methods ))
+          assignments
+      in
+      let defs = List.map (fun (defs, _, _) -> defs) compiled |> List.flatten in
+      let code = List.map (fun (_, code, _) -> code) compiled |> List.flatten in
+      let static_methods =
+        List.map (fun (_, _, smethods) -> smethods) compiled |> List.flatten
+      in
+
+      (defs, code, static_methods)
 
 and compile_bop label_gen env top_level_bindings e0 e1 =
   let compile_expr_rec = compile_expr label_gen env top_level_bindings in
@@ -566,7 +607,7 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
           env )
 
 let compile_decl label_gen env toplevel = function
-  | Desugared_ast.Val (ty, x, e) ->
+  | Desugared_ast.Val (ty, x, (Fun _ as e)) ->
       (* compile static method *)
       let funargs, body = Desugar.Utils.collect_funargs e in
       let static_label_gen = reset_for_static_func_generators label_gen in
@@ -613,6 +654,15 @@ let compile_decl label_gen env toplevel = function
         [ static_method ] @ smethods,
         env',
         new_toplevel )
+  | Desugared_ast.Val (ty, x, e) ->
+      let defs, c, smethods = compile_expr label_gen env toplevel e in
+      let env' = Value_env.add_static_field x ("Foo", x, convert_type ty) env in
+      let new_toplevel = StringSet.add x toplevel in
+      ( defs,
+        c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
+        smethods,
+        env',
+        new_toplevel )
   (*
   Compile two versions of the function - one static method, and one closure.
   Usage depends on whether all arguments are supplied.
@@ -654,14 +704,24 @@ let compile_decl label_gen env toplevel = function
         }
       in
 
-      clear_shared_expr_labels body;
-
       let env' =
         Value_env.add_static_field x closure_details env
         |> Value_env.add_static_method x static_method_details
       in
       let new_toplevel = StringSet.add x toplevel in
-      let defs, c, smethods = compile_expr label_gen env' new_toplevel e in
+
+      let new_body =
+        Desugared_ast.Direct_app
+          ( Desugared_ast.get_expr_type body,
+            List.map (fun (_, ty) -> ty) funargs,
+            x,
+            List.map (fun (arg, ty) -> Desugared_ast.Ident (ty, arg)) funargs )
+      in
+
+      let closure_e = Desugar.Utils.replace_funargs funargs new_body in
+      let defs, c, smethods =
+        compile_expr label_gen env' new_toplevel closure_e
+      in
       ( defs,
         c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
         [ static_method ] @ smethods,

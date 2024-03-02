@@ -1,15 +1,13 @@
 let () =
-  let string_program = {|
-  val foo = let x = 3 in let y = x + 1 in y
-  |} in
+  let string_program =
+    {|
+  val rec count = fun n -> if n = 0 then 1 else count (n - 1)
+  |}
+  in
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string "test_env"
   |> Desugar.desugar_program |> Middle_end.Driver.run_middleend
-  |> fun p ->
-  List.iter Desugar.Desugared_ast.pp_decl p;
-  p
-  |> List.map Middle_end.Tail_call_optimise.has_tail_call_decl
-  |> List.iter (fun b -> print_endline @@ string_of_bool b)
+  |> List.iter Desugar.Desugared_ast.pp_decl
 
 (*
 let string_program =

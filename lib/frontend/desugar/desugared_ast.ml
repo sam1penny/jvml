@@ -33,6 +33,10 @@ type expr =
   | Match_Failure
   (* ref to expr, label (in compiled repr) *)
   | Shared_Expr of expr ref * string option ref
+  | While_true of expr
+  | Return of expr
+  (* Sequence of assignments, special case as assign does not produce a 'unit' on the stack *)
+  | Assign_Seq of (string * Typed_ast.type_expr * expr) list
 
 type type_constr = DeclConstr of string * int * Typed_ast.type_expr option
 
@@ -67,6 +71,10 @@ let rec get_expr_type = function
   | Switch (t, _, _, _) -> t
   | Match_Failure -> TyVar (desugared_tvar_cnter ())
   | Shared_Expr ({ contents = e }, _) -> get_expr_type e
+  | While_true e -> get_expr_type e
+  | Return e -> get_expr_type e
+  | Assign_Seq _ -> Typed_ast.TyUnit
+
 (* huge bodge to get match_failure working
 
    todo - think of an alternative to get this working
@@ -100,6 +108,9 @@ let string_of_expr_node =
   | Switch _ -> "Switch"
   | Match_Failure -> "Match_Failure"
   | Shared_Expr (_, _) -> "Shared"
+  | While_true _ -> "While true"
+  | Return _ -> "Return"
+  | Assign_Seq _ -> sprintf "Assign_Seq"
 
 let pp_con ?(indent = "") con =
   match con with
@@ -164,6 +175,18 @@ let rec pp_expr ?(indent = "") expr =
   | Shared_Expr ({ contents = shared }, _) ->
       pp_node expr;
       pp_rec_expr shared
+  | While_true e | Return e ->
+      pp_node expr;
+      pp_rec_expr e
+  | Assign_Seq assigns ->
+      pp_node expr;
+      let assign_indent = indent ^ "   " in
+      List.iter
+        (fun (x, ty, e) ->
+          printf "%s└── assign %s : %s = \n" x (Typed_ast.pp_texpr ty)
+            assign_indent;
+          pp_expr ~indent:(assign_indent ^ "   ") e)
+        assigns
 
 and pp_case indent (pattern, expr) =
   printf "%s└── <case>\n" indent;
