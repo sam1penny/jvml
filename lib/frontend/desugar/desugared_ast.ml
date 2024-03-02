@@ -183,8 +183,8 @@ let rec pp_expr ?(indent = "") expr =
       let assign_indent = indent ^ "   " in
       List.iter
         (fun (x, ty, e) ->
-          printf "%s└── assign %s : %s = \n" x (Typed_ast.pp_texpr ty)
-            assign_indent;
+          printf "%s└── assign %s : %s = \n" assign_indent x
+            (Typed_ast.pp_texpr ty);
           pp_expr ~indent:(assign_indent ^ "   ") e)
         assigns
 
