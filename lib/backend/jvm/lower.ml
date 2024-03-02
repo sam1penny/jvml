@@ -639,25 +639,3 @@ L9:
 .const [_59] = MethodHandle invokeStatic Method Std lambda$static$0 (Ljava/lang/Object;)LUnit;
 .end class
 |}
-
-(*
---- MAIN METHOD FOR USING GENERATED CLOSURE ---
-
-.method public static main : ([Ljava/lang/String;)V
-    .code stack 3 locals 2
-        new Lambda$1
-        dup
-        ldc 10
-        invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;
-        invokespecial Method Lambda$1 <init> (Ljava/lang/Integer;)V
-        ldc 3
-        invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;
-        invokeinterface InterfaceMethod java/util/function/Function apply (Ljava/lang/Object;)Ljava/lang/Object; 2
-        getstatic Field java/lang/System out Ljava/io/PrintStream;
-        swap
-        invokevirtual Method java/io/PrintStream println (Ljava/lang/Object;)V
-        return
-    .end code
-.end method
-
-*)
