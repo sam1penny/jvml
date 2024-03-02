@@ -429,7 +429,7 @@ let lower_static_method static_method =
   sprintf
     {|
 .method public static synthetic %s : (%s)L%s;
-  .code stack 10 locals 10
+  .code stack %i locals %i
 %s
     areturn
 
@@ -439,6 +439,8 @@ let lower_static_method static_method =
     static_method.name
     (lower_type_list static_method.args)
     (lower_type static_method.return_type)
+    (max_stack_depth static_method.body)
+    (num_local_vars (List.length static_method.args) static_method.body)
     (lower_body "     " "Foo" static_method.body)
 
 let lower_field_defs p =
