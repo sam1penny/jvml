@@ -28,3 +28,9 @@ let rec storeload_opt is =
       DUP :: STORE_STATIC (clazz1, f1, ty) :: storeload_opt is
   | i1 :: i2 :: is -> i1 :: storeload_opt (i2 :: is)
   | is -> is
+
+let rec gotolabel_opt is =
+  match is with
+  | GOTO l1 :: LABEL l2 :: is when l1 = l2 -> LABEL l2 :: gotolabel_opt is
+  | i1 :: i2 :: is -> i1 :: gotolabel_opt (i2 :: is)
+  | is -> is
