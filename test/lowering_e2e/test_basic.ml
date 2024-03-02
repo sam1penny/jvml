@@ -334,3 +334,54 @@ let%expect_test "test lambda lift mutual recursion" =
     true
   |}]
 *)
+
+let%expect_test "test one-arg tail call" =
+  let program =
+    {|
+  val rec count = fun n -> if n = 0 then 1 else count (n - 1)
+  val test = print(count 5)
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|1|}]
+
+let%expect_test "test multiple arg tail call" =
+  let program =
+    {|
+  val rec count2 = fun x -> fun y ->
+    if x = 0 then y
+    else count2 (x - 1) y
+
+  val test = print(count2 5 6)
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|6|}]
+
+let%expect_test "test tail call with match" =
+  let program =
+    {|
+  val rec count = fun x ->
+    match x with
+      | 0 -> 1
+      | _ -> count (x - 1)
+
+  val test = print(count 5)
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|1|}]
+
+let%expect_test "test tail call with ADT" =
+  let program =
+    {|
+  type 'a list = N | C of 'a * 'a list
+  val rec length_tr = fun l -> fun acc ->
+    match l with
+      | N -> acc
+      | C(_, tl) -> length_tr tl (acc+1)
+  val test = print(length_tr (C(1, C(2, C(3, N)))) 0)
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|3|}]
