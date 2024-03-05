@@ -47,7 +47,7 @@ let rec transform_direct_call_expr env e =
   | Fun (t0, t1, x, e) -> Fun (t0, t1, x, rec_transform_direct e)
   | App (ret_ty, e0, e1) as e_app -> (
       match maybe_transform_direct env e_app with
-      | None -> App (ret_ty, e0, e1)
+      | None -> App (ret_ty, e0, rec_transform_direct e1)
       | Some (ty_args, name, es) ->
           Direct_app (ret_ty, ty_args, name, List.map rec_transform_direct es))
   | Direct_app _ ->
