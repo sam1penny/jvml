@@ -34,3 +34,18 @@ let rec gotolabel_opt is =
   | GOTO l1 :: LABEL l2 :: is when l1 = l2 -> LABEL l2 :: gotolabel_opt is
   | i1 :: i2 :: is -> i1 :: gotolabel_opt (i2 :: is)
   | is -> is
+
+(*
+Currently occur as a result of Set_Tuple.
+Also can occur in compiling, e.g
+do { (); true }, or
+do { 3; true }
+etc
+*)
+let rec pushpop_opt is =
+  match is with
+  | PUSH_UNIT :: POP :: is -> pushpop_opt is
+  | PUSH_BOOL _ :: POP :: is -> pushpop_opt is
+  | PUSH_INT _ :: POP :: is -> pushpop_opt is
+  | i1 :: i2 :: is -> i1 :: pushpop_opt (i2 :: is)
+  | is -> is

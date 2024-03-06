@@ -20,4 +20,5 @@ let run_optimisations program =
     apply_over_instructions Peephole.boxunbox_opt program
     |> apply_over_instructions Peephole.storeload_opt
     |> apply_over_instructions Peephole.gotolabel_opt
+    |> apply_over_instructions Peephole.pushpop_opt
   else program
