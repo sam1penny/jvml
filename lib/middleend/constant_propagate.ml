@@ -10,7 +10,7 @@ let rec const_prop_expr const_tbl e =
       match e0 with
       | Int _ | Bool _ | Unit ->
           let _ = Hashtbl.add const_tbl x e0 in
-          Let (ty, x, rec_const_prop e0, rec_const_prop e1)
+          rec_const_prop e1
       | _ ->
           Let (ty, x, rec_const_prop e0, rec_const_prop e1)
           (* todo - consider transforming into A-normal form to simplify constant propagation.
