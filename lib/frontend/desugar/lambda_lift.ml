@@ -71,10 +71,10 @@ let free_vars_with_types_expr bound e =
           StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
         in
         (free, fvs_by_ident)
-    | Direct_app (ret_ty, args_ty, name, es) ->
+    | Direct_app (_, args_ty, fun_arg_ty, name, es) ->
         List.map rec_aux es |> union_list |> fun (accfree, acc_by_indent) ->
         ( StringMap.union takeleft accfree
-            (StringMap.singleton name (assemble_fun_ty args_ty ret_ty)),
+            (StringMap.singleton name (assemble_fun_ty args_ty fun_arg_ty)),
           acc_by_indent )
     | Tuple (_, es) -> List.map rec_aux es |> union_list
     | Let (_, x, (Fun _ as e0), e1) ->

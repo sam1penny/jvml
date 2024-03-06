@@ -7,7 +7,7 @@ let rec transform_tail_call_expr_inner fn_name funargs e =
   match e with
   | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure -> (e, false)
   | Bop _ | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _ -> (e, false)
-  | Direct_app (_, _, name, arg_es) when name = fn_name ->
+  | Direct_app (_, _, _, name, arg_es) when name = fn_name ->
       let assign_seq =
         List.combine funargs arg_es
         |> List.map (fun ((arg_name, arg_ty), arg_expr) ->

@@ -20,7 +20,11 @@ type expr =
   | Fun of Typed_ast.type_expr * Typed_ast.type_expr * string * expr
   | App of Typed_ast.type_expr * expr * expr
   | Direct_app of
-      Typed_ast.type_expr * Typed_ast.type_expr list * string * expr list
+      Typed_ast.type_expr
+      * Typed_ast.type_expr list
+      * Typed_ast.type_expr
+      * string
+      * expr list
   | Tuple of Typed_ast.type_expr * expr list
   | Let of Typed_ast.type_expr * string * expr * expr
   | LetRec of Typed_ast.type_expr * string * expr * expr
@@ -61,7 +65,7 @@ let rec get_expr_type = function
   | If (t, _, _, _) -> t
   | Fun (t0, t1, _, _) -> Typed_ast.TyFun (t0, t1)
   | App (t, _, _) -> t
-  | Direct_app (t, _, _, _) -> t
+  | Direct_app (t, _, _, _, _) -> t
   | Tuple (t, _) -> t
   | Let (t, _, _, _) | LetRec (t, _, _, _) -> t
   | Constr (t, _) -> t
@@ -96,7 +100,7 @@ let string_of_expr_node =
       sprintf "Fun %s : %s" x
         (Typed_ast.pp_texpr (TyFun (arg_type, return_type)))
   | App _ -> "App"
-  | Direct_app (_, _, name, _) -> sprintf "Direct_app : %s" name
+  | Direct_app (_, _, _, name, _) -> sprintf "Direct_app : %s" name
   | Tuple (ty, _) -> sprintf "Tuple : %s" (Typed_ast.pp_texpr ty)
   | Let (_, x, _, _) -> sprintf "Let %s" x
   | LetRec (_, x, _, _) -> sprintf "LetRec %s" x
@@ -141,7 +145,7 @@ let rec pp_expr ?(indent = "") expr =
       pp_node expr;
       pp_rec_expr e0;
       pp_rec_expr e1
-  | Tuple (_, es) | Direct_app (_, _, _, es) ->
+  | Tuple (_, es) | Direct_app (_, _, _, _, es) ->
       pp_node expr;
       List.iter pp_rec_expr es
   | Let (_, _, e0, e1) ->

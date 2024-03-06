@@ -71,10 +71,10 @@ let free_vars_with_types_expr bound e =
         aux bound' free e
     | App (_, e0, e1) ->
         StringMap.union takeleft (aux bound free e0) (aux bound free e1)
-    | Direct_app (ret_ty, args_ty, name, es) ->
+    | Direct_app (_, args_ty, fun_ret_ty, name, es) ->
         let acc =
           if StringSet.mem name bound then StringMap.empty
-          else StringMap.singleton name (assemble_fun_ty args_ty ret_ty)
+          else StringMap.singleton name (assemble_fun_ty args_ty fun_ret_ty)
         in
         List.map (aux bound free) es
         |> List.fold_left (StringMap.union takeleft) acc
@@ -138,7 +138,7 @@ let rec clear_shared_expr_labels e =
   | App (_, e0, e1) ->
       clear_shared_expr_labels e0;
       clear_shared_expr_labels e1
-  | Direct_app (_, _, _, es) -> List.iter clear_shared_expr_labels es
+  | Direct_app (_, _, _, _, es) -> List.iter clear_shared_expr_labels es
   | Tuple (_, es) -> List.iter clear_shared_expr_labels es
   | Let (_, _, e0, e1) ->
       clear_shared_expr_labels e0;
@@ -234,7 +234,7 @@ let rec compile_expr label_gen env top_level_bindings e =
       let defs0, c0, s0 = compile_expr_rec e0 in
       let defs1, c1, s1 = compile_expr_rec e1 in
       (defs0 @ defs1, c0 @ c1 @ [ APPLY (convert_type ty) ], s0 @ s1)
-  | Direct_app (ty_ret, ty_args, name, es) ->
+  | Direct_app (ty_ret, ty_args, fun_ret_ty, name, es) ->
       let defs, ecode, smethods = compile_expr_list compile_expr_rec es in
       ( List.flatten defs,
         List.flatten ecode
@@ -242,10 +242,9 @@ let rec compile_expr label_gen env top_level_bindings e =
             STATIC_APPLY
               ( name,
                 List.map convert_type ty_args,
-                convert_type ty_ret,
+                convert_type fun_ret_ty,
                 convert_type ty_ret );
           ],
-        (* todo : check 100% about (convert_type ty_ret)*)
         List.flatten smethods )
   | Let (_, x, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in
@@ -732,6 +731,7 @@ let compile_decl label_gen env toplevel = function
         Desugared_ast.Direct_app
           ( Desugared_ast.get_expr_type body,
             List.map (fun (_, ty) -> ty) funargs,
+            Desugared_ast.get_expr_type body,
             x,
             List.map (fun (arg, ty) -> Desugared_ast.Ident (ty, arg)) funargs )
       in

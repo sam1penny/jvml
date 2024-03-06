@@ -18,19 +18,17 @@ let maybe_transform_direct env e =
   let rec maybe_transform_direct_inner nargs e =
     match e with
     | Ident (_, name) ->
-        StringMap.find_opt name env >>= fun ty_args ->
-        if nargs = List.length ty_args then Some (ty_args, name, []) else None
+        StringMap.find_opt name env >>= fun (ty_args, ty_ret) ->
+        if nargs = List.length ty_args then Some (ty_args, ty_ret, name, [])
+        else None
     | App (_, e0, e1) -> (
         match maybe_transform_direct_inner (nargs + 1) e0 with
         | None -> None
-        | Some (ty_args, name, es) -> Some (ty_args, name, es @ [ e1 ]))
+        | Some (ty_args, ty_ret, name, es) ->
+            Some (ty_args, ty_ret, name, es @ [ e1 ]))
     | _ -> None
   in
   maybe_transform_direct_inner 0 e
-
-let rec collect_funargs_tys = function
-  | Fun (t0, _, _, e) -> t0 :: collect_funargs_tys e
-  | _ -> []
 
 let rec transform_direct_call_expr env e =
   let rec_transform_direct = transform_direct_call_expr env in
@@ -48,8 +46,10 @@ let rec transform_direct_call_expr env e =
   | App (ret_ty, e0, e1) as e_app -> (
       match maybe_transform_direct env e_app with
       | None -> App (ret_ty, e0, rec_transform_direct e1)
-      | Some (ty_args, name, es) ->
-          Direct_app (ret_ty, ty_args, name, List.map rec_transform_direct es))
+      | Some (ty_args, fun_ty_ret, name, es) ->
+          Direct_app
+            (ret_ty, ty_args, fun_ty_ret, name, List.map rec_transform_direct es)
+      )
   | Direct_app _ ->
       raise
       @@ Failure
@@ -59,14 +59,18 @@ let rec transform_direct_call_expr env e =
       let e0' = rec_transform_direct e0 in
 
       let env' =
-        match collect_funargs_tys e0 with
-        | [] -> env
-        | ty_args -> StringMap.add x ty_args env
+        match Desugar.Utils.collect_funargs e0 with
+        | [], _ -> env
+        | funargs, body ->
+            let ty_args = List.map (fun (_, ty) -> ty) funargs in
+            StringMap.add x (ty_args, get_expr_type body) env
       in
       let e1' = transform_direct_call_expr env' e1 in
       Let (ty, x, e0', e1')
   | LetRec (ty, x, e0, e1) ->
-      let env' = StringMap.add x (collect_funargs_tys e) env in
+      let funargs, body = Desugar.Utils.collect_funargs e0 in
+      let ty_args = List.map (fun (_, ty) -> ty) funargs in
+      let env' = StringMap.add x (ty_args, get_expr_type body) env in
       let e0' = transform_direct_call_expr env' e0 in
       let e1' = transform_direct_call_expr env' e1 in
       LetRec (ty, x, e0', e1')
@@ -94,13 +98,18 @@ let transform_direct_call_decl env decl =
   | Val (ty, x, e) ->
       let e' = transform_direct_call_expr env e in
       let env' =
-        match collect_funargs_tys e with
-        | [] -> env
-        | ty_args -> StringMap.add x ty_args env
+        match Desugar.Utils.collect_funargs e with
+        | [], _ -> env
+        | args, body ->
+            StringMap.add x
+              (List.map (fun (_, ty) -> ty) args, get_expr_type body)
+              env
       in
       (Val (ty, x, e'), env')
   | ValRec (ty, x, e) ->
-      let env' = StringMap.add x (collect_funargs_tys e) env in
+      let funargs, body = Desugar.Utils.collect_funargs e in
+      let ty_args = List.map (fun (_, ty) -> ty) funargs in
+      let env' = StringMap.add x (ty_args, get_expr_type body) env in
       let e' = transform_direct_call_expr env' e in
       (ValRec (ty, x, e'), env')
   | Type _ -> (decl, StringMap.empty)

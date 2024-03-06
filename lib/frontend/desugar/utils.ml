@@ -34,8 +34,8 @@ let map_over_sub_expr f e =
       let e0' = f e0 in
       let e1' = f e1 in
       App (ty, e0', e1')
-  | Direct_app (ret_ty, args_ty, name, es) ->
-      Direct_app (ret_ty, args_ty, name, List.map f es)
+  | Direct_app (ret_ty, args_ty, fun_ret_ty, name, es) ->
+      Direct_app (ret_ty, args_ty, fun_ret_ty, name, List.map f es)
   | Tuple (ty, es) -> Tuple (ty, List.map f es)
   | Let (ty, x, e0, e1) ->
       let e0' = f e0 in
