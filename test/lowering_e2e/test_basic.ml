@@ -385,3 +385,71 @@ let%expect_test "test tail call with ADT" =
   in
   let _ = build_and_run program in
   [%expect {|3|}]
+
+(*
+tests for tail recursion modulo monoid
+*)
+
+let%expect_test "test trmm - simple recursive sum" =
+  let program =
+    {|
+  val rec sum = fun n ->
+    if n = 0 then 0
+    else n + sum (n - 1)
+
+  val test = do {
+    print(sum 2);
+    print(sum 10)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+  3
+  55
+  |}]
+
+let%expect_test "test trmm - with tail call" =
+  let program =
+    {|
+  val rec foo = fun n ->
+    if n = 0 then 0
+    else if n = 1 then foo (n - 1)
+    else n + foo (n - 1)
+
+  val test = do {
+    print(foo 2);
+    print(foo 10)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+  2
+  54
+  |}]
+
+let%expect_test "test trmm - test one call suitable for trmc, one not" =
+  let program =
+    {|
+  val rec foo = fun n ->
+    if n < 2 then 1
+    else foo(n - 2) + foo (n - 1)
+
+  val test = do {
+    print(foo 2);
+    print(foo 3);
+    print(foo 4);
+    print(foo 5);
+    print(foo 6)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    2
+    3
+    5
+    8
+    13
+  |}]
