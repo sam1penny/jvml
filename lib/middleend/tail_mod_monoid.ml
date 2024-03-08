@@ -213,8 +213,7 @@ let transform_tmm_decl decl =
             Desugar.Utils.replace_funargs funargs original_body
           in
           [
-            ValRec (ty, x ^ "_acc", transformed_expr);
-            ValRec (ty, x, original_expr);
+            ValRec (ty, x ^ "_acc", transformed_expr); Val (ty, x, original_expr);
           ])
   | _ -> [ decl ]
 

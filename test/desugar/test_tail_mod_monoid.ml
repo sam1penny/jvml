@@ -34,7 +34,7 @@ let%expect_test "test simple recursive sum" =
                    └──Bop - : int
                       └──Ident n_$0 : int
                       └──Int 1
-    └──ValRec sum_$0
+    └──Val sum_$0
        └──Fun n_$0 : int -> int
           └──Direct_app : sum_$0_acc
              └──Int 0
@@ -78,7 +78,7 @@ let%expect_test "test tmm with tail call" =
                     └──Bop - : int
                        └──Ident n_$0 : int
                        └──Int 1
-  └──ValRec foo_$0
+  └──Val foo_$0
      └──Fun n_$0 : int -> int
         └──Direct_app : foo_$0_acc
            └──Int 1
@@ -118,7 +118,7 @@ let%expect_test "test non-direct application provided acc argument" =
                    └──Bop - : int
                       └──Ident n_$0 : int
                       └──Int 1
-    └──ValRec foo_$0
+    └──Val foo_$0
        └──Fun n_$0 : int -> int
           └──Direct_app : foo_$0_acc
              └──Int 0
@@ -155,7 +155,7 @@ let%expect_test "test one call suitable for trmc, one not (+ enforces \
                    └──Bop - : int
                       └──Ident n_$0 : int
                       └──Int 1
-    └──ValRec foo_$0
+    └──Val foo_$0
        └──Fun n_$0 : int -> int
           └──Direct_app : foo_$0_acc
              └──Int 0
@@ -201,7 +201,7 @@ let%expect_test "test deeply right nested trmc" =
                             └──Bop - : int
                                └──Ident n_$0 : int
                                └──Int 2
-    └──ValRec foo_$0
+    └──Val foo_$0
        └──Fun n_$0 : int -> int
           └──Direct_app : foo_$0_acc
              └──Int 0
