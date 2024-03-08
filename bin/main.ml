@@ -1,16 +1,14 @@
 let () =
   let string_program =
     {|
-    val rec foo = fun n ->
-      if n = 0 then 1
-      else n + (foo (n - 2) + (foo (n - 1) + 1))
+    val rec foo = fun x ->
+      if x = 0 then 1
+      else x * foo (x - 1)
   |}
   in
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string "test_env"
-  |> Desugar.desugar_program
-  |> Middle_end.Direct_calls.transform_direct_call_program
-  |> Middle_end.Tail_mod_monoid.transform_tmm_program
+  |> Desugar.desugar_program |> Middle_end.Driver.run_middleend
   |> List.iter Desugar.Desugared_ast.pp_decl
 
 (*
