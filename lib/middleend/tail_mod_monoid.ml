@@ -51,6 +51,13 @@ let rec has_tmm_expr fn_name e =
       None
   | Bop (_, _, ADD, Direct_app (_, _, _, name, _)) when name = fn_name ->
       Some ADD
+  | Bop (_, Direct_app (_, _, _, name, _), ADD, _) when name = fn_name ->
+      Some ADD
+  | Bop (_, e0, ADD, e1) ->
+      rec_has_tmm e0
+      >>= (fun bop -> if bop = ADD then Some bop else None)
+      |> or_else rec_has_tmm e1
+      >>= fun bop -> if bop = ADD then Some bop else None
   | Bop _ -> None
   | If (_, _, e1, e2) -> rec_has_tmm e1 |> or_else rec_has_tmm e2
   | Let (_, _, _, e1) | LetRec (_, _, _, e1) -> rec_has_tmm e1
@@ -98,6 +105,19 @@ let rec rewrite_apps fn_name e =
       else e
   | _ -> Desugar.Utils.map_over_sub_expr (rewrite_apps fn_name) e
 
+let rec pass_to_accumulator e0 e1 =
+  match (e0, e1) with
+  | Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es), e1 ->
+      let acc_expr = List.hd arg_es in
+      let acc_expr' = pass_to_accumulator acc_expr e1 in
+      Direct_app (ret_ty, arg_tys, fun_ret_ty, name, acc_expr' :: List.tl arg_es)
+  | e0, Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es) ->
+      let acc_expr = List.hd arg_es in
+      let acc_expr' = pass_to_accumulator acc_expr e0 in
+      Direct_app (ret_ty, arg_tys, fun_ret_ty, name, acc_expr' :: List.tl arg_es)
+  | _, e1 -> Bop (Typed_ast.TyInt, e0, ADD, e1)
+(* todo:  maybe then match on e1? *)
+
 (*
 if the tail context is a tail call, simply thread in the accumulator
 
@@ -117,7 +137,8 @@ let rec transform_tmm_expr fn_name e =
   | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure | Fun _ | App _
   | Tuple _ | TupleGet _ | ConstructorGet _ | Direct_app _ ->
       Bop (Typed_ast.TyInt, Ident (Typed_ast.TyInt, "acc"), ADD, e)
-  | Bop (_, e0, ADD, Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es)) ->
+  | Bop (_, e', ADD, Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es))
+  | Bop (_, Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es), ADD, e') ->
       if name = fn_name then
         (* todo - dollar sign after acc *)
         Direct_app
@@ -125,9 +146,17 @@ let rec transform_tmm_expr fn_name e =
             [ Typed_ast.TyInt ] @ arg_tys,
             fun_ret_ty,
             name ^ "_acc",
-            [ rec_transform_tmm e0 ] @ arg_es )
+            [ rec_transform_tmm e' ] @ arg_es )
       else e
-  | Bop _ -> e
+  | Bop (_, e0, ADD, e1) -> (
+      let transformed_e0 = rec_transform_tmm e0 in
+      let transformed_e1 = rec_transform_tmm e1 in
+      match (transformed_e0, transformed_e1) with
+      | Direct_app _, Direct_app _ ->
+          pass_to_accumulator transformed_e0 transformed_e1
+      | Direct_app _, _ -> pass_to_accumulator transformed_e0 e1
+      | _, Direct_app _ -> pass_to_accumulator e0 transformed_e1
+      | _ -> pass_to_accumulator transformed_e0 transformed_e1)
   | _ -> shallow_map_tail_positions rec_transform_tmm e
 
 let transform_tmm_decl decl =

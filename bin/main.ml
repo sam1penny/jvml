@@ -3,8 +3,7 @@ let () =
     {|
     val rec foo = fun n ->
       if n = 0 then 1
-      else if n = 1 then (fun x -> x) (foo 3)
-      else foo(n - 2) + foo (n - 1)
+      else n + (foo (n - 2) + (foo (n - 1) + 1))
   |}
   in
   Parsing.Driver.parse_string string_program

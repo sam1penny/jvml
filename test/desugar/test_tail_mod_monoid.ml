@@ -124,7 +124,8 @@ let%expect_test "test non-direct application provided acc argument" =
              └──Int 0
              └──Ident n_$0 : int |}]
 
-let%expect_test "test one call suitable for trmc, one not" =
+let%expect_test "test one call suitable for trmc, one not (+ enforces \
+                 evaluation order)" =
   let program =
     {|
   val rec foo = fun n ->
@@ -154,6 +155,52 @@ let%expect_test "test one call suitable for trmc, one not" =
                    └──Bop - : int
                       └──Ident n_$0 : int
                       └──Int 1
+    └──ValRec foo_$0
+       └──Fun n_$0 : int -> int
+          └──Direct_app : foo_$0_acc
+             └──Int 0
+             └──Ident n_$0 : int |}]
+
+let%expect_test "test deeply right nested trmc" =
+  let program =
+    {|
+  val rec foo = fun n ->
+   match n with
+      | 0 -> 1
+      | _ -> n + (foo (n - 2) + (foo (n - 1) + 1))
+  |}
+  in
+  let _ = run program in
+  [%expect
+    {|
+    └──ValRec foo_$0_acc
+       └──Fun acc : int -> int -> int
+          └──Fun n_$0 : int -> int
+             └──Let desugar_t0_$0
+                └──Ident n_$0 : int
+                └──Switch
+                   └──Ident desugar_t0_$0 : int
+                   └── <case>
+                      └──Int(0)
+                      └──Shared
+                         └──Bop + : int
+                            └──Ident acc : int
+                            └──Int 1
+                   └── <fallback>
+                      └──Shared
+                         └──Direct_app : foo_$0_acc
+                            └──Direct_app : foo_$0_acc
+                               └──Bop + : int
+                                  └──Bop + : int
+                                     └──Ident acc : int
+                                     └──Int 1
+                                  └──Ident n_$0 : int
+                               └──Bop - : int
+                                  └──Ident n_$0 : int
+                                  └──Int 1
+                            └──Bop - : int
+                               └──Ident n_$0 : int
+                               └──Int 2
     └──ValRec foo_$0
        └──Fun n_$0 : int -> int
           └──Direct_app : foo_$0_acc
