@@ -9,25 +9,16 @@ let rec length = fun x -> match x with
 *)
 open Desugar.Desugared_ast
 open Typing
+open Common
 
-(*
-need a function for mapping onto tail positions.
-
-rewrite as a separate function
-
-if direct call, pass acc in
-else pass 0
-*)
-
-let rec map_over_tail_positions f e =
+let shallow_map_tail_positions f e =
   match e with
   | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure | Fun _ | App _
   | Tuple _ | TupleGet _ | ConstructorGet _ | Bop _ | Direct_app _ ->
-      f e
-  | If (ty, e0, e1, e2) ->
-      If (ty, e0, map_over_tail_positions f e1, map_over_tail_positions f e2)
-  | Let (ty, x, e0, e1) -> Let (ty, x, e0, map_over_tail_positions f e1)
-  | LetRec (ty, x, e0, e1) -> LetRec (ty, x, e0, map_over_tail_positions f e1)
+      e
+  | If (ty, e0, e1, e2) -> If (ty, e0, f e1, f e2)
+  | Let (ty, x, e0, e1) -> Let (ty, x, e0, f e1)
+  | LetRec (ty, x, e0, e1) -> LetRec (ty, x, e0, f e1)
   | Seq (ty, es) ->
       let last, rev_rest =
         let reversed = List.rev es in
@@ -36,17 +27,13 @@ let rec map_over_tail_positions f e =
       Seq (ty, List.rev (f last :: rev_rest))
   | Switch (ty, e, cases, maybe_fallback_expr) ->
       let cases' =
-        List.map
-          (fun (con, case_expr) -> (con, map_over_tail_positions f case_expr))
-          cases
+        List.map (fun (con, case_expr) -> (con, f case_expr)) cases
       in
-      let maybe_fallback_expr' =
-        Option.map (map_over_tail_positions f) maybe_fallback_expr
-      in
+      let maybe_fallback_expr' = Option.map f maybe_fallback_expr in
       Switch (ty, e, cases', maybe_fallback_expr')
   (* unsafe if shared, need to add option field *)
   | Shared_Expr (e_ref, _) ->
-      e_ref := map_over_tail_positions f !e_ref;
+      e_ref := f !e_ref;
       e
   | While_true _ | Return _ | Assign_Seq _ ->
       raise
@@ -54,6 +41,43 @@ let rec map_over_tail_positions f e =
            "tail rec constructs should not be present before calling \
             tail_call_optimise"
 
+let or_else f k o = match o with None -> f k | Some _ -> o
+
+let rec has_tmm_expr fn_name e =
+  let rec_has_tmm = has_tmm_expr fn_name in
+  match e with
+  | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure | Fun _ | App _
+  | Tuple _ | TupleGet _ | ConstructorGet _ | Direct_app _ ->
+      None
+  | Bop (_, _, ADD, Direct_app (_, _, _, name, _)) when name = fn_name ->
+      Some ADD
+  | Bop _ -> None
+  | If (_, _, e1, e2) -> rec_has_tmm e1 |> or_else rec_has_tmm e2
+  | Let (_, _, _, e1) | LetRec (_, _, _, e1) -> rec_has_tmm e1
+  | Seq (_, es) ->
+      let last = List.rev es |> List.hd in
+      rec_has_tmm last
+  | Switch (_, _, cases, maybe_fallback_expr) ->
+      List.map (fun (_, case_expr) -> rec_has_tmm case_expr) cases
+      |> List.find_opt Option.is_some
+      |> Option.join
+      |> or_else
+           (fun e -> Option.map rec_has_tmm e |> Option.join)
+           maybe_fallback_expr
+  | Shared_Expr (e_ref, _) -> rec_has_tmm !e_ref
+  | While_true _ | Return _ | Assign_Seq _ ->
+      raise
+      @@ Failure
+           "tail rec constructs should not be present before calling \
+            tail_call_optimise"
+
+(*
+rewrite applications not in the tail position,
+
+or partial applications in tail position
+
+to initialise the accumulator to 0.
+*)
 let rec rewrite_apps fn_name e =
   match e with
   | Ident (ty, name) ->
@@ -64,12 +88,14 @@ let rec rewrite_apps fn_name e =
             Int 0 )
       else e
   | Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es) ->
-      Direct_app
-        ( ret_ty,
-          [ Typed_ast.TyInt ] @ arg_tys,
-          fun_ret_ty,
-          name ^ "_acc",
-          [ Ident (Typed_ast.TyInt, "acc") ] @ arg_es )
+      if name = fn_name then
+        Direct_app
+          ( ret_ty,
+            [ Typed_ast.TyInt ] @ arg_tys,
+            fun_ret_ty,
+            name ^ "_acc",
+            [ Int 0 ] @ arg_es )
+      else e
   | _ -> Desugar.Utils.map_over_sub_expr (rewrite_apps fn_name) e
 
 (*
@@ -77,121 +103,41 @@ if the tail context is a tail call, simply thread in the accumulator
 
 otherwise add the bop to the tail: acc + tail
 *)
-let thread_in_accumulator fn_name e =
-  let foo e =
-    match e with
-    | Direct_app (_, _, _, name, _) when name = fn_name ^ "_acc" -> e
-    | _ -> Bop (Typed_ast.TyInt, Ident (Typed_ast.TyInt, "acc"), ADD, e)
-  in
-  map_over_tail_positions foo e
-
 let rec transform_tmm_expr fn_name e =
-  let rec_transform_tc = transform_tmm_expr fn_name in
+  let rec_transform_tmm = transform_tmm_expr fn_name in
   match e with
+  | Direct_app (ret_ty, args_ty, fun_ret_ty, name, arg_es) when name = fn_name
+    ->
+      Direct_app
+        ( ret_ty,
+          [ Typed_ast.TyInt ] @ args_ty,
+          fun_ret_ty,
+          name ^ "_acc",
+          [ Ident (Typed_ast.TyInt, "acc") ] @ arg_es )
   | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure | Fun _ | App _
   | Tuple _ | TupleGet _ | ConstructorGet _ | Direct_app _ ->
-      (e, false)
+      Bop (Typed_ast.TyInt, Ident (Typed_ast.TyInt, "acc"), ADD, e)
   | Bop (_, e0, ADD, Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es)) ->
       if name = fn_name then
         (* todo - dollar sign after acc *)
-        ( Direct_app
-            ( ret_ty,
-              [ Typed_ast.TyInt ] @ arg_tys,
-              fun_ret_ty,
-              name ^ "_acc",
-              [ rewrite_apps fn_name e0 |> thread_in_accumulator fn_name ]
-              @ arg_es ),
-          true )
-      else (e, false)
-  | Bop _ -> (e, false)
-  | If (ty, e0, e1, e2) ->
-      let transformed_e1, did_tmm_e1 = rec_transform_tc e1 in
-      let transformed_e2, did_tmm_e2 = rec_transform_tc e2 in
-      if did_tmm_e1 || did_tmm_e2 then
-        let e1' =
-          if did_tmm_e1 then transformed_e1
-          else
-            rewrite_apps fn_name transformed_e1 |> thread_in_accumulator fn_name
-        in
-        let e2' =
-          if did_tmm_e2 then transformed_e2
-          else
-            rewrite_apps fn_name transformed_e2 |> thread_in_accumulator fn_name
-        in
-        (If (ty, rewrite_apps fn_name e0, e1', e2'), true)
-      else (e, false)
-  | Switch (ty, e0, cases, maybe_fallback_expr) ->
-      let transformed_cases =
-        List.map
-          (fun (con, case_expr) -> (con, rec_transform_tc case_expr))
-          cases
-      in
-      let transformed_fallback =
-        Option.map rec_transform_tc maybe_fallback_expr
-      in
-      let did_any_tmm =
-        List.exists (fun (_, (_, did_tmm)) -> did_tmm) transformed_cases
-        |> ( || )
-             (Option.map (fun (_, did_tmm) -> did_tmm) transformed_fallback
-             |> Option.value ~default:false)
-      in
-      if did_any_tmm then
-        let cases' =
-          List.map
-            (fun (con, (trans_case_expr, did_tmm)) ->
-              if did_tmm then (con, trans_case_expr)
-              else
-                ( con,
-                  rewrite_apps fn_name trans_case_expr
-                  |> thread_in_accumulator fn_name ))
-            transformed_cases
-        in
-        let maybe_fallback_expr' =
-          Option.map
-            (fun (trans_fallback_expr, did_tmm) ->
-              if did_tmm then trans_fallback_expr
-              else
-                rewrite_apps fn_name trans_fallback_expr
-                |> thread_in_accumulator fn_name)
-            transformed_fallback
-        in
-        (Switch (ty, e0, cases', maybe_fallback_expr'), true)
-      else (e, false)
-  | Let (ty, x, e0, e1) ->
-      let e1', did_tmm = rec_transform_tc e1 in
-      (Let (ty, x, e0, e1'), did_tmm)
-  | LetRec (ty, x, e0, e1) ->
-      let e1', did_tmm = rec_transform_tc e1 in
-      (LetRec (ty, x, e0, e1'), did_tmm)
-  | Shared_Expr (e_ref, _) ->
-      let e', did_tmm = rec_transform_tc !e_ref in
-      e_ref := e';
-      (e', did_tmm)
-  | Seq (ty, es) ->
-      let last, rev_rest =
-        let reversed = List.rev es in
-        (List.hd reversed, List.tl reversed)
-      in
-      let last', did_tmm = rec_transform_tc last in
-      (Seq (ty, last' :: rev_rest |> List.rev), did_tmm)
-  | While_true _ | Return _ | Assign_Seq _ ->
-      raise
-      @@ Failure
-           "tail rec constructs should not be present before calling \
-            tail_call_optimise"
+        Direct_app
+          ( ret_ty,
+            [ Typed_ast.TyInt ] @ arg_tys,
+            fun_ret_ty,
+            name ^ "_acc",
+            [ rec_transform_tmm e0 ] @ arg_es )
+      else e
+  | Bop _ -> e
+  | _ -> shallow_map_tail_positions rec_transform_tmm e
 
 let transform_tmm_decl decl =
   match decl with
   | ValRec (ty, x, e) -> (
       let funargs, body = Desugar.Utils.collect_funargs e in
-      let transformed_body, did_tmm = transform_tmm_expr x body in
-      match did_tmm with
-      | false ->
-          [
-            ValRec
-              (ty, x, Desugar.Utils.replace_funargs funargs transformed_body);
-          ]
-      | true ->
+      match has_tmm_expr x body with
+      | None -> [ ValRec (ty, x, Desugar.Utils.replace_funargs funargs body) ]
+      | Some _ ->
+          let transformed_body = transform_tmm_expr x body |> rewrite_apps x in
           let expr_without_acc =
             Desugar.Utils.replace_funargs funargs transformed_body
           in
@@ -202,7 +148,6 @@ let transform_tmm_decl decl =
                 "acc",
                 expr_without_acc )
           in
-
           let original_body =
             Direct_app
               ( get_expr_type body,
