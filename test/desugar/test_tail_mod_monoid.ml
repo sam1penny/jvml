@@ -44,9 +44,9 @@ let%expect_test "test tmm with tail call" =
   let program =
     {|
   val rec foo = fun n ->
-  if n = 0 then 0
+  if n = 0 then 1
   else if n = 1 then foo (n - 1)
-  else n + foo (n - 1)
+  else n * foo (n - 1)
   |}
   in
   let _ = run program in
@@ -59,9 +59,9 @@ let%expect_test "test tmm with tail call" =
               └──Bop = : bool
                  └──Ident n_$0 : int
                  └──Int 0
-              └──Bop + : int
+              └──Bop * : int
                  └──Ident acc : int
-                 └──Int 0
+                 └──Int 1
               └──If
                  └──Bop = : bool
                     └──Ident n_$0 : int
@@ -72,7 +72,7 @@ let%expect_test "test tmm with tail call" =
                        └──Ident n_$0 : int
                        └──Int 1
                  └──Direct_app : foo_$0_acc
-                    └──Bop + : int
+                    └──Bop * : int
                        └──Ident acc : int
                        └──Ident n_$0 : int
                     └──Bop - : int
@@ -81,7 +81,7 @@ let%expect_test "test tmm with tail call" =
   └──ValRec foo_$0
      └──Fun n_$0 : int -> int
         └──Direct_app : foo_$0_acc
-           └──Int 0
+           └──Int 1
            └──Ident n_$0 : int |}]
 
 let%expect_test "test non-direct application provided acc argument" =
@@ -206,3 +206,34 @@ let%expect_test "test deeply right nested trmc" =
           └──Direct_app : foo_$0_acc
              └──Int 0
              └──Ident n_$0 : int |}]
+
+let%expect_test "test mixing of monoid operations is not optimised" =
+  let program =
+    {|
+  val rec foo = fun x -> 1 + foo(x - 1) * 3
+  val rec bar = fun x -> 3 * 2 + foo(x - 1)
+  |}
+  in
+  let _ = run program in
+  [%expect
+    {|
+    └──ValRec foo_$0
+       └──Fun x_$0 : int -> int
+          └──Bop + : int
+             └──Int 1
+             └──Bop * : int
+                └──Direct_app : foo_$0
+                   └──Bop - : int
+                      └──Ident x_$0 : int
+                      └──Int 1
+                └──Int 3
+    └──ValRec bar_$0
+       └──Fun x_$0 : int -> int
+          └──Bop + : int
+             └──Bop * : int
+                └──Int 3
+                └──Int 2
+             └──Direct_app : foo_$0
+                └──Bop - : int
+                   └──Ident x_$0 : int
+                   └──Int 1 |}]
