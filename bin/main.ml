@@ -1,9 +1,9 @@
 let () =
   let string_program =
     {|
-  val rec foo = fun n ->
+  val rec sum = fun n ->
     if n = 0 then 1
-    else foo(n - 2) + foo (n - 1)
+    else sum (n - 1) + sum (n - 1) + 1
   |}
   in
   Parsing.Driver.parse_string string_program

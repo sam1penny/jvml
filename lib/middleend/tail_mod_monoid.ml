@@ -1,6 +1,6 @@
 (*
 automatic transform of functions that are
-tail recursive modulo some number of monoid operators.
+tail recursive modulo some number of commutative monoid operators.
 
 for example,
 let rec length = fun x -> match x with
@@ -103,6 +103,7 @@ let rec transform_tmm_expr fn_name e =
               @ arg_es ),
           true )
       else (e, false)
+  | Bop _ -> (e, false)
   | If (ty, e0, e1, e2) ->
       let transformed_e1, did_tmm_e1 = rec_transform_tc e1 in
       let transformed_e2, did_tmm_e2 = rec_transform_tc e2 in
@@ -119,7 +120,65 @@ let rec transform_tmm_expr fn_name e =
         in
         (If (ty, rewrite_apps fn_name e0, e1', e2'), true)
       else (e, false)
-  | _ -> (e, false)
+  | Switch (ty, e0, cases, maybe_fallback_expr) ->
+      let transformed_cases =
+        List.map
+          (fun (con, case_expr) -> (con, rec_transform_tc case_expr))
+          cases
+      in
+      let transformed_fallback =
+        Option.map rec_transform_tc maybe_fallback_expr
+      in
+      let did_any_tmm =
+        List.exists (fun (_, (_, did_tmm)) -> did_tmm) transformed_cases
+        |> ( || )
+             (Option.map (fun (_, did_tmm) -> did_tmm) transformed_fallback
+             |> Option.value ~default:false)
+      in
+      if did_any_tmm then
+        let cases' =
+          List.map
+            (fun (con, (trans_case_expr, did_tmm)) ->
+              if did_tmm then (con, trans_case_expr)
+              else
+                ( con,
+                  rewrite_apps fn_name trans_case_expr
+                  |> thread_in_accumulator fn_name ))
+            transformed_cases
+        in
+        let maybe_fallback_expr' =
+          Option.map
+            (fun (trans_fallback_expr, did_tmm) ->
+              if did_tmm then trans_fallback_expr
+              else
+                rewrite_apps fn_name trans_fallback_expr
+                |> thread_in_accumulator fn_name)
+            transformed_fallback
+        in
+        (Switch (ty, e0, cases', maybe_fallback_expr'), true)
+      else (e, false)
+  | Let (ty, x, e0, e1) ->
+      let e1', did_tmm = rec_transform_tc e1 in
+      (Let (ty, x, e0, e1'), did_tmm)
+  | LetRec (ty, x, e0, e1) ->
+      let e1', did_tmm = rec_transform_tc e1 in
+      (LetRec (ty, x, e0, e1'), did_tmm)
+  | Shared_Expr (e_ref, _) ->
+      let e', did_tmm = rec_transform_tc !e_ref in
+      e_ref := e';
+      (e', did_tmm)
+  | Seq (ty, es) ->
+      let last, rev_rest =
+        let reversed = List.rev es in
+        (List.hd reversed, List.tl reversed)
+      in
+      let last', did_tmm = rec_transform_tc last in
+      (Seq (ty, last' :: rev_rest |> List.rev), did_tmm)
+  | While_true _ | Return _ | Assign_Seq _ ->
+      raise
+      @@ Failure
+           "tail rec constructs should not be present before calling \
+            tail_call_optimise"
 
 let transform_tmm_decl decl =
   match decl with
