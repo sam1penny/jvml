@@ -103,7 +103,7 @@ let rec rewrite_apps modulo_bop fn_name e =
       if name = fn_name then
         App
           ( ty,
-            Ident (Typed_ast.TyFun (Typed_ast.TyInt, ty), name ^ "_acc"),
+            Ident (Typed_ast.TyFun (Typed_ast.TyInt, ty), name ^ "_acc$"),
             get_identity_element modulo_bop )
       else e
   | Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es) ->
@@ -112,7 +112,7 @@ let rec rewrite_apps modulo_bop fn_name e =
           ( ret_ty,
             [ Typed_ast.TyInt ] @ arg_tys,
             fun_ret_ty,
-            name ^ "_acc",
+            name ^ "_acc$",
             [ get_identity_element modulo_bop ] @ arg_es )
       else e
   | _ -> Desugar.Utils.map_over_sub_expr (rewrite_apps modulo_bop fn_name) e
@@ -128,7 +128,6 @@ let rec pass_to_accumulator modulo_bop e0 e1 =
       let acc_expr' = pass_to_accumulator modulo_bop acc_expr e0 in
       Direct_app (ret_ty, arg_tys, fun_ret_ty, name, acc_expr' :: List.tl arg_es)
   | _, e1 -> Bop (Typed_ast.TyInt, e0, modulo_bop, e1)
-(* todo:  maybe then match on e1? *)
 
 (*
 if the tail context is a tail call, simply thread in the accumulator
@@ -144,11 +143,11 @@ let rec transform_tmm_expr modulo_bop fn_name e =
         ( ret_ty,
           [ Typed_ast.TyInt ] @ args_ty,
           fun_ret_ty,
-          name ^ "_acc",
-          [ Ident (Typed_ast.TyInt, "acc") ] @ arg_es )
+          name ^ "_acc$",
+          [ Ident (Typed_ast.TyInt, "acc$") ] @ arg_es )
   | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure | Fun _ | App _
   | Tuple _ | TupleGet _ | ConstructorGet _ | Direct_app _ ->
-      Bop (Typed_ast.TyInt, Ident (Typed_ast.TyInt, "acc"), modulo_bop, e)
+      Bop (Typed_ast.TyInt, Ident (Typed_ast.TyInt, "acc$"), modulo_bop, e)
   | Bop
       ( _,
         e',
@@ -161,12 +160,11 @@ let rec transform_tmm_expr modulo_bop fn_name e =
         e' )
     when bop = modulo_bop ->
       if name = fn_name then
-        (* todo - dollar sign after acc *)
         Direct_app
           ( ret_ty,
             [ Typed_ast.TyInt ] @ arg_tys,
             fun_ret_ty,
-            name ^ "_acc",
+            name ^ "_acc$",
             [ rec_transform_tmm e' ] @ arg_es )
       else e
   | Bop (_, e0, ((ADD | MUL) as bop), e1) when bop = modulo_bop -> (
@@ -197,7 +195,7 @@ let transform_tmm_decl decl =
             Fun
               ( Typed_ast.TyInt,
                 get_expr_type expr_without_acc,
-                "acc",
+                "acc$",
                 expr_without_acc )
           in
           let original_body =
@@ -205,7 +203,7 @@ let transform_tmm_decl decl =
               ( get_expr_type body,
                 [ Typed_ast.TyInt ] @ List.map (fun (_, ty) -> ty) funargs,
                 get_expr_type body,
-                x ^ "_acc",
+                x ^ "_acc$",
                 [ get_identity_element modulo_bop ]
                 @ List.map (fun (arg, ty) -> Ident (ty, arg)) funargs )
           in
@@ -213,7 +211,8 @@ let transform_tmm_decl decl =
             Desugar.Utils.replace_funargs funargs original_body
           in
           [
-            ValRec (ty, x ^ "_acc", transformed_expr); Val (ty, x, original_expr);
+            ValRec (ty, x ^ "_acc$", transformed_expr);
+            Val (ty, x, original_expr);
           ])
   | _ -> [ decl ]
 
