@@ -4,14 +4,14 @@ open Test_utils.Utils
 open Test_utils
 
 let%expect_test "basic int arithmetic" =
-  let x = Bop (Int 6, MUL, Bop (Int 3, ADD, Int 4)) in
+  let x = Bop (Int 6l, MUL, Bop (Int 3l, ADD, Int 4l)) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
   [%expect {|Ok(int)|}]
 
 let%expect_test "invalid arithmetic" =
-  let x = Bop (Int 6, MUL, Bool false) in
+  let x = Bop (Int 6l, MUL, Bool false) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
@@ -32,7 +32,7 @@ let%expect_test "basic if statement" =
   [%expect {|Ok(unit)|}]
 
 let%expect_test "infer simple function argument" =
-  let x = Fun ("x", Bop (Ident "x", SUB, Int 4)) in
+  let x = Fun ("x", Bop (Ident "x", SUB, Int 4l)) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
@@ -52,7 +52,7 @@ let%expect_test "function variable shadowing" =
       ( "x",
         Tuple
           [
-            Fun ("x", Bop (Int 3, ADD, Ident "x"));
+            Fun ("x", Bop (Int 3l, ADD, Ident "x"));
             Bop (Ident "x", AND, Bool true);
           ] )
   in
@@ -69,7 +69,7 @@ let%expect_test "function variable shadowing - reversed" =
         Tuple
           [
             Bop (Ident "x", AND, Bool true);
-            Fun ("x", Bop (Int 3, ADD, Ident "x"));
+            Fun ("x", Bop (Int 3l, ADD, Ident "x"));
           ] )
   in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
@@ -78,7 +78,7 @@ let%expect_test "function variable shadowing - reversed" =
   [%expect {|Ok(bool -> (bool * (int -> int)))|}]
 
 let%expect_test "infer basic let expression" =
-  let x = Let ("x", Int 3, Ident "x") in
+  let x = Let ("x", Int 3l, Ident "x") in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
@@ -90,7 +90,7 @@ let%expect_test "test let polymorphism" =
     Let
       ( "f",
         Fun ("x", Ident "x"),
-        Tuple [ App (Ident "f", Int 3); App (Ident "f", Bool true) ] )
+        Tuple [ App (Ident "f", Int 3l); App (Ident "f", Bool true) ] )
   in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
@@ -98,14 +98,14 @@ let%expect_test "test let polymorphism" =
   [%expect {|Ok((int * bool))|}]
 
 let%expect_test "test nested let" =
-  let x = Let ("x", Int 3, Let ("y", Ident "x", Ident "y")) in
+  let x = Let ("x", Int 3l, Let ("y", Ident "x", Ident "y")) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
   [%expect {|Ok(int)|}]
 
 let%expect_test "test binding match" =
-  let x = Match (Int 3, [ (Pat_Ident "x", Ident "x") ]) in
+  let x = Match (Int 3l, [ (Pat_Ident "x", Ident "x") ]) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
@@ -119,7 +119,7 @@ let%expect_test "test shadowing binding match" =
         Tuple
           [
             Bop (Ident "x", AND, Bool true);
-            Match (Int 3, [ (Pat_Ident "x", Ident "x") ]);
+            Match (Int 3l, [ (Pat_Ident "x", Ident "x") ]);
           ] )
   in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
@@ -146,8 +146,8 @@ let%expect_test "test matching tuple" =
 let%expect_test "test pattern with duplicate bindings" =
   let x =
     Match
-      ( Tuple [ Int 0; Int 1 ],
-        [ (Pat_Tuple [ Pat_Ident "x"; Pat_Ident "x" ], Int 3) ] )
+      ( Tuple [ Int 0l; Int 1l ],
+        [ (Pat_Tuple [ Pat_Ident "x"; Pat_Ident "x" ], Int 3l) ] )
   in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
@@ -155,21 +155,21 @@ let%expect_test "test pattern with duplicate bindings" =
   [%expect {|Error|}]
 
 let%expect_test "test valid polymorphic equals" =
-  let x = Tuple [ Bop (Int 3, EQ, Int 3); Bop (Bool true, EQ, Bool false) ] in
+  let x = Tuple [ Bop (Int 3l, EQ, Int 3l); Bop (Bool true, EQ, Bool false) ] in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
   [%expect {|Ok((bool * bool))|}]
 
 let%expect_test "test invalid polymorphic equals" =
-  let x = Bop (Int 3, EQ, Bool true) in
+  let x = Bop (Int 3l, EQ, Bool true) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
   [%expect {|Error|}]
 
 let%expect_test "test ored pattern" =
-  let x = Match (Int 3, [ (Pat_Or [ Pat_Int 0; Pat_Int 1 ], Int 1) ]) in
+  let x = Match (Int 3l, [ (Pat_Or [ Pat_Int 0l; Pat_Int 1l ], Int 1l) ]) in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
@@ -183,7 +183,7 @@ let%expect_test "test function equality fails" =
   [%expect {|Error|}]
 
 let%expect_test "test sequence typing" =
-  let x = Seq [ Unit; Bool true; Int 3 ] in
+  let x = Seq [ Unit; Bool true; Int 3l ] in
   Utils.add_dummy_loc_expr x |> Typing.Driver.type_expr
   |> Result.map Typing.Infer.get_expr_type
   |> pp_tree_result |> print_string;
@@ -198,8 +198,8 @@ let%expect_test "test matched pattern bindings ok" =
             [
               ( Pat_Or
                   [
-                    Pat_Tuple [ Pat_Int 3; Pat_Ident "x" ];
-                    Pat_Tuple [ Pat_Ident "x"; Pat_Int 3 ];
+                    Pat_Tuple [ Pat_Int 3l; Pat_Ident "x" ];
+                    Pat_Tuple [ Pat_Ident "x"; Pat_Int 3l ];
                   ],
                 Bool true );
             ] ) )
@@ -218,7 +218,7 @@ let%expect_test "test uncorresponding types in pattern bindings fails" =
             [
               ( Pat_Or
                   [
-                    Pat_Tuple [ Pat_Int 3; Pat_Ident "x" ];
+                    Pat_Tuple [ Pat_Int 3l; Pat_Ident "x" ];
                     Pat_Tuple [ Pat_Ident "x"; Pat_Bool true ];
                   ],
                 Bool true );

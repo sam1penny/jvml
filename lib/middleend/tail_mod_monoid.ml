@@ -81,8 +81,8 @@ let rec has_tmm_expr fn_name e =
             tail_call_optimise"
 
 let get_identity_element = function
-  | ADD -> Int 0
-  | MUL -> Int 1
+  | ADD -> Int 0l
+  | MUL -> Int 1l
   | _ ->
       raise
       @@ Failure

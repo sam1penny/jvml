@@ -8,10 +8,15 @@ open Printf
 open Common
 
 type loc = Lexing.position * Lexing.position
-type con = IntCon of int | BoolCon of bool | UnitCon | AdtCon of string * int
+
+type con =
+  | IntCon of Int32.t
+  | BoolCon of bool
+  | UnitCon
+  | AdtCon of string * Int32.t
 
 type expr =
-  | Int of int
+  | Int of Int32.t
   | Ident of Typed_ast.type_expr * string
   | Bool of bool
   | Unit
@@ -42,7 +47,7 @@ type expr =
   (* Sequence of assignments, special case as assign does not produce a 'unit' on the stack *)
   | Assign_Seq of (string * Typed_ast.type_expr * expr) list
 
-type type_constr = DeclConstr of string * int * Typed_ast.type_expr option
+type type_constr = DeclConstr of string * Int32.t * Typed_ast.type_expr option
 
 type decl =
   | Val of Typed_ast.type_expr * string * expr
@@ -89,7 +94,7 @@ let rec get_expr_type = function
 let string_of_expr_node =
   let open Printf in
   function
-  | Int i -> sprintf "Int %i" i
+  | Int i -> sprintf "Int %ld" i
   | Bool b -> sprintf "Bool %b" b
   | Ident (ty, ident) -> sprintf "Ident %s : %s" ident (Typed_ast.pp_texpr ty)
   | Unit -> "()"
@@ -118,10 +123,10 @@ let string_of_expr_node =
 
 let pp_con ?(indent = "") con =
   match con with
-  | IntCon i -> printf "%s└──Int(%i)\n" indent i
+  | IntCon i -> printf "%s└──Int(%ld)\n" indent i
   | BoolCon b -> printf "%s└──Bool(%b)\n" indent b
   | UnitCon -> printf "%s└──Unit\n" indent
-  | AdtCon (cname, tag) -> printf "%s└──%s : tag=%i\n" indent cname tag
+  | AdtCon (cname, tag) -> printf "%s└──%s : tag=%ld\n" indent cname tag
 
 let rec pp_expr ?(indent = "") expr =
   let open Printf in
@@ -202,9 +207,9 @@ let pp_tconstr ?(indent = "") =
   let open Printf in
   function
   | DeclConstr (cname, tag, None) ->
-      printf "%s└──%s : tag=%i\n" indent cname tag
+      printf "%s└──%s : tag=%ld\n" indent cname tag
   | DeclConstr (cname, tag, Some texpr) ->
-      printf "%s└──%s of %s : tag=%i\n" indent cname (Typed_ast.pp_texpr texpr)
+      printf "%s└──%s of %s : tag=%ld\n" indent cname (Typed_ast.pp_texpr texpr)
         tag
 
 let pp_decl ?(indent = "") =

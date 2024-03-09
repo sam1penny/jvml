@@ -26,7 +26,7 @@ let type_progam_and_pp p =
   |> Typing.Driver.type_program |> pp_decls_result |> print_string
 
 let%expect_test "basic assignment" =
-  let x = Val ("f", Fun ("x", Bop (Ident "x", ADD, Int 3))) in
+  let x = Val ("f", Fun ("x", Bop (Ident "x", ADD, Int 3l))) in
   type_decl_and_pp x;
   [%expect {|Ok(int -> int)|}]
 
@@ -39,12 +39,12 @@ let%expect_test "recursive function" =
             Match
               ( Ident "x",
                 [
-                  (Pat_Int 1, Int 1);
+                  (Pat_Int 1l, Int 1l);
                   ( Pat_Any,
                     Bop
                       ( Ident "x",
                         MUL,
-                        App (Ident "fact", Bop (Ident "x", SUB, Int 1)) ) );
+                        App (Ident "fact", Bop (Ident "x", SUB, Int 1l)) ) );
                 ] ) ) )
   in
   type_decl_and_pp x;
@@ -64,7 +64,7 @@ let%expect_test "use generic list" =
               );
           ] );
       Val ("x", Constr "N");
-      Val ("y", App (Constr "C", Tuple [ Int 3; Constr "N" ]));
+      Val ("y", App (Constr "C", Tuple [ Int 3l; Constr "N" ]));
       Val ("z", Fun ("x", App (Constr "C", Tuple [ Ident "x"; Constr "N" ])));
     ]
   in
@@ -95,8 +95,9 @@ let%expect_test "incorrectly use generic list" =
         ( "x",
           App
             ( Constr "C",
-              Tuple [ Int 3; App (Constr "C", Tuple [ Bool true; Constr "N" ]) ]
-            ) );
+              Tuple
+                [ Int 3l; App (Constr "C", Tuple [ Bool true; Constr "N" ]) ] )
+        );
     ]
   in
   type_progam_and_pp x;
@@ -123,7 +124,7 @@ let%expect_test "use generic dict" =
                      ]) );
           ] );
       Val ("x", Constr "N");
-      Val ("y", App (Constr "C", Tuple [ Int 3; Bool true; Constr "N" ]));
+      Val ("y", App (Constr "C", Tuple [ Int 3l; Bool true; Constr "N" ]));
     ]
   in
   type_progam_and_pp x;
@@ -139,7 +140,7 @@ let%expect_test "multiple usages of polymorphic function" =
   let x =
     [
       Val ("f", Fun ("x", Ident "x"));
-      Val ("a", App (Ident "f", Int 3));
+      Val ("a", App (Ident "f", Int 3l));
       Val ("b", App (Ident "f", Bool true));
     ]
   in
@@ -156,8 +157,8 @@ let%expect_test "use multiple top-level values" =
   let x =
     [
       Val ("apply", Fun ("f", Fun ("x", App (Ident "f", Ident "x"))));
-      Val ("double", Fun ("x", Bop (Ident "x", MUL, Int 2)));
-      Val ("v", App (App (Ident "apply", Ident "double"), Int 3));
+      Val ("double", Fun ("x", Bop (Ident "x", MUL, Int 2l)));
+      Val ("v", App (App (Ident "apply", Ident "double"), Int 3l));
     ]
   in
   type_progam_and_pp x;
@@ -214,7 +215,7 @@ let%expect_test "test pattern matching constructor" =
     ) |}]
 
 let%expect_test "variable escaping toplevel scope" =
-  let x = [ Val ("x", Let ("y", Int 3, Ident "y")); Val ("z", Ident "y") ] in
+  let x = [ Val ("x", Let ("y", Int 3l, Ident "y")); Val ("z", Ident "y") ] in
   type_progam_and_pp x;
   [%expect {|
 Error
@@ -235,7 +236,7 @@ let%expect_test "test type definition with all types" =
       Val ("m", App (Constr "X", Fun ("x", Ident "x")));
       Val ("n", App (Constr "Y", Unit));
       Val ("o", App (Constr "Z", Bool true));
-      Val ("p", App (Constr "A", Int 3));
+      Val ("p", App (Constr "A", Int 3l));
     ]
   in
   type_progam_and_pp x;

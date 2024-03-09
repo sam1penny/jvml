@@ -49,7 +49,8 @@ let rec desugared_ast_of_expr constructors_by_type expr =
   | Typed_ast.Seq (_, ty, es) -> Seq (ty, List.map rec_desugar es)
 
 let desugared_ast_of_type_constructor tag = function
-  | Typed_ast.DeclConstr (_, cname, ty_opt) -> DeclConstr (cname, tag, ty_opt)
+  | Typed_ast.DeclConstr (_, cname, ty_opt) ->
+      DeclConstr (cname, Int32.of_int tag, ty_opt)
 
 let desugared_ast_of_decl constructors_by_type = function
   | Typed_ast.Val (_, ty, x, e) ->

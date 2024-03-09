@@ -3,7 +3,7 @@ open Common
 type loc = Lexing.position * Lexing.position
 
 type expr =
-  | Int of loc * int
+  | Int of loc * Int32.t
   | Ident of loc * string
   | Constr of loc * string
   | Bool of loc * bool
@@ -19,7 +19,7 @@ type expr =
   | Seq of loc * expr list
 
 and pattern =
-  | Pat_Int of loc * int
+  | Pat_Int of loc * Int32.t
   | Pat_Ident of loc * string
   | Pat_Bool of loc * bool
   | Pat_Unit of loc
@@ -73,7 +73,7 @@ let get_pattern_loc = function
 let string_of_expr_node =
   let open Printf in
   function
-  | Int (_, i) -> sprintf "Int %i" i
+  | Int (_, i) -> sprintf "Int %ld" i
   | Bool (_, b) -> sprintf "Bool %b" b
   | Ident (_, ident) -> sprintf "Ident %s" ident
   | Unit _ -> "()"
@@ -91,7 +91,7 @@ let string_of_expr_node =
 let string_of_pat_node =
   let open Printf in
   function
-  | Pat_Int (_, i) -> sprintf "Pat_Int %i" i
+  | Pat_Int (_, i) -> sprintf "Pat_Int %ld" i
   | Pat_Ident (_, ident) -> sprintf "Pat_Ident %s" ident
   | Pat_Bool (_, b) -> sprintf "Pat_Bool %b" b
   | Pat_Unit _ -> sprintf "Pat_()"

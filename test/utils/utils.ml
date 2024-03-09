@@ -10,7 +10,7 @@ type type_expr =
   | TyFun of type_expr * type_expr
 
 type expr =
-  | Int of int
+  | Int of Int32.t
   | Ident of string
   | Constr of string
   | Bool of bool
@@ -26,7 +26,7 @@ type expr =
   | Seq of expr list
 
 and pattern =
-  | Pat_Int of int
+  | Pat_Int of Int32.t
   | Pat_Ident of string
   | Pat_Bool of bool
   | Pat_Unit

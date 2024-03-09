@@ -161,14 +161,14 @@ let rec clear_shared_expr_labels e =
 
 let con_index = function
   | Desugared_ast.IntCon i -> i
-  | Desugared_ast.BoolCon b -> if b then 1 else 0
-  | Desugared_ast.UnitCon -> 0
+  | Desugared_ast.BoolCon b -> if b then 1l else 0l
+  | Desugared_ast.UnitCon -> 0l
   | Desugared_ast.AdtCon (_, tag) -> tag
 
 let get_index = function
   | Typed_ast.TyInt -> [ UNBOX_INT ]
   | Typed_ast.TyBool -> [ UNBOX_BOOL ]
-  | Typed_ast.TyUnit -> [ POP; PUSH_INT 0 ]
+  | Typed_ast.TyUnit -> [ POP; PUSH_INT 0l ]
   | Typed_ast.TyCustom (_, tname) -> [ CONSTRUCTOR_INDEX tname ]
   | _ -> raise @@ Failure "attempted to match on unsupported type"
 
@@ -288,7 +288,9 @@ let rec compile_expr label_gen env top_level_bindings e =
       (List.flatten defs, List.flatten pop_throwaways, List.flatten smethods)
   | TupleGet (ty, i, e) ->
       let defs, code, static_methods = compile_expr_rec e in
-      (defs, code @ [ TUPLE_GET (convert_type ty, i) ], static_methods)
+      ( defs,
+        code @ [ TUPLE_GET (convert_type ty, Int32.of_int i) ],
+        static_methods )
   | ConstructorGet (ty, cname, e) ->
       let defs, code, static_methods = compile_expr_rec e in
       (defs, code @ [ CONSTRUCTOR_GET (convert_type ty, cname) ], static_methods)
@@ -572,14 +574,18 @@ and compile_dyn_lambda label_gen env fvars_with_types defs
     smethods @ [ lifted_method ] )
 
 and lower_tuple_eles_to_array label_gen env top_level_bindings es =
-  let prelude = [ PUSH_INT (List.length es); ALLOC_ARRAY "java/lang/Object" ] in
+  let prelude =
+    [ PUSH_INT (Int32.of_int (List.length es)); ALLOC_ARRAY "java/lang/Object" ]
+  in
   let main_col =
     List.mapi
       (fun i e ->
         let edefs, ecode, smethods =
           compile_expr label_gen env top_level_bindings e
         in
-        (edefs, [ DUP; PUSH_INT i ] @ ecode @ [ STORE_ARRAY ], smethods))
+        ( edefs,
+          [ DUP; PUSH_INT (Int32.of_int i) ] @ ecode @ [ STORE_ARRAY ],
+          smethods ))
       es
   in
   let defs, maincode, smethods =

@@ -3,7 +3,7 @@
 [@@@coverage exclude_file]
 %}
 
-%token <int> INT
+%token <Int32.t> INT
 %token <string> LOWERCASE_IDENT
 %token <string> UPPERCASE_IDENT
 

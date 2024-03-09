@@ -15,7 +15,7 @@ type type_expr =
 type switch_type = LOOKUP | TABLE of int [@@deriving show]
 
 type instruction =
-  | PUSH_INT of int
+  | PUSH_INT of Int32.t
   | BOX_INT
   | UNBOX_INT
   | PUSH_BOOL of bool
@@ -47,10 +47,10 @@ type instruction =
   | STORE_STATIC of string * string * type_expr
   (* freevar types, arg, return *)
   | CREATE_DYNAMIC_CLOSURE of string * type_expr list * type_expr * type_expr
-  | TUPLE_GET of type_expr * int
+  | TUPLE_GET of type_expr * Int32.t
   | CONSTRUCTOR_GET of type_expr * string
   (* (int_to_test, label), default label *)
-  | SWITCH of switch_type * (int * string) list * string
+  | SWITCH of switch_type * (Int32.t * string) list * string
   | MATCH_FAILURE
   | CONSTRUCTOR_INDEX of string
   | RETURN
@@ -70,7 +70,7 @@ type type_interface = { name : string; constructors : string list }
 
 type constructor = {
   name : string;
-  tag : int;
+  tag : Int32.t;
   tname : string;
   arg : type_expr option;
 }

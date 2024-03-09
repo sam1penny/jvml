@@ -86,9 +86,9 @@ let lower_bop ctrl_gen = function
       ]
 
 let load_int = function
-  | -1 -> "iconst_m1"
-  | (0 | 1 | 2 | 3 | 4 | 5) as n -> sprintf "iconst_%i" n
-  | n -> sprintf "ldc %i" n
+  | -1l -> "iconst_m1"
+  | (0l | 1l | 2l | 3l | 4l | 5l) as n -> sprintf "iconst_%ld" n
+  | n -> sprintf "ldc %ld" n
 
 let store_ref = function
   | (0 | 1 | 2 | 3) as n -> sprintf "astore_%i" n
@@ -117,7 +117,7 @@ let lower_switch switch_type cases default_lab =
   match switch_type with
   | LOOKUP ->
       [ "lookupswitch" ]
-      @ List.map (fun (index, lab) -> sprintf "%i : %s" index lab) cases
+      @ List.map (fun (index, lab) -> sprintf "%ld : %s" index lab) cases
       @ [ sprintf "default : %s" default_lab ]
   | TABLE i ->
       [ sprintf "tableswitch %i" i ]

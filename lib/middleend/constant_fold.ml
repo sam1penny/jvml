@@ -3,10 +3,10 @@ open Common
 
 let apply_int_bop bop i1 i2 =
   match bop with
-  | ADD -> i1 + i2
-  | SUB -> i1 - i2
-  | MUL -> i1 * i2
-  | DIV -> i1 / i2
+  | ADD -> Int32.add i1 i2
+  | SUB -> Int32.sub i1 i2
+  | MUL -> Int32.mul i1 i2
+  | DIV -> Int32.div i1 i2
   | _ -> raise @@ Failure "called apply_int_bop to non-int bop!"
 
 (*
@@ -26,9 +26,9 @@ let rec constant_fold_bop ty e0 bop e1 =
   | (ADD | SUB | MUL), Int i0, Int i1 -> Int (apply_int_bop bop i0 i1)
   (* associative bop with no side effects *)
   | ADD, Bop (_, e0_0, ADD, Int i0_1), Int i1 ->
-      Bop (ty, e0_0, ADD, Int (i0_1 + i1))
+      Bop (ty, e0_0, ADD, Int (Int32.add i0_1 i1))
   | MUL, Bop (_, e0_0, ADD, Int i0_1), Int i1 ->
-      Bop (ty, e0_0, MUL, Int (i0_1 + i1))
+      Bop (ty, e0_0, MUL, Int (Int32.add i0_1 i1))
   (* associative + commutative, move constant to right for subcall *)
   | ADD, Bop (ty', e0_0, ADD, Int i0_1), e1 ->
       constant_fold_bop ty (Bop (ty', e0_0, ADD, e1)) ADD (Int i0_1)
@@ -36,7 +36,7 @@ let rec constant_fold_bop ty e0 bop e1 =
       constant_fold_bop ty (Bop (ty', e0_0, MUL, e1)) MUL (Int i0_1)
   | ADD, (Int _ as e0), e1 -> constant_fold_bop ty e1 ADD e0
   | MUL, (Int _ as e0), e1 -> constant_fold_bop ty e1 MUL e0
-  | DIV, Int i0, Int i1 when i1 <> 0 -> Int (i0 / i1)
+  | DIV, Int i0, Int i1 when i1 <> 0l -> Int (Int32.div i0 i1)
   | LT, Int i0, Int i1 -> Bool (i0 < i1)
   | GT, Int i0, Int i1 -> Bool (i0 > i1)
   | AND, Bool b1, Bool b2 -> Bool (b1 && b2)

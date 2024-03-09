@@ -21,7 +21,7 @@ let uppercase_ident = (['A'-'Z'] | '_') (letter | ['0'-'9'] | '_' | '\'')*
 
 rule token = parse
     | white {token lexbuf}
-    | int { INT (int_of_string (Lexing.lexeme lexbuf)) }
+    | int { INT (Int32.of_string (Lexing.lexeme lexbuf)) }
     | '(' { LPAREN }
     | ')' { RPAREN }
     | '+' { ADD }
