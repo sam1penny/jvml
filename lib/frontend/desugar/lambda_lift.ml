@@ -23,7 +23,7 @@ let print_fv_maps fv_maps =
       Printf.printf " --- \n")
     fv_maps
 
-let stdlib = StringSet.singleton "print_$0"
+let external_lib = [ "print_$0"; "Nil$"; "Cons$" ] |> StringSet.of_list
 
 let free_vars_with_types_expr bound e =
   let union_list =
@@ -150,7 +150,8 @@ let free_vars_with_types_program program =
     (fun (fv_map, top_level) decl ->
       let d_fv_map, new_top_level = free_vars_with_types_decl top_level decl in
       (StringMap.union takeleft fv_map d_fv_map, new_top_level))
-    (StringMap.empty, stdlib) program
+    (StringMap.empty, external_lib)
+    program
   |> fun (fv_map, _) -> fv_map
 
 let lift_to_valrec name funargs body =

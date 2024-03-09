@@ -13,11 +13,19 @@ type env = {
 
 let empty = StringMap.empty
 
-let stdlib =
+let external_lib =
+  let alpha_list = TyCustom "list$" in
   {
     fields =
-      StringMap.singleton "print_$0"
-        (Static_field ("Std", "print", TyFun (TyAny, TyUnit)));
+      [
+        ("print_$0", Static_field ("Std", "print", TyFun (TyAny, TyUnit)));
+        ("Nil$", Static_field ("Std", "Nil$", alpha_list));
+        ( "Cons$",
+          Static_field
+            ("Std", "Cons$", TyFun (TyTuple [ TyAny; alpha_list ], alpha_list))
+        );
+      ]
+      |> StringMap.of_list;
     static_methods = StringMap.empty;
   }
 

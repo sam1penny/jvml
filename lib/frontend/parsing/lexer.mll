@@ -44,6 +44,8 @@ rule token = parse
     | '}' { RCURLY }
     | "::" { CONS }
     | "[]" { EMPTY_LIST }
+    | '['  { LSQUARE }
+    | ']'  { RSQUARE }
     | "true" { TRUE }
     | "false" { FALSE }
     | "if" { IF }

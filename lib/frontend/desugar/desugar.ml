@@ -72,6 +72,14 @@ let desugared_ast_of_decl constructors_by_type = function
       ( StringMap.add tname casecons_by_name constructors_by_type,
         Type (ty, params, tname, desugared_constructors) )
 
+let external_lib =
+  [
+    ( "list$",
+      [ ("Nil$", AdtCon ("Nil$", 0l)); ("Cons$", AdtCon ("Cons$", 1l)) ]
+      |> StringMap.of_list );
+  ]
+  |> StringMap.of_list
+
 (*
 - compile patterns and desugar constructors
 - necessary desugaring to use desugared_ast
@@ -83,7 +91,7 @@ let desugared_ast_of_program program =
         desugared_ast_of_decl constructors_by_type decl
       in
       (constructors_by_type, desugared_decl :: desugared_program_rev))
-    (StringMap.empty, []) program
+    (external_lib, []) program
   |> fun (_, reversed_program) -> List.rev reversed_program
 
 let desugar_program program =

@@ -476,7 +476,7 @@ let produce_instruction_bytecode (p, static_methods) =
     (lower_body "        " "Foo" p)
     (List.map lower_static_method static_methods |> String.concat "\n")
 
-let stdlib =
+let external_lib =
   {|
 .version 62 0
 .class public super MatchFailure
@@ -581,12 +581,129 @@ L3:
 .end method
 .end class
 
+; my custom list class
+
+.version 65 0
+.class public super abstract List$
+.super java/lang/Object
+
+.method public <init> : ()V
+    .code stack 1 locals 1
+L0:     aload_0
+L1:     invokespecial Method java/lang/Object <init> ()V
+L4:     return
+
+    .end code
+.end method
+.permittedsubclasses Cons$ Nil$
+.end class
+
+
+.version 65 0
+.class public final super Nil$
+.super List$
+
+.method public <init> : ()V
+    .code stack 1 locals 1
+L0:     aload_0
+L1:     invokespecial Method List$ <init> ()V
+L4:     return
+
+    .end code
+.end method
+
+.method public toString : ()Ljava/lang/String;
+    .code stack 1 locals 1
+L0:     ldc "[]"
+L2:     areturn
+
+    .end code
+.end method
+.end class
+
+
+.version 65 0
+.class public final super Cons$
+.super List$
+.field public arg LTuple;
+
+.method public <init> : (LTuple;)V
+    .code stack 2 locals 2
+L0:     aload_0
+L1:     invokespecial Method List$ <init> ()V
+L4:     aload_0
+L5:     aload_1
+L6:     putfield Field Cons$ arg LTuple;
+L9:     return
+
+    .end code
+.end method
+
+.method public toString : ()Ljava/lang/String;
+    .code stack 3 locals 3
+L0:     new java/lang/StringBuilder
+L3:     dup
+L4:     ldc "["
+L6:     invokespecial Method java/lang/StringBuilder <init> (Ljava/lang/String;)V
+L9:     astore_1
+L10:    aload_0
+L11:    astore_2
+
+        .stack append Object java/lang/StringBuilder Object Cons$
+L12:    aload_2
+L13:    getfield Field Cons$ arg LTuple;
+L16:    getfield Field Tuple data [Ljava/lang/Object;
+L19:    iconst_1
+L20:    aaload
+L21:    invokevirtual Method java/lang/Object getClass ()Ljava/lang/Class;
+L24:    ldc Class Nil$
+L26:    if_acmpeq L64
+L29:    aload_1
+L30:    aload_2
+L31:    getfield Field Cons$ arg LTuple;
+L34:    getfield Field Tuple data [Ljava/lang/Object;
+L37:    iconst_0
+L38:    aaload
+L39:    invokevirtual Method java/lang/StringBuilder append (Ljava/lang/Object;)Ljava/lang/StringBuilder;
+L42:    ldc ";"
+L44:    invokevirtual Method java/lang/StringBuilder append (Ljava/lang/String;)Ljava/lang/StringBuilder;
+L47:    pop
+L48:    aload_2
+L49:    getfield Field Cons$ arg LTuple;
+L52:    getfield Field Tuple data [Ljava/lang/Object;
+L55:    iconst_1
+L56:    aaload
+L57:    checkcast Cons$
+L60:    astore_2
+L61:    goto L12
+
+        .stack same
+L64:    aload_1
+L65:    aload_2
+L66:    getfield Field Cons$ arg LTuple;
+L69:    getfield Field Tuple data [Ljava/lang/Object;
+L72:    iconst_0
+L73:    aaload
+L74:    invokevirtual Method java/lang/StringBuilder append (Ljava/lang/Object;)Ljava/lang/StringBuilder;
+L77:    pop
+L78:    aload_1
+L79:    ldc "]"
+L81:    invokevirtual Method java/lang/StringBuilder append (Ljava/lang/String;)Ljava/lang/StringBuilder;
+L84:    invokevirtual Method java/lang/StringBuilder toString ()Ljava/lang/String;
+L87:    areturn
+
+    .end code
+.end method
+.end class
+
 .version 62 0
 .class public super Std
 .super java/lang/Object
 .field public static print Ljava/util/function/Function; .fieldattributes
     .signature Ljava/util/function/Function<Ljava/lang/Object;LUnit;>;
 .end fieldattributes
+.field public static Nil$ LList$;
+.field public static Cons$ Ljava/util/function/Function;
 
 .method public <init> : ()V
     .code stack 1 locals 1
@@ -621,11 +738,32 @@ L11:
     .end code
 .end method
 
+.method private static synthetic lambda$static$1 : (LTuple;)LCons$;
+    .code stack 3 locals 1
+        new Cons$
+        dup
+        aload_0
+        invokespecial Method Cons$ <init> (LTuple;)V
+        areturn
+
+    .end code
+.end method
+
+
 .method static <clinit> : ()V
-    .code stack 1 locals 0
+    .code stack 2 locals 0
 L0:     invokedynamic [_25]
 L5:     putstatic Field Std print Ljava/util/function/Function;
-L8:     return
+
+        new Nil$
+        dup
+        invokespecial Method Nil$ <init> ()V
+        putstatic Field Std Nil$ LList$;
+
+        invokedynamic [_100]
+        putstatic Field Std Cons$ Ljava/util/function/Function;
+
+        return
 L9:
         .linenumbertable
             L0 4
@@ -639,5 +777,7 @@ L9:
 .end innerclasses
 .const [_25] = InvokeDynamic invokeStatic Method java/lang/invoke/LambdaMetafactory metafactory (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; MethodType (Ljava/lang/Object;)Ljava/lang/Object; [_59] MethodType (Ljava/lang/Object;)LUnit; : apply ()Ljava/util/function/Function;
 .const [_59] = MethodHandle invokeStatic Method Std lambda$static$0 (Ljava/lang/Object;)LUnit;
+.const [_100] = InvokeDynamic invokeStatic Method java/lang/invoke/LambdaMetafactory metafactory (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; MethodType (Ljava/lang/Object;)Ljava/lang/Object; [_101] MethodType (LTuple;)LCons$; : apply ()Ljava/util/function/Function;
+.const [_101] = MethodHandle invokeStatic Method Std lambda$static$1 (LTuple;)LCons$;
 .end class
 |}

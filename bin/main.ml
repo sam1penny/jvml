@@ -1,16 +1,16 @@
 let () =
   let string_program =
     {|
-    val foo = fun x -> let y = x in (fun x -> x) val z = print(foo 3)
+    val rec foo = fun x -> match x with
+      | [] -> 0
+      | [_] -> 1
+      | x::xs -> 1 + foo xs
   |}
   in
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string "test_env"
   |> Desugar.desugar_program |> Middle_end.Driver.run_middleend
-  |> fun p ->
-  List.iter Desugar.Desugared_ast.pp_decl p;
-  p |> Linear.Lower.compile_program_from_scratch
-  |> Linear.Instruction.show_program |> print_endline
+  |> fun p -> List.iter Desugar.Desugared_ast.pp_decl p
 
 (*
 let string_program =

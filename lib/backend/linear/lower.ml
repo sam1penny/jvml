@@ -788,7 +788,7 @@ let compile_decl label_gen env toplevel = function
 let compile_decl_from_scratch d =
   let generators = make_generators () in
   let defs, code, smethods, _, _ =
-    compile_decl generators Value_env.stdlib StringSet.empty d
+    compile_decl generators Value_env.external_lib StringSet.empty d
   in
   { declarations = defs; code; static_methods = smethods }
 
@@ -800,7 +800,7 @@ let compile_program_from_scratch p =
         compile_decl generators envacc tlacc d
       in
       (defsacc @ defs, codeacc @ code, smethodsacc @ smethods, env, tl))
-    ([], [], [], Value_env.stdlib, StringSet.empty)
+    ([], [], [], Value_env.external_lib, StringSet.empty)
     p
   |> fun (defs, code, smethods, _, _) ->
   { declarations = defs; code; static_methods = smethods }

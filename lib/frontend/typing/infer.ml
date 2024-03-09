@@ -511,13 +511,21 @@ let simplify_texpr_state () =
     if not @@ StringTbl.mem remap v then StringTbl.add remap v (nc ()) else ();
     Typed_ast.TyVar (StringTbl.find remap v)
 
-let stdlib_env =
-  StringMap.singleton "print"
-    (Typed_ast.TyFun (Typed_ast.TyVar "'a", TyUnit), StringSet.singleton "'a")
+let external_env =
+  let open Typed_ast in
+  let alpha_list = TyCustom ([ TyVar "'a" ], "list$") in
+  StringMap.of_list
+    [
+      ("print", (TyFun (TyVar "'a", TyUnit), StringSet.singleton "'a"));
+      ("Nil$", (alpha_list, StringSet.singleton "'a"));
+      ( "Cons$",
+        ( TyFun (TyTuple [ TyVar "'a"; alpha_list ], alpha_list),
+          StringSet.singleton "'a" ) );
+    ]
 
 let type_expr_from_scratch expr =
   let u = Unifications.create 10 in
-  let env = stdlib_env in
+  let env = external_env in
   let type_gen = make_new_type () in
   type_expr u type_gen env expr >>=? fun exprnode ->
   let state = simplify_texpr_state () in
@@ -640,7 +648,7 @@ let type_decl unifications nt env type_env = function
 
 let type_decl_from_scratch decl =
   let u = Unifications.create 20 in
-  let env = stdlib_env in
+  let env = external_env in
   let type_env = StringMap.empty in
   let type_gen = make_new_type () in
   type_decl u type_gen env type_env decl >>=? fun (declnode, _, _) ->
@@ -652,7 +660,7 @@ let type_decl_from_scratch decl =
 
 let type_program program =
   let u = Unifications.create 20 in
-  let env = stdlib_env in
+  let env = external_env in
   let type_env = StringMap.empty in
   let type_gen = make_new_type () in
   List.fold_left

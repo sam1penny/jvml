@@ -11,7 +11,7 @@
 %token TRUE, FALSE, AND, OR, IF, THEN, ELSE, EQ, LT, GT
 %token FUN, ARROW, MATCH, BAR, WITH, UNDERSCORE
 %token UNIT, COMMA, APOSTROPHE, LET, IN, REC
-%token DO, SEMICOLON, LCURLY, RCURLY
+%token DO, SEMICOLON, LCURLY, RCURLY, LSQUARE, RSQUARE
 %token CONS, EMPTY_LIST
 %token EOF
 
@@ -20,11 +20,10 @@
 
 %token ADD, SUB, MUL, DIV
 
-%left BAR
 %left ADD, SUB
 %left MUL, DIV, AND, OR, EQ, LT, GT
 
-%right ARROW
+%right ARROW, CONS
 
 (*
 %nonassoc THEN
@@ -60,11 +59,22 @@ expr4:
   | i = INT { Parsed_ast.Int ($sloc, i) }
   | i = LOWERCASE_IDENT {Parsed_ast.Ident ($sloc, i)}
   | i = UPPERCASE_IDENT {Parsed_ast.Constr ($sloc, i)}
+  | EMPTY_LIST {Parsed_ast.Constr($sloc, "Nil$")}
   | TRUE { Parsed_ast.Bool ($sloc, true) }
   | FALSE { Parsed_ast.Bool ($sloc, false)}
   | UNIT { Parsed_ast.Unit $sloc }
   | LPAREN; e = expr; RPAREN { e }
   | LPAREN; exprs = tuple_sep(COMMA, expr); RPAREN {Parsed_ast.Tuple ($sloc, exprs)}
+  | e = expr4; CONS; e2 = expr4 { Parsed_ast.App($sloc, Parsed_ast.Constr($sloc, "Cons$"), Parsed_ast.Tuple($sloc, [e; e2])) }
+  | LSQUARE; exprs = tuple_sep(SEMICOLON, expr); RSQUARE {
+    List.fold_right (fun e lst ->
+    Parsed_ast.App(
+      $sloc,
+      Parsed_ast.Constr($sloc, "Cons$"),
+      Parsed_ast.Tuple($sloc, [e; lst])
+    )
+    ) exprs (Parsed_ast.Constr($sloc, "Nil$"))
+  }
 
 expr3:
   | e = expr4 { e }
@@ -83,17 +93,32 @@ expr:
  | LET; REC; i = LOWERCASE_IDENT; EQ; e1 = expr; IN; e2 = expr; {Parsed_ast.LetRec ($sloc, i, e1, e2)}
  | DO; LCURLY; es = tuple_sep(SEMICOLON, expr); RCURLY { Parsed_ast.Seq($sloc, es)}
 
-pattern1:
+pattern2:
   | i = INT { Parsed_ast.Pat_Int ($sloc, i) }
   | i = LOWERCASE_IDENT {Parsed_ast.Pat_Ident ($sloc, i)}
   | i = UPPERCASE_IDENT {Parsed_ast.Pat_Constr ($sloc, i, None)}
+  | EMPTY_LIST {Parsed_ast.Pat_Constr ($sloc, "Nil$", None)}
   | TRUE { Parsed_ast.Pat_Bool ($sloc, true) }
   | FALSE { Parsed_ast.Pat_Bool ($sloc, false)}
   | UNIT { Parsed_ast.Pat_Unit $sloc }
   | UNDERSCORE {Parsed_ast.Pat_Any $sloc}
-  | LPAREN; pats = tuple_sep(COMMA, pattern1); RPAREN {Parsed_ast.Pat_Tuple ($sloc, pats)}
-  | cname = UPPERCASE_IDENT; p = pattern1 {Parsed_ast.Pat_Constr ($sloc, cname, Some p)}
+  | LPAREN; pats = tuple_sep(COMMA, pattern2); RPAREN {Parsed_ast.Pat_Tuple ($sloc, pats)}
+  | cname = UPPERCASE_IDENT; p = pattern2 {Parsed_ast.Pat_Constr ($sloc, cname, Some p)}
   | LPAREN; pat = pattern; RPAREN { pat }
+  | LSQUARE; pat = pattern; RSQUARE {
+    Parsed_ast.Pat_Constr ($sloc, "Cons$", Some (
+      Parsed_ast.Pat_Tuple ($sloc, [pat; Parsed_ast.Pat_Constr($sloc, "Nil$", None)])
+    ))
+  }
+
+pattern1:
+  | p = pattern2 { p }
+  | p0 = pattern2; CONS; p1 = pattern1 {
+    Parsed_ast.Pat_Constr ($sloc, "Cons$", Some (
+      Parsed_ast.Pat_Tuple ($sloc, [p0; p1])
+    ))
+
+    }
 
 pattern:
   | p = pattern1 { p }
