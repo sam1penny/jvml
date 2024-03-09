@@ -17,26 +17,26 @@ let%expect_test "test simple recursive sum" =
   let _ = run program in
   [%expect
     {|
-    └──ValRec sum_$0_acc
-       └──Fun acc : int -> int -> int
+    └──ValRec sum_$0_acc$
+       └──Fun acc$ : int -> int -> int
           └──Fun n_$0 : int -> int
              └──If
                 └──Bop = : bool
                    └──Ident n_$0 : int
                    └──Int 0
                 └──Bop + : int
-                   └──Ident acc : int
+                   └──Ident acc$ : int
                    └──Int 0
-                └──Direct_app : sum_$0_acc
+                └──Direct_app : sum_$0_acc$
                    └──Bop + : int
-                      └──Ident acc : int
+                      └──Ident acc$ : int
                       └──Ident n_$0 : int
                    └──Bop - : int
                       └──Ident n_$0 : int
                       └──Int 1
     └──Val sum_$0
        └──Fun n_$0 : int -> int
-          └──Direct_app : sum_$0_acc
+          └──Direct_app : sum_$0_acc$
              └──Int 0
              └──Ident n_$0 : int |}]
 
@@ -52,35 +52,35 @@ let%expect_test "test tmm with tail call" =
   let _ = run program in
   [%expect
     {|
-  └──ValRec foo_$0_acc
-     └──Fun acc : int -> int -> int
+  └──ValRec foo_$0_acc$
+     └──Fun acc$ : int -> int -> int
         └──Fun n_$0 : int -> int
            └──If
               └──Bop = : bool
                  └──Ident n_$0 : int
                  └──Int 0
               └──Bop * : int
-                 └──Ident acc : int
+                 └──Ident acc$ : int
                  └──Int 1
               └──If
                  └──Bop = : bool
                     └──Ident n_$0 : int
                     └──Int 1
-                 └──Direct_app : foo_$0_acc
-                    └──Ident acc : int
+                 └──Direct_app : foo_$0_acc$
+                    └──Ident acc$ : int
                     └──Bop - : int
                        └──Ident n_$0 : int
                        └──Int 1
-                 └──Direct_app : foo_$0_acc
+                 └──Direct_app : foo_$0_acc$
                     └──Bop * : int
-                       └──Ident acc : int
+                       └──Ident acc$ : int
                        └──Ident n_$0 : int
                     └──Bop - : int
                        └──Ident n_$0 : int
                        └──Int 1
   └──Val foo_$0
      └──Fun n_$0 : int -> int
-        └──Direct_app : foo_$0_acc
+        └──Direct_app : foo_$0_acc$
            └──Int 1
            └──Ident n_$0 : int |}]
 
@@ -95,8 +95,8 @@ let%expect_test "test non-direct application provided acc argument" =
   let _ = run program in
   [%expect
     {|
-    └──ValRec foo_$0_acc
-       └──Fun acc : int -> int -> int
+    └──ValRec foo_$0_acc$
+       └──Fun acc$ : int -> int -> int
           └──Fun n_$0 : int -> int
              └──If
                 └──Bop = : bool
@@ -104,23 +104,23 @@ let%expect_test "test non-direct application provided acc argument" =
                    └──Int 0
                 └──Let alias_$0
                    └──App
-                      └──Ident foo_$0_acc : int -> int -> int
+                      └──Ident foo_$0_acc$ : int -> int -> int
                       └──Int 0
                    └──Bop + : int
-                      └──Ident acc : int
+                      └──Ident acc$ : int
                       └──App
                          └──Ident alias_$0 : int -> int
                          └──Int 3
-                └──Direct_app : foo_$0_acc
+                └──Direct_app : foo_$0_acc$
                    └──Bop + : int
-                      └──Ident acc : int
+                      └──Ident acc$ : int
                       └──Ident n_$0 : int
                    └──Bop - : int
                       └──Ident n_$0 : int
                       └──Int 1
     └──Val foo_$0
        └──Fun n_$0 : int -> int
-          └──Direct_app : foo_$0_acc
+          └──Direct_app : foo_$0_acc$
              └──Int 0
              └──Ident n_$0 : int |}]
 
@@ -136,19 +136,19 @@ let%expect_test "test one call suitable for trmc, one not (+ enforces \
   let _ = run program in
   [%expect
     {|
-    └──ValRec foo_$0_acc
-       └──Fun acc : int -> int -> int
+    └──ValRec foo_$0_acc$
+       └──Fun acc$ : int -> int -> int
           └──Fun n_$0 : int -> int
              └──If
                 └──Bop = : bool
                    └──Ident n_$0 : int
                    └──Int 0
                 └──Bop + : int
-                   └──Ident acc : int
+                   └──Ident acc$ : int
                    └──Int 1
-                └──Direct_app : foo_$0_acc
-                   └──Direct_app : foo_$0_acc
-                      └──Ident acc : int
+                └──Direct_app : foo_$0_acc$
+                   └──Direct_app : foo_$0_acc$
+                      └──Ident acc$ : int
                       └──Bop - : int
                          └──Ident n_$0 : int
                          └──Int 2
@@ -157,7 +157,7 @@ let%expect_test "test one call suitable for trmc, one not (+ enforces \
                       └──Int 1
     └──Val foo_$0
        └──Fun n_$0 : int -> int
-          └──Direct_app : foo_$0_acc
+          └──Direct_app : foo_$0_acc$
              └──Int 0
              └──Ident n_$0 : int |}]
 
@@ -173,8 +173,8 @@ let%expect_test "test deeply right nested trmc" =
   let _ = run program in
   [%expect
     {|
-    └──ValRec foo_$0_acc
-       └──Fun acc : int -> int -> int
+    └──ValRec foo_$0_acc$
+       └──Fun acc$ : int -> int -> int
           └──Fun n_$0 : int -> int
              └──Let desugar_t0_$0
                 └──Ident n_$0 : int
@@ -184,15 +184,15 @@ let%expect_test "test deeply right nested trmc" =
                       └──Int(0)
                       └──Shared
                          └──Bop + : int
-                            └──Ident acc : int
+                            └──Ident acc$ : int
                             └──Int 1
                    └── <fallback>
                       └──Shared
-                         └──Direct_app : foo_$0_acc
-                            └──Direct_app : foo_$0_acc
+                         └──Direct_app : foo_$0_acc$
+                            └──Direct_app : foo_$0_acc$
                                └──Bop + : int
                                   └──Bop + : int
-                                     └──Ident acc : int
+                                     └──Ident acc$ : int
                                      └──Int 1
                                   └──Ident n_$0 : int
                                └──Bop - : int
@@ -203,7 +203,7 @@ let%expect_test "test deeply right nested trmc" =
                                └──Int 2
     └──Val foo_$0
        └──Fun n_$0 : int -> int
-          └──Direct_app : foo_$0_acc
+          └──Direct_app : foo_$0_acc$
              └──Int 0
              └──Ident n_$0 : int |}]
 
