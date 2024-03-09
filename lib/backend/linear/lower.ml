@@ -654,8 +654,9 @@ let compile_decl label_gen env toplevel = function
         |> Value_env.add_static_field x closure_details
       in
 
-      (* todo - verify it is correct to throw away defs and staticmethods *)
-      let _, c, _ = compile_expr static_label_gen static_env toplevel body in
+      let static_defs, c, static_smethods =
+        compile_expr static_label_gen static_env toplevel body
+      in
 
       let static_method =
         {
@@ -669,12 +670,14 @@ let compile_decl label_gen env toplevel = function
       clear_shared_expr_labels body;
 
       (* compile closure *)
-      let defs, c, smethods = compile_expr label_gen env toplevel e in
+      let closure_defs, c, closure_smethods =
+        compile_expr label_gen env toplevel e
+      in
       let env' = Value_env.add_static_field x ("Foo", x, convert_type ty) env in
       let new_toplevel = StringSet.add x toplevel in
-      ( defs,
+      ( static_defs @ closure_defs,
         c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
-        [ static_method ] @ smethods,
+        [ static_method ] @ static_smethods @ closure_smethods,
         env',
         new_toplevel )
   | Desugared_ast.Val (ty, x, e) ->
@@ -716,7 +719,9 @@ let compile_decl label_gen env toplevel = function
         |> Value_env.add_static_field x closure_details
       in
       (* todo - verify it is correct to throw away defs and staticmethods *)
-      let _, c, _ = compile_expr static_label_gen static_env toplevel body in
+      let static_defs, c, static_smethods =
+        compile_expr static_label_gen static_env toplevel body
+      in
 
       let static_method =
         {
@@ -743,12 +748,12 @@ let compile_decl label_gen env toplevel = function
       in
 
       let closure_e = Desugar.Utils.replace_funargs funargs new_body in
-      let defs, c, smethods =
+      let closure_defs, c, closure_body =
         compile_expr label_gen env' new_toplevel closure_e
       in
-      ( defs,
+      ( static_defs @ closure_defs,
         c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
-        [ static_method ] @ smethods,
+        [ static_method ] @ static_smethods @ closure_body,
         env',
         new_toplevel )
   | Desugared_ast.Type (ty, _, tname, type_constructors) ->

@@ -1,14 +1,16 @@
 let () =
   let string_program =
     {|
-    val rec fact = fun n -> if n = 0 then 1 else n * fact (n - 1)
-    val test = do {print(fact 0); print (fact 1); print (fact 2); print (fact 5); print(fact 6)}
+    val foo = fun x -> let y = x in (fun x -> x) val z = print(foo 3)
   |}
   in
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string "test_env"
   |> Desugar.desugar_program |> Middle_end.Driver.run_middleend
-  |> List.iter Desugar.Desugared_ast.pp_decl
+  |> fun p ->
+  List.iter Desugar.Desugared_ast.pp_decl p;
+  p |> Linear.Lower.compile_program_from_scratch
+  |> Linear.Instruction.show_program |> print_endline
 
 (*
 let string_program =
