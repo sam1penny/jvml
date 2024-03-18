@@ -661,8 +661,8 @@ let compile_decl label_gen env toplevel = function
       let static_method =
         {
           name = x;
-          args = List.map (fun (_, ty) -> convert_type ty) funargs;
-          return_type = Desugared_ast.get_expr_type body |> convert_type;
+          args = converted_funargs;
+          return_type = converted_ret_ty;
           body = c;
         }
       in
@@ -673,7 +673,9 @@ let compile_decl label_gen env toplevel = function
       let closure_defs, c, closure_smethods =
         compile_expr label_gen env toplevel e
       in
-      let env' = Value_env.add_static_field x ("Foo", x, convert_type ty) env in
+      let env' = Value_env.add_static_field x ("Foo", x, convert_type ty) env
+                |> Value_env.add_static_method x static_method_details
+      in
       let new_toplevel = StringSet.add x toplevel in
       ( static_defs @ closure_defs,
         c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
