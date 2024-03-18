@@ -178,7 +178,7 @@ let rec transform_tmm_expr modulo_bop fn_name e =
       | _ -> pass_to_accumulator modulo_bop transformed_e0 transformed_e1)
   | _ -> shallow_map_tail_positions rec_transform_tmm e
 
-let transform_tmm_decl decl =
+let rec transform_tmm_decl decl =
   match decl with
   | ValRec (ty, x, e) -> (
       let funargs, body = Desugar.Utils.collect_funargs e in
@@ -214,6 +214,7 @@ let transform_tmm_decl decl =
             ValRec (ty, x ^ "_acc$", transformed_expr);
             Val (ty, x, original_expr);
           ])
+  | And decls -> [ And (List.map transform_tmm_decl decls |> List.flatten) ]
   | _ -> [ decl ]
 
 let transform_tmm_program program =

@@ -104,3 +104,41 @@ let%expect_test "test capturing recursive inner function" =
                 └──Ident fact_$0 : int -> int
                 └──Ident z_$0 : int
              └──Int 5 |}]
+
+let%expect_test "test lambda lift mutual recursion" =
+  let program =
+    {|
+    val rec iseven = fun x ->
+      let rec isodd = fun y -> if y = 0 then false else iseven (y - 1) in
+      if x = 0 then true else isodd (x - 1)
+    |}
+  in
+  let _ = parse_type_desugar_print program in
+  [%expect
+    {|
+    └──And
+       └──ValRec isodd_$0
+          └──Fun y_$0 : int -> bool
+             └──If
+                └──Bop = : bool
+                   └──Ident y_$0 : int
+                   └──Int 0
+                └──Bool false
+                └──App
+                   └──Ident iseven_$0 : int -> bool
+                   └──Bop - : int
+                      └──Ident y_$0 : int
+                      └──Int 1
+       └──ValRec iseven_$0
+          └──Fun x_$0 : int -> bool
+             └──If
+                └──Bop = : bool
+                   └──Ident x_$0 : int
+                   └──Int 0
+                └──Bool true
+                └──App
+                   └──Ident isodd_$0 : int -> bool
+                   └──Bop - : int
+                      └──Ident x_$0 : int
+                      └──Int 1
+  |}]

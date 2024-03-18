@@ -11,11 +11,12 @@ let replace_funargs funargs body =
     (fun (arg, arg_ty) b -> Fun (arg_ty, get_expr_type b, arg, b))
     funargs body
 
-let map_over_decl_exprs f d =
+let rec map_over_decl_exprs f d =
   match d with
   | Val (ty, x, e) -> Val (ty, x, f e)
   | ValRec (ty, x, e) -> ValRec (ty, x, f e)
   | Type _ -> d
+  | And decls -> And (List.map (map_over_decl_exprs f) decls)
 
 let map_over_sub_expr f e =
   match e with

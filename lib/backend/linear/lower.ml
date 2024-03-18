@@ -629,20 +629,42 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
           ("Foo", cname, TyFun (ty, typedef_texpr))
           env )
 
-let compile_decl label_gen env toplevel = function
+let get_static_method_details x e =
+  let funargs, body = Desugar.Utils.collect_funargs e in
+  let num_funargs = List.length funargs in
+  let converted_funargs = List.map (fun (_, ty) -> convert_type ty) funargs in
+  let converted_ret_ty = Desugared_ast.get_expr_type body |> convert_type in
+  (x, num_funargs, converted_funargs, converted_ret_ty)
+
+let get_closure_details ty x = ("Foo", x, convert_type ty)
+
+let update_env env = function
+  | Desugared_ast.Val (ty, x, (Fun _ as e)) ->
+      Value_env.add_static_field x (get_closure_details ty x) env
+      |> Value_env.add_static_method x (get_static_method_details x e)
+  | Desugared_ast.Val (ty, x, _) ->
+      Value_env.add_static_field x (get_closure_details ty x) env
+  | Desugared_ast.ValRec (ty, x, e) ->
+      Value_env.add_static_field x (get_closure_details ty x) env
+      |> Value_env.add_static_method x (get_static_method_details x e)
+  | _ -> raise @@ Failure "illegal state"
+
+let update_toplevel toplevel = function
+  | Desugared_ast.Val (_, x, _) | Desugared_ast.ValRec (_, x, _) ->
+      StringSet.add x toplevel
+  | _ -> raise @@ Failure "illegal state"
+
+let rec compile_decl label_gen env toplevel = function
   | Desugared_ast.Val (ty, x, (Fun _ as e)) ->
       (* compile static method *)
       let funargs, body = Desugar.Utils.collect_funargs e in
       let static_label_gen = reset_for_static_func_generators label_gen in
-      let num_funargs = List.length funargs in
       let converted_funargs =
         List.map (fun (_, ty) -> convert_type ty) funargs
       in
       let converted_ret_ty = Desugared_ast.get_expr_type body |> convert_type in
-      let static_method_details =
-        (x, num_funargs, converted_funargs, converted_ret_ty)
-      in
-      let closure_details = ("Foo", x, convert_type ty) in
+      let static_method_details = get_static_method_details x e in
+      let closure_details = get_closure_details ty x in
 
       let static_env =
         Value_env.strip_nonstatic env |> fun env ->
@@ -673,8 +695,9 @@ let compile_decl label_gen env toplevel = function
       let closure_defs, c, closure_smethods =
         compile_expr label_gen env toplevel e
       in
-      let env' = Value_env.add_static_field x ("Foo", x, convert_type ty) env
-                |> Value_env.add_static_method x static_method_details
+      let env' =
+        Value_env.add_static_field x closure_details env
+        |> Value_env.add_static_method x static_method_details
       in
       let new_toplevel = StringSet.add x toplevel in
       ( static_defs @ closure_defs,
@@ -684,7 +707,7 @@ let compile_decl label_gen env toplevel = function
         new_toplevel )
   | Desugared_ast.Val (ty, x, e) ->
       let defs, c, smethods = compile_expr label_gen env toplevel e in
-      let env' = Value_env.add_static_field x ("Foo", x, convert_type ty) env in
+      let env' = Value_env.add_static_field x (get_closure_details ty x) env in
       let new_toplevel = StringSet.add x toplevel in
       ( defs,
         c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
@@ -700,16 +723,9 @@ let compile_decl label_gen env toplevel = function
       let funargs, body = Desugar.Utils.collect_funargs e in
       let static_label_gen = reset_for_static_func_generators label_gen in
 
-      let num_funargs = List.length funargs in
-      let converted_funargs =
-        List.map (fun (_, ty) -> convert_type ty) funargs
-      in
-      let converted_ret_ty = Desugared_ast.get_expr_type body |> convert_type in
-      let static_method_details =
-        (x, num_funargs, converted_funargs, converted_ret_ty)
-      in
+      let static_method_details = get_static_method_details x e in
 
-      let closure_details = ("Foo", x, convert_type ty) in
+      let closure_details = get_closure_details ty x in
 
       let static_env =
         Value_env.strip_nonstatic env |> fun env ->
@@ -720,7 +736,7 @@ let compile_decl label_gen env toplevel = function
         |> Value_env.add_static_method x static_method_details
         |> Value_env.add_static_field x closure_details
       in
-      (* todo - verify it is correct to throw away defs and staticmethods *)
+
       let static_defs, c, static_smethods =
         compile_expr static_label_gen static_env toplevel body
       in
@@ -786,6 +802,19 @@ let compile_decl label_gen env toplevel = function
           type_constructors ([], [], [], env)
       in
       ([ typei ] @ tconstrs @ defs, code, smethods, env, toplevel)
+  (* not a nice hack, but we know all decls within an 'AND' are val/valrec *)
+  | And decls ->
+      let env = List.fold_left update_env env decls in
+      let toplevel = List.fold_left update_toplevel toplevel decls in
+
+      List.fold_left
+        (fun (defsacc, codeacc, smethodsacc, envacc, tlacc) d ->
+          let defs, code, smethods, env, tl =
+            compile_decl label_gen envacc tlacc d
+          in
+          (defsacc @ defs, codeacc @ code, smethodsacc @ smethods, env, tl))
+        ([], [], [], env, toplevel)
+        decls
 
 let compile_decl_from_scratch d =
   let generators = make_generators () in

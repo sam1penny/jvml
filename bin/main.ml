@@ -1,10 +1,7 @@
 let () =
   let string_program =
     {|
-    val rec foo = fun x -> match x with
-      | [] -> 0
-      | [_] -> 1
-      | x::xs -> 1 + foo xs
+    val rec baz = fun z -> let rec qux = fun x -> qux (x - 1) in qux 5
   |}
   in
   Parsing.Driver.parse_string string_program

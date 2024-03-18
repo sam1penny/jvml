@@ -93,7 +93,7 @@ let transform_tail_call_expr fn_name funargs e =
   | e, true -> While_true e
   | e, false -> e
 
-let transform_tail_call_decl decl =
+let rec transform_tail_call_decl decl =
   match decl with
   | ValRec (ty, x, e) ->
       let funargs, body = Desugar.Utils.collect_funargs e in
@@ -102,6 +102,7 @@ let transform_tail_call_decl decl =
         Desugar.Utils.replace_funargs funargs transformed_body
       in
       ValRec (ty, x, transformed_expr)
+  | And decls -> And (List.map transform_tail_call_decl decls)
   | _ -> decl
 
 let transform_tail_call_program program =

@@ -311,9 +311,6 @@ let%expect_test "test multiple nested lambdas for lifting" =
   64
   |}]
 
-(*
-currently broken -- requires me to implement AND
-
 let%expect_test "test lambda lift mutual recursion" =
   let program =
     {|
@@ -326,14 +323,13 @@ let%expect_test "test lambda lift mutual recursion" =
       print(iseven 12)
     }
     |}
-    in
+  in
   let _ = build_and_run program in
   [%expect {|
     true
     false
     true
   |}]
-*)
 
 let%expect_test "test one-arg tail call" =
   let program =

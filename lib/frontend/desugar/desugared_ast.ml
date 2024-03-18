@@ -53,6 +53,8 @@ type decl =
   | Val of Typed_ast.type_expr * string * expr
   | ValRec of Typed_ast.type_expr * string * expr
   | Type of Typed_ast.type_expr * string list * string * type_constr list
+  (* mutual recursion as consequence of lambda lifting *)
+  | And of decl list
 
 let desugared_tvar_cnter =
   let n = ref 0 in
@@ -212,7 +214,7 @@ let pp_tconstr ?(indent = "") =
       printf "%s└──%s of %s : tag=%ld\n" indent cname (Typed_ast.pp_texpr texpr)
         tag
 
-let pp_decl ?(indent = "") =
+let rec pp_decl ?(indent = "") =
   let open Printf in
   let print_with_indent = printf "%s└──%s\n" in
   function
@@ -228,3 +230,6 @@ let pp_decl ?(indent = "") =
         (String.concat "," params |> sprintf "params = [%s]");
       print_with_indent (indent ^ "   ") "constructors";
       List.iter (pp_tconstr ~indent:(indent ^ "      ")) constructors
+  | And decls ->
+      print_with_indent indent "And";
+      List.iter (pp_decl ~indent:(indent ^ "   ")) decls

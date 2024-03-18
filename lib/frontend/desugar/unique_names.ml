@@ -93,7 +93,7 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
 
-let rename_decl most_recent_version d =
+let rec rename_decl most_recent_version d =
   match d with
   | Val (ty, x, e) ->
       let e' = rename_expr most_recent_version e in
@@ -104,6 +104,7 @@ let rename_decl most_recent_version d =
       ValRec (ty, x_versioned, rename_expr most_recent_version e)
   | Type (ty, params, tname, type_constructors) ->
       Type (ty, params, tname, type_constructors)
+  | And decls -> And (List.map (rename_decl most_recent_version) decls)
 
 let rename_program program =
   let renamings = Hashtbl.create 10 in

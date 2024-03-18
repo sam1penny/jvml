@@ -93,26 +93,36 @@ let rec transform_direct_call_expr env e =
       raise
       @@ Failure "tail rec constructs should not be present in direct_calls"
 
-let transform_direct_call_decl env decl =
-  match decl with
-  | Val (ty, x, e) ->
-      let e' = transform_direct_call_expr env e in
-      let env' =
-        match Desugar.Utils.collect_funargs e with
-        | [], _ -> env
-        | args, body ->
-            StringMap.add x
-              (List.map (fun (_, ty) -> ty) args, get_expr_type body)
-              env
-      in
-      (Val (ty, x, e'), env')
-  | ValRec (ty, x, e) ->
+let update_env env = function
+  | Val (_, x, (Fun _ as e)) | ValRec (_, x, e) ->
       let funargs, body = Desugar.Utils.collect_funargs e in
       let ty_args = List.map (fun (_, ty) -> ty) funargs in
       let env' = StringMap.add x (ty_args, get_expr_type body) env in
+      env'
+  | Val _ -> env
+  | _ -> raise @@ Failure "illegal state"
+
+let rec transform_direct_call_decl env decl =
+  match decl with
+  | Val (ty, x, (Fun _ as e)) ->
+      let e' = transform_direct_call_expr env e in
+      (Val (ty, x, e'), update_env env decl)
+  | Val (ty, x, e) ->
+      let e' = transform_direct_call_expr env e in
+      (Val (ty, x, e'), env)
+  | ValRec (ty, x, e) ->
+      let env' = update_env env decl in
       let e' = transform_direct_call_expr env' e in
       (ValRec (ty, x, e'), env')
   | Type _ -> (decl, StringMap.empty)
+  | And decls ->
+      let env = List.fold_left update_env env decls in
+      List.fold_left
+        (fun (transformed_decls, env) decl ->
+          let transformed_decl, env' = transform_direct_call_decl env decl in
+          (transformed_decls @ [ transformed_decl ], env'))
+        ([], env) decls
+      |> fun (transformed_decls, env) -> (And transformed_decls, env)
 
 let transform_direct_call_program program =
   List.fold_left

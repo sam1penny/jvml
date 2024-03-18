@@ -144,6 +144,8 @@ let free_vars_with_types_decl bound decl =
       free_vars_with_types_expr bound' e |> fun (fv_val, fv_map) ->
       StringMap.add x fv_val fv_map |> fun fv_map -> (fv_map, bound')
   | Type _ -> (StringMap.empty, bound)
+  | And _ ->
+      raise @@ Failure "mutual recursion should not occur before lambda lifting"
 
 let free_vars_with_types_program program =
   List.fold_left
@@ -174,8 +176,11 @@ so it can now be removed from free variable mappings.
 let remove_from_fv_tbls key fv_tbls =
   Hashtbl.iter (fun _ fv_tbl -> Hashtbl.remove fv_tbl key) fv_tbls
 
-let rec lift_lambdas_expr free_var_tbl e =
-  let rec_lift_lambdas_expr = lift_lambdas_expr free_var_tbl in
+(* dodgy bodge to set flag if mutual recursion is actually required *)
+let mutual_recursion_required = ref false
+
+let rec lift_lambdas_expr decl_name free_var_tbl e =
+  let rec_lift_lambdas_expr = lift_lambdas_expr decl_name free_var_tbl in
   let rec_lift_list es =
     let lifted_es = List.map rec_lift_lambdas_expr es in
     let lifted_defs =
@@ -236,6 +241,12 @@ let rec lift_lambdas_expr free_var_tbl e =
       let lifted_valrec = lift_to_valrec x lifted_args body in
       remove_from_fv_tbls x free_var_tbl;
       let defs1, e1 = rec_lift_lambdas_expr e1 in
+
+      let freevars_in_e0, _ = free_vars_with_types_expr StringSet.empty e0 in
+
+      if StringMap.mem decl_name freevars_in_e0 then
+        mutual_recursion_required := true
+      else ();
       ([ lifted_valrec ] @ defs1, e1)
   | Tuple (ty, es) ->
       let lifted_defs, lifted_es = rec_lift_list es in
@@ -279,12 +290,17 @@ let rec lift_lambdas_expr free_var_tbl e =
 let lift_lambdas_decl free_var_map decl =
   match decl with
   | Val (ty, x, e) ->
-      let lifted_decls, e = lift_lambdas_expr free_var_map e in
+      let lifted_decls, e = lift_lambdas_expr x free_var_map e in
       lifted_decls @ [ Val (ty, x, e) ]
   | ValRec (ty, x, e) ->
-      let lifted_decls, e = lift_lambdas_expr free_var_map e in
-      lifted_decls @ [ ValRec (ty, x, e) ]
+      mutual_recursion_required := false;
+      let lifted_decls, e = lift_lambdas_expr x free_var_map e in
+      if !mutual_recursion_required then
+        [ And (lifted_decls @ [ ValRec (ty, x, e) ]) ]
+      else lifted_decls @ [ ValRec (ty, x, e) ]
   | Type _ -> [ decl ]
+  | And _ ->
+      raise @@ Failure "mutual recursion should not occur before lambda lifting"
 
 let to_hashtbl fv_map =
   StringMap.to_seq fv_map
