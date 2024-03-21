@@ -1,7 +1,17 @@
 let () =
   let string_program =
     {|
-  val rec foo = fun x -> fun y -> foo (foo x y) x
+  val rec map = fun f -> fun l ->
+    match l with
+        | [] -> []
+        | x::xs -> f x :: (map f xs)
+
+  val foo =
+    let x = [1; 2; 3] in
+    let y = [true; false] in
+    let a = map (fun x -> x + 1) x in
+    let b = map (fun x -> x && true) y in
+    do {print(a); print(b)}
   |}
   in
   Parsing.Driver.parse_string string_program

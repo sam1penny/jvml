@@ -149,7 +149,7 @@ let rec compile_match (table : (expr, shared_expr) Hashtbl.t)
           let unitcons = StringMap.singleton "unit" UnitCon in
           compile_constructor_match table constructors clauses branch_var
             unitcons return_type
-      | _ -> raise @@ Failure "")
+      | _ -> raise @@ Failure "illegal pattern")
 
 and compile_constructor_match table constructors (clauses : clause list)
     (branch_var : expr) (constructors_by_name : con StringMap.t)

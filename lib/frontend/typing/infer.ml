@@ -596,6 +596,9 @@ let type_decl unifications nt env type_env = function
         Error (loc, sprintf "Duplicate definition of binding %s" v)
       else
         type_expr unifications nt env expr >>=? fun exprnode ->
+        let exprnode =
+          map_over_expr_texprs (find_unified_type unifications) exprnode
+        in
         let env' =
           StringMap.add v (generalize env (get_expr_type exprnode)) env
         in
@@ -611,6 +614,9 @@ let type_decl unifications nt env type_env = function
         let v_type = nt () in
         let env' = StringMap.add v (v_type, StringSet.empty) env in
         type_expr unifications nt env' expr >>=? fun exprnode ->
+        let exprnode =
+          map_over_expr_texprs (find_unified_type unifications) exprnode
+        in
         let env' =
           StringMap.add v (generalize env (get_expr_type exprnode)) env'
         in
@@ -695,7 +701,8 @@ let type_program_exn input program =
       Pp_loc.pp ~input Format.std_formatter [ to_internal_loc loc ];
       (* todo install exception printers and raise exception *)
       Format.printf "Error: %s\n" message;
-      raise (Failure "")
+      Format.print_flush ();
+      raise (Failure "error in type inference")
 
 let type_program_exn_from_file filename program =
   type_program_exn (Pp_loc.Input.file filename) program

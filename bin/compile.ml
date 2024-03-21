@@ -21,4 +21,5 @@ let () =
       print_endline usage_msg;
       exit 0)
   in
-  Jvml.Run_jvml.compile_program_from_string program_text |> print_endline
+  Jvml.Run_jvml.compile_program_from_string ~filename:!file program_text
+  |> print_endline
