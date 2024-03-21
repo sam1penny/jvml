@@ -65,7 +65,6 @@ expr4:
   | UNIT { Parsed_ast.Unit $sloc }
   | LPAREN; e = expr; RPAREN { e }
   | LPAREN; exprs = tuple_sep(COMMA, expr); RPAREN {Parsed_ast.Tuple ($sloc, exprs)}
-  | e = expr4; CONS; e2 = expr4 { Parsed_ast.App($sloc, Parsed_ast.Constr($sloc, "Cons$"), Parsed_ast.Tuple($sloc, [e; e2])) }
   | LSQUARE; exprs = tuple_sep(SEMICOLON, expr); RSQUARE {
     List.fold_right (fun e lst ->
     Parsed_ast.App(
@@ -83,6 +82,7 @@ expr3:
 expr2:
  | e = expr3 {e}
  | e1 = expr2; op = infix_op; e2 = expr2 { Parsed_ast.Bop($sloc, e1, op, e2) }
+ | e1 = expr2; CONS; e2 = expr2 { Parsed_ast.App($sloc, Parsed_ast.Constr($sloc, "Cons$"), Parsed_ast.Tuple($sloc, [e1; e2])) }
 
 expr:
  | e = expr2 { e }

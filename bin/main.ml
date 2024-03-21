@@ -1,10 +1,11 @@
 let () =
   let string_program =
     {|
+
   val rec map = fun f -> fun l ->
     match l with
         | [] -> []
-        | x::xs -> f x :: (map f xs)
+        | x::xs -> f x :: map f xs
 
   val foo =
     let x = [1; 2; 3] in
