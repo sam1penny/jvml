@@ -586,6 +586,7 @@ L3:
 .version 65 0
 .class public super abstract List$
 .super java/lang/Object
+.field tag I
 
 .method public <init> : ()V
     .code stack 1 locals 1
@@ -604,9 +605,12 @@ L4:     return
 .super List$
 
 .method public <init> : ()V
-    .code stack 1 locals 1
+    .code stack 2 locals 1
 L0:     aload_0
 L1:     invokespecial Method List$ <init> ()V
+        aload_0
+        iconst_0
+        putfield Field Nil$ tag I
 L4:     return
 
     .end code
@@ -625,7 +629,7 @@ L2:     areturn
 .version 65 0
 .class public final super Cons$
 .super List$
-.field public arg LTuple;
+.field public val LTuple;
 
 .method public <init> : (LTuple;)V
     .code stack 2 locals 2
@@ -633,7 +637,10 @@ L0:     aload_0
 L1:     invokespecial Method List$ <init> ()V
 L4:     aload_0
 L5:     aload_1
-L6:     putfield Field Cons$ arg LTuple;
+L6:     putfield Field Cons$ val LTuple;
+        aload_0
+        iconst_1
+        putfield Field Cons$ tag I
 L9:     return
 
     .end code
@@ -651,7 +658,7 @@ L11:    astore_2
 
         .stack append Object java/lang/StringBuilder Object Cons$
 L12:    aload_2
-L13:    getfield Field Cons$ arg LTuple;
+L13:    getfield Field Cons$ val LTuple;
 L16:    getfield Field Tuple data [Ljava/lang/Object;
 L19:    iconst_1
 L20:    aaload
@@ -660,7 +667,7 @@ L24:    ldc Class Nil$
 L26:    if_acmpeq L64
 L29:    aload_1
 L30:    aload_2
-L31:    getfield Field Cons$ arg LTuple;
+L31:    getfield Field Cons$ val LTuple;
 L34:    getfield Field Tuple data [Ljava/lang/Object;
 L37:    iconst_0
 L38:    aaload
@@ -669,7 +676,7 @@ L42:    ldc ";"
 L44:    invokevirtual Method java/lang/StringBuilder append (Ljava/lang/String;)Ljava/lang/StringBuilder;
 L47:    pop
 L48:    aload_2
-L49:    getfield Field Cons$ arg LTuple;
+L49:    getfield Field Cons$ val LTuple;
 L52:    getfield Field Tuple data [Ljava/lang/Object;
 L55:    iconst_1
 L56:    aaload
@@ -680,7 +687,7 @@ L61:    goto L12
         .stack same
 L64:    aload_1
 L65:    aload_2
-L66:    getfield Field Cons$ arg LTuple;
+L66:    getfield Field Cons$ val LTuple;
 L69:    getfield Field Tuple data [Ljava/lang/Object;
 L72:    iconst_0
 L73:    aaload

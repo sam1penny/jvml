@@ -1,7 +1,6 @@
 let () =
   let string_program =
     {|
-
     val rec map = fun f -> fun l ->
       match l with
           | [] -> []
@@ -25,9 +24,45 @@ let () =
           | _ -> []
 
   val rec mapn = fun f -> fun lists ->
-    match lists with
+  match lists with
       | []::others -> []
       | _ -> (f (map head lists)) :: (mapn f (map tail lists))
+
+  val rec fold_left = fun f -> fun acc -> fun l ->
+  match l with
+      | [] -> acc
+      | x::xs -> fold_left f (f acc x) xs
+
+  val matrix_multiply = fun m1 -> fun m2 ->
+  map
+      (fun row ->
+      mapn
+          (fun column ->
+          fold_left (fun x -> fun y -> x + y) 0
+              (map2 (fun x -> fun y -> x * y) row column))
+          m2)
+      m1
+
+  val make_matrix = fun size ->
+      let rec mk_row = fun cur -> fun n ->
+          if n = 0 then []
+          else cur :: mk_row (cur + 1) (n - 1)
+      in
+      let rec mk_mat = fun size -> fun rows -> fun start ->
+          if rows = 0 then []
+          else (mk_row start size) :: (mk_mat (rows - 1) (start + size))
+      in
+      mk_mat size size 0
+
+  val test =
+  let a = make_matrix 2 in
+  let b = make_matrix 2 in
+  let c = matrix_multiply a b in
+  do {
+      print(a);
+      print(b);
+      print(c)
+  }
   |}
   in
   Parsing.Driver.parse_string string_program
