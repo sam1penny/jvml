@@ -22,7 +22,11 @@ let rec const_prop_expr const_tbl e =
   | _ -> Desugar.Utils.map_over_sub_expr rec_const_prop e
 
 let const_prop_decl const_tbl decl =
-  Desugar.Utils.map_over_decl_exprs (const_prop_expr const_tbl) decl
+  let prop_decl =
+    Desugar.Utils.map_over_decl_exprs (const_prop_expr const_tbl) decl
+  in
+  Desugar.Utils.clear_shared_decl_seen prop_decl;
+  prop_decl
 
 let const_prop_program program =
   let const_tbl = Hashtbl.create 10 in

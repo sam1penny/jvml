@@ -29,7 +29,7 @@ type shared_expr = { expr : expr; ref_count : int ref }
 let make_shared table expr =
   match Hashtbl.find_opt table expr with
   | None ->
-      let shared = Shared_Expr (ref expr, ref None) in
+      let shared = Shared_Expr (ref expr, ref None, ref false) in
       Hashtbl.add table expr { expr = shared; ref_count = ref 0 };
       shared
   | Some { expr = e; ref_count = rc } ->

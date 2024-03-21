@@ -52,7 +52,7 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
   | Fun (t0, t1, x, e) ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let e' = rec_rename_expr e in
-      restore_previous_version most_recent_version x;
+      let () = restore_previous_version most_recent_version x in
       Fun (t0, t1, x_versioned, e')
   | App (ty, e0, e1) ->
       let e0' = rec_rename_expr e0 in
@@ -65,7 +65,7 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
       let e0' = rec_rename_expr e0 in
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let e1' = rec_rename_expr e1 in
-      restore_previous_version most_recent_version x;
+      let () = restore_previous_version most_recent_version x in
       Let (ty, x_versioned, e0', e1')
   | LetRec (ty, x, e0, e1) ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
@@ -85,10 +85,12 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
           cases
       in
       Switch (ty, e0', cases', Option.map rec_rename_expr maybe_fallback_expr)
-  | Shared_Expr (expr_ref, label_opt) ->
-      (* todo - add general bool seen flag to avoid unnecessary recomputation *)
-      expr_ref := rec_rename_expr !expr_ref;
-      Shared_Expr (expr_ref, label_opt)
+  | Shared_Expr (expr_ref, label_opt, seen) as shared_expr ->
+      if !seen then shared_expr
+      else (
+        seen := true;
+        expr_ref := rec_rename_expr !expr_ref;
+        Shared_Expr (expr_ref, label_opt, seen))
   | While_true _ | Return _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
@@ -108,8 +110,12 @@ let rec rename_decl most_recent_version d =
 
 let rename_program program =
   let renamings = Hashtbl.create 10 in
-  List.fold_left
-    (fun renamed_program_rev decl ->
-      rename_decl renamings decl :: renamed_program_rev)
-    [] program
-  |> List.rev
+  let renamed_program =
+    List.fold_left
+      (fun renamed_program_rev decl ->
+        rename_decl renamings decl :: renamed_program_rev)
+      [] program
+    |> List.rev
+  in
+  Utils.clear_shared_program_seen renamed_program;
+  renamed_program

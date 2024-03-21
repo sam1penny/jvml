@@ -2,17 +2,32 @@ let () =
   let string_program =
     {|
 
-  val rec map = fun f -> fun l ->
-    match l with
-        | [] -> []
-        | x::xs -> f x :: map f xs
+    val rec map = fun f -> fun l ->
+      match l with
+          | [] -> []
+          | x::xs -> f x :: (map f xs)
 
-  val foo =
-    let x = [1; 2; 3] in
-    let y = [true; false] in
-    let a = map (fun x -> x + 1) x in
-    let b = map (fun x -> x && true) y in
-    do {print(a); print(b)}
+
+  val head = fun l ->
+      match l with
+          | [] -> 0
+          | x::_ -> x
+
+  val tail = fun l ->
+      match l with
+          | [] -> []
+          | _::xs -> xs
+
+  val rec map2 = fun f -> fun a -> fun b ->
+      match (a, b) with
+          | ([], []) -> []
+          | ((a::as), (b::bs)) -> f a b :: (map2 f as bs)
+          | _ -> []
+
+  val rec mapn = fun f -> fun lists ->
+    match lists with
+      | []::others -> []
+      | _ -> (f (map head lists)) :: (mapn f (map tail lists))
   |}
   in
   Parsing.Driver.parse_string string_program

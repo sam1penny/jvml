@@ -134,11 +134,13 @@ let rec transform_tail_call_expr_inner name_gen fn_name funargs e =
         in
         (Switch (ty, e0, cases', maybe_fallback_expr'), true)
       else (e, false)
-  | Shared_Expr (e_ref, _) ->
-      (* unsafe if expr really is shared - fix with flag on shared_expr *)
-      let transformed_e, did_tail_call = rec_transform_tc !e_ref in
-      e_ref := transformed_e;
-      (e, did_tail_call)
+  | Shared_Expr (e_ref, _, seen) ->
+      if !seen then (e, false)
+      else (
+        seen := true;
+        let transformed_e, did_tail_call = rec_transform_tc !e_ref in
+        e_ref := transformed_e;
+        (e, did_tail_call))
   | While_true _ | Return _ | Assign_Seq _ ->
       raise
       @@ Failure
@@ -164,4 +166,6 @@ let rec transform_tail_call_decl decl =
   | _ -> decl
 
 let transform_tail_call_program program =
-  List.map transform_tail_call_decl program
+  let transformed_program = List.map transform_tail_call_decl program in
+  Desugar.Utils.clear_shared_program_seen transformed_program;
+  transformed_program

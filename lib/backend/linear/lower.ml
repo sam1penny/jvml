@@ -103,7 +103,7 @@ let free_vars_with_types_expr bound e =
              (Option.map (fun e -> aux bound free e) fallback_opt
              |> Option.value ~default:StringMap.empty)
     | Match_Failure -> StringMap.empty
-    | Shared_Expr (e, _) -> aux bound free !e
+    | Shared_Expr (e, _, _) -> aux bound free !e
     | While_true e -> aux bound free e
     | Return e -> aux bound free e
     | Assign_Seq assignments ->
@@ -122,6 +122,8 @@ the 'sharing' in shared expr is implemented with a GOTO instruction to
 the already compiled code.
 
 this must be reset on exiting a scope (e.g when compiling a method twice).
+
+todo - refactor with Desugar.Utils
 *)
 let rec clear_shared_expr_labels e =
   let open Desugared_ast in
@@ -153,7 +155,7 @@ let rec clear_shared_expr_labels e =
       clear_shared_expr_labels e;
       List.iter (fun (_, case_expr) -> clear_shared_expr_labels case_expr) cases;
       Option.iter clear_shared_expr_labels fallback_opt
-  | Shared_Expr (_, lab_opt_ref) -> lab_opt_ref := None
+  | Shared_Expr (_, lab_opt_ref, _) -> lab_opt_ref := None
   | While_true e -> clear_shared_expr_labels e
   | Return e -> clear_shared_expr_labels e
   | Assign_Seq assignments ->
@@ -189,7 +191,7 @@ let expr_is_return e =
   let open Desugared_ast in
   match e with
   | Return _ -> true
-  | Shared_Expr ({ contents = Return _ }, _) -> true
+  | Shared_Expr ({ contents = Return _ }, _, _) -> true
   | _ -> false
 
 let compile_expr_list compile_func es =
@@ -367,7 +369,7 @@ let rec compile_expr label_gen env top_level_bindings e =
             @ case_code @ default_code @ [ LABEL after_label ],
             static_methods0 @ case_smethods @ default_static_methods ))
   | Match_Failure -> ([], [ MATCH_FAILURE ], [])
-  | Shared_Expr (e, lab_opt) -> (
+  | Shared_Expr (e, lab_opt, _) -> (
       match !lab_opt with
       | None ->
           let lab = label_gen.ctrl_label () in

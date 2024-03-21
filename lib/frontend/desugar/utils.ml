@@ -55,12 +55,41 @@ let map_over_sub_expr f e =
         List.map (fun (con, case_expr) -> (con, f case_expr)) cases
       in
       Switch (ty, e0', cases', Option.map f maybe_fallback_expr)
-  | Shared_Expr (expr_ref, label_opt) ->
-      (* todo - add general bool seen flag to avoid unnecessary recomputation *)
-      expr_ref := f !expr_ref;
-      Shared_Expr (expr_ref, label_opt)
-  | While_true _ | Return _ | Assign_Seq _ ->
-      raise
-      @@ Failure
-           "tail rec constructs should not be present in utils (todo change \
-            this)"
+  | Shared_Expr (expr_ref, label_opt, seen) as shared_expr ->
+      if !seen then shared_expr
+      else (
+        seen := true;
+        expr_ref := f !expr_ref;
+        Shared_Expr (expr_ref, label_opt, seen))
+  | While_true e -> While_true (f e)
+  | Return e -> Return (f e)
+  | Assign_Seq assigns ->
+      Assign_Seq (List.map (fun (x, ty, e) -> (x, ty, f e)) assigns)
+
+let iter_over_sub_expr f e =
+  let _ =
+    map_over_sub_expr
+      (fun x ->
+        f x;
+        x)
+      e
+  in
+  ()
+
+let iter_over_decl_exprs f d =
+  let _ =
+    map_over_decl_exprs
+      (fun x ->
+        f x;
+        x)
+      d
+  in
+  ()
+
+let rec clear_shared_expr_seen e =
+  match e with
+  | Shared_Expr (_, _, seen) -> seen := false
+  | _ -> iter_over_sub_expr clear_shared_expr_seen e
+
+let clear_shared_decl_seen d = iter_over_decl_exprs clear_shared_expr_seen d
+let clear_shared_program_seen program = List.iter clear_shared_decl_seen program

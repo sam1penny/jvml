@@ -41,7 +41,7 @@ type expr =
   | Switch of Typed_ast.type_expr * expr * (con * expr) list * expr option
   | Match_Failure
   (* ref to expr, label (in compiled repr) *)
-  | Shared_Expr of expr ref * string option ref
+  | Shared_Expr of expr ref * string option ref * bool ref
   | While_true of expr
   | Return of expr
   (* Sequence of assignments, special case as assign does not produce a 'unit' on the stack *)
@@ -81,7 +81,7 @@ let rec get_expr_type = function
   | ConstructorGet (t, _, _) -> t
   | Switch (t, _, _, _) -> t
   | Match_Failure -> TyVar (desugared_tvar_cnter ())
-  | Shared_Expr ({ contents = e }, _) -> get_expr_type e
+  | Shared_Expr ({ contents = e }, _, _) -> get_expr_type e
   | While_true e -> get_expr_type e
   | Return e -> get_expr_type e
   | Assign_Seq _ -> Typed_ast.TyUnit
@@ -118,7 +118,7 @@ let string_of_expr_node =
   | ConstructorGet _ -> "GetArg"
   | Switch _ -> "Switch"
   | Match_Failure -> "Match_Failure"
-  | Shared_Expr (_, _) -> "Shared"
+  | Shared_Expr (_, _, _) -> "Shared"
   | While_true _ -> "While true"
   | Return _ -> "Return"
   | Assign_Seq _ -> sprintf "Assign_Seq"
@@ -183,7 +183,7 @@ let rec pp_expr ?(indent = "") expr =
           printf "%s└── <fallback>\n" case_indent;
           pp_expr ~indent:(case_indent ^ "   ") expr)
   | Match_Failure -> pp_node expr
-  | Shared_Expr ({ contents = shared }, _) ->
+  | Shared_Expr ({ contents = shared }, _, _) ->
       pp_node expr;
       pp_rec_expr shared
   | While_true e | Return e ->

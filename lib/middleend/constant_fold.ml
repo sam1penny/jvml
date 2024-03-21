@@ -51,5 +51,9 @@ and constant_fold_expr e =
       constant_fold_bop ty e0' bop e1'
   | e -> Desugar.Utils.map_over_sub_expr constant_fold_expr e
 
-let constant_fold_decl = Desugar.Utils.map_over_decl_exprs constant_fold_expr
+let constant_fold_decl d =
+  let folded_decl = Desugar.Utils.map_over_decl_exprs constant_fold_expr d in
+  Desugar.Utils.clear_shared_decl_seen folded_decl;
+  folded_decl
+
 let constant_fold_program program = List.map constant_fold_decl program

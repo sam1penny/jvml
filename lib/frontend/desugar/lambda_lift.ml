@@ -125,7 +125,7 @@ let free_vars_with_types_expr bound e =
             ( StringMap.union takeleft accfree fallback_free,
               StringMap.union takeleft acc_by_indent fallback_by_ident ))
     | Match_Failure -> (StringMap.empty, StringMap.empty)
-    | Shared_Expr (e, _) -> rec_aux !e
+    | Shared_Expr (e, _, _) -> rec_aux !e
     | While_true _ | Return _ | Assign_Seq _ ->
         raise
         @@ Failure "tail rec constructs should not be present in lambda_lift"
@@ -279,10 +279,13 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
       in
       ( defs @ case_defs @ fallback_defs,
         Switch (ty, e, lifted_cases, maybe_lifted_fallback_expr) )
-  | Shared_Expr (e_ref, label_ref) ->
-      let defs, e = rec_lift_lambdas_expr !e_ref in
-      e_ref := e;
-      (defs, Shared_Expr (e_ref, label_ref))
+  | Shared_Expr (e_ref, label_ref, seen) as shared_expr ->
+      if !seen then ([], shared_expr)
+      else (
+        seen := true;
+        let defs, e = rec_lift_lambdas_expr !e_ref in
+        e_ref := e;
+        (defs, Shared_Expr (e_ref, label_ref, seen)))
   | While_true _ | Return _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
@@ -310,4 +313,8 @@ let to_hashtbl fv_map =
 let lift_lambdas_program program =
   let fv_map = free_vars_with_types_program program in
   let fv_tbl = to_hashtbl fv_map in
-  List.map (lift_lambdas_decl fv_tbl) program |> List.flatten
+  let lifted_program =
+    List.map (lift_lambdas_decl fv_tbl) program |> List.flatten
+  in
+  Utils.clear_shared_program_seen lifted_program;
+  lifted_program

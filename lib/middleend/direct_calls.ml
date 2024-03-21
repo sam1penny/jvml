@@ -86,9 +86,12 @@ let rec transform_direct_call_expr env e =
             (fun (con, case_expr) -> (con, rec_transform_direct case_expr))
             cases,
           Option.map rec_transform_direct maybe_fallback_expr )
-  | Shared_Expr (expr_ref, maybe_label) ->
-      let _ = expr_ref := rec_transform_direct !expr_ref in
-      Shared_Expr (expr_ref, maybe_label)
+  | Shared_Expr (expr_ref, maybe_label, seen) ->
+      if !seen then e
+      else (
+        seen := true;
+        let _ = expr_ref := rec_transform_direct !expr_ref in
+        Shared_Expr (expr_ref, maybe_label, seen))
   | While_true _ | Return _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in direct_calls"
@@ -125,9 +128,13 @@ let rec transform_direct_call_decl env decl =
       |> fun (transformed_decls, env) -> (And transformed_decls, env)
 
 let transform_direct_call_program program =
-  List.fold_left
-    (fun (transformed_program, env) decl ->
-      let transformed_decl, env' = transform_direct_call_decl env decl in
-      (transformed_program @ [ transformed_decl ], env'))
-    ([], StringMap.empty) program
-  |> fun (transformed_program, _) -> transformed_program
+  let transformed_program =
+    List.fold_left
+      (fun (transformed_program, env) decl ->
+        let transformed_decl, env' = transform_direct_call_decl env decl in
+        (transformed_program @ [ transformed_decl ], env'))
+      ([], StringMap.empty) program
+    |> fun (transformed_program, _) -> transformed_program
+  in
+  Desugar.Utils.clear_shared_program_seen transformed_program;
+  transformed_program

@@ -32,9 +32,12 @@ let shallow_map_tail_positions f e =
       let maybe_fallback_expr' = Option.map f maybe_fallback_expr in
       Switch (ty, e, cases', maybe_fallback_expr')
   (* unsafe if shared, need to add option field *)
-  | Shared_Expr (e_ref, _) ->
-      e_ref := f !e_ref;
-      e
+  | Shared_Expr (e_ref, _, seen) ->
+      if !seen then e
+      else (
+        seen := true;
+        e_ref := f !e_ref;
+        e)
   | While_true _ | Return _ | Assign_Seq _ ->
       raise
       @@ Failure
@@ -73,7 +76,7 @@ let rec has_tmm_expr fn_name e =
       |> or_else
            (fun e -> Option.map rec_has_tmm e |> Option.join)
            maybe_fallback_expr
-  | Shared_Expr (e_ref, _) -> rec_has_tmm !e_ref
+  | Shared_Expr (e_ref, _, _) -> rec_has_tmm !e_ref
   | While_true _ | Return _ | Assign_Seq _ ->
       raise
       @@ Failure
@@ -218,4 +221,8 @@ let rec transform_tmm_decl decl =
   | _ -> [ decl ]
 
 let transform_tmm_program program =
-  List.map transform_tmm_decl program |> List.flatten
+  let transformed_program =
+    List.map transform_tmm_decl program |> List.flatten
+  in
+  Desugar.Utils.clear_shared_program_seen transformed_program;
+  transformed_program
