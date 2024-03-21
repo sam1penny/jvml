@@ -1,19 +1,76 @@
 (* todo - move this into backend *)
 
 open Desugar.Desugared_ast
+open Common
 
-let rec transform_tail_call_expr_inner fn_name funargs e =
-  let rec_transform_tc = transform_tail_call_expr_inner fn_name funargs in
+let name_generator () =
+  let n = ref 0 in
+  fun () ->
+    let x = !n in
+    n := x + 1;
+    "temp$" ^ string_of_int x
+
+(* hack to avoid assigning to temporaries when unnecessary.
+   Could be fixed with a nice copy propagation phase, instead.
+*)
+
+let temporaries_required funargs arg_es =
+  List.combine funargs arg_es
+  |> List.fold_left
+       (fun (args_so_far, temp_required) ((arg_name, _), arg_e) ->
+         let fvar_set =
+           Desugar.Lambda_lift.free_vars_with_types_expr StringSet.empty arg_e
+           |> fun (fvars, _) ->
+           StringMap.bindings fvars
+           |> List.map (fun (var_name, _) -> var_name)
+           |> StringSet.of_list
+         in
+         let arg_requires_tmp =
+           StringSet.inter fvar_set args_so_far |> StringSet.cardinal
+           |> fun s -> s > 0
+         in
+         (StringSet.add arg_name args_so_far, temp_required || arg_requires_tmp))
+       (StringSet.empty, false)
+  |> fun (_, b) -> b
+
+let generate_argument_assignments name_gen funargs arg_es =
+  let temporaries_are_necessary = temporaries_required funargs arg_es in
+  if temporaries_are_necessary then
+    let temps = List.map (fun (_, ty) -> (name_gen (), ty)) funargs in
+
+    let assign_from_tmps =
+      List.combine funargs temps
+      |> List.map (fun ((arg_name, arg_ty), (temp_name, temp_ty)) ->
+             (arg_name, arg_ty, Ident (temp_ty, temp_name)))
+    in
+    let assign_to_tmps =
+      List.combine temps arg_es
+      |> List.map (fun ((arg_name, arg_ty), arg_expr) ->
+             (arg_name, arg_ty, arg_expr))
+      |> fun l ->
+      List.fold_right
+        (fun (arg_name, _, arg_expr) e ->
+          Let (get_expr_type e, arg_name, arg_expr, e))
+        l (Assign_Seq assign_from_tmps)
+    in
+    assign_to_tmps
+  else
+    let assign_seq =
+      List.combine funargs arg_es
+      |> List.map (fun ((arg_name, arg_ty), arg_e) -> (arg_name, arg_ty, arg_e))
+    in
+    Assign_Seq assign_seq
+
+let rec transform_tail_call_expr_inner name_gen fn_name funargs e =
+  let rec_transform_tc =
+    transform_tail_call_expr_inner name_gen fn_name funargs
+  in
   match e with
   | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure -> (e, false)
   | Bop _ | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _ -> (e, false)
   | Direct_app (_, _, _, name, arg_es) when name = fn_name ->
-      let assign_seq =
-        List.combine funargs arg_es
-        |> List.map (fun ((arg_name, arg_ty), arg_expr) ->
-               (arg_name, arg_ty, arg_expr))
-      in
-      (Assign_Seq assign_seq, true)
+      let assignments = generate_argument_assignments name_gen funargs arg_es in
+      (assignments, true)
   | Direct_app _ -> (e, false)
   | If (ty, e0, e1, e2) ->
       let transformed_e1, did_tail_call_e1 = rec_transform_tc e1 in
@@ -88,16 +145,17 @@ let rec transform_tail_call_expr_inner fn_name funargs e =
            "tail rec constructs should not be present before calling \
             tail_call_optimise"
 
-let transform_tail_call_expr fn_name funargs e =
-  match transform_tail_call_expr_inner fn_name funargs e with
+let transform_tail_call_expr name_gen fn_name funargs e =
+  match transform_tail_call_expr_inner name_gen fn_name funargs e with
   | e, true -> While_true e
   | e, false -> e
 
 let rec transform_tail_call_decl decl =
   match decl with
   | ValRec (ty, x, e) ->
+      let name_gen = name_generator () in
       let funargs, body = Desugar.Utils.collect_funargs e in
-      let transformed_body = transform_tail_call_expr x funargs body in
+      let transformed_body = transform_tail_call_expr name_gen x funargs body in
       let transformed_expr =
         Desugar.Utils.replace_funargs funargs transformed_body
       in

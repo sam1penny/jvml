@@ -144,3 +144,30 @@ let%expect_test "test tail call with ADT" =
                                         └──Int 1
 
   |}]
+
+let%expect_test "test tail call that requires temporaries" =
+  let program =
+    {|
+ val rec foo = fun x -> fun y -> foo (foo x y) (foo x y)
+ |}
+  in
+  let _ = parse_type_desugar_tco_print program in
+  [%expect
+    {|
+    └──ValRec foo_$0
+       └──Fun x_$0 : 'a -> 'a -> unit
+          └──Fun y_$0 : 'a -> unit
+             └──While true
+                └──Let temp$0
+                   └──Direct_app : foo_$0
+                      └──Ident x_$0 : 'a
+                      └──Ident y_$0 : 'a
+                   └──Let temp$1
+                      └──Direct_app : foo_$0
+                         └──Ident x_$0 : 'a
+                         └──Ident y_$0 : 'a
+                      └──Assign_Seq
+                         └── assign x_$0 : 'a =
+                            └──Ident temp$0 : 'a
+                         └── assign y_$0 : 'a =
+                            └──Ident temp$1 : 'a |}]

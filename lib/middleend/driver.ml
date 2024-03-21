@@ -18,7 +18,6 @@ let iter_constant_opts program =
   loop_until_no_changes 0 program
 
 let run_middleend program =
-  (*iter_constant_opts program*)
   iter_constant_opts program |> Direct_calls.transform_direct_call_program
   |> Tail_mod_monoid.transform_tmm_program
   |> Tail_call_optimise.transform_tail_call_program
