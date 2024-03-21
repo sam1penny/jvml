@@ -224,10 +224,11 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
         Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
       in
       let lifted_args = freevars @ funargs in
-      let lifted_val = lift_to_val x lifted_args body in
+      let defs0, body0 = rec_lift_lambdas_expr body in
+      let lifted_val = lift_to_val x lifted_args body0 in
       remove_from_fv_tbls x free_var_tbl;
       let defs1, e1 = rec_lift_lambdas_expr e1 in
-      ([ lifted_val ] @ defs1, e1)
+      ([ lifted_val ] @ defs0 @ defs1, e1)
   | Let (ty, x, e0, e1) ->
       let defs0, e0 = rec_lift_lambdas_expr e0 in
       let defs1, e1 = rec_lift_lambdas_expr e1 in
@@ -238,7 +239,8 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
         Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
       in
       let lifted_args = freevars @ funargs in
-      let lifted_valrec = lift_to_valrec x lifted_args body in
+      let defs0, body0 = rec_lift_lambdas_expr body in
+      let lifted_valrec = lift_to_valrec x lifted_args body0 in
       remove_from_fv_tbls x free_var_tbl;
       let defs1, e1 = rec_lift_lambdas_expr e1 in
 
@@ -247,7 +249,7 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
       if StringMap.mem decl_name freevars_in_e0 then
         mutual_recursion_required := true
       else ();
-      ([ lifted_valrec ] @ defs1, e1)
+      ([ lifted_valrec ] @ defs0 @ defs1, e1)
   | Tuple (ty, es) ->
       let lifted_defs, lifted_es = rec_lift_list es in
       (lifted_defs, Tuple (ty, lifted_es))

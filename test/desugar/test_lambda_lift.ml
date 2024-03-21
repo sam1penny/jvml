@@ -92,7 +92,9 @@ let%expect_test "test capturing recursive inner function" =
                    └──Int 0
                 └──Ident z_$0 : int
                 └──App
-                   └──Ident fact_$0 : int -> int
+                   └──App
+                      └──Ident fact_$0 : int -> int
+                      └──Ident z_$0 : int
                    └──Bop - : int
                       └──Ident x_$0 : int
                       └──Int 1

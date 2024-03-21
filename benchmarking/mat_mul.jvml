@@ -45,11 +45,11 @@ val make_matrix = fun size ->
         if n = 0 then []
         else cur :: mk_row (cur + 1) (n - 1)
     in
-    let rec mk_mat = fun size -> fun rows -> fun start ->
+    let rec mk_mat = fun rows -> fun start ->
         if rows = 0 then []
-        else (mk_row start size) :: (mk_mat size (rows - 1) (start + size))
+        else (mk_row start size) :: (mk_mat (rows - 1) (start + size))
     in
-    mk_mat size size 1
+    mk_mat size 1
 
 val test =
 let a = make_matrix 500 in
