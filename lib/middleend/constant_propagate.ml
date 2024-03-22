@@ -20,18 +20,18 @@ let rec const_prop_expr const_tbl e =
   | Ident (_, x) -> (
       match Hashtbl.find_opt const_tbl x with None -> e | Some c -> c)
   | Let (ty, x, e0, e1) -> (
-      match e0 with
+      let e0' = rec_const_prop e0 in
+      match e0' with
       | Int _ | Bool _ | Unit | Constr _ ->
-          let _ = Hashtbl.add const_tbl x e0 in
+          let _ = Hashtbl.add const_tbl x e0' in
           rec_const_prop e1
-      | _ ->
-          Let (ty, x, rec_const_prop e0, rec_const_prop e1)
-          (* todo - consider transforming into A-normal form to simplify constant propagation.
+      | _ -> Let (ty, x, e0', rec_const_prop e1)
+      (* todo - consider transforming into A-normal form to simplify constant propagation.
 
-             Only cost is, always assigning to variables (let x = 1 in let y = 2 in x + y) has significant performance decrease.
+         Only cost is, always assigning to variables (let x = 1 in let y = 2 in x + y) has significant performance decrease.
 
-             But maybe these disappear after optimisations?
-          *))
+         But maybe these disappear after optimisations?
+      *))
   | If (ty, e0, e1, e2) -> (
       match rec_const_prop e0 with
       | Bool true -> rec_const_prop e1
