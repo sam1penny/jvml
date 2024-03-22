@@ -44,3 +44,5 @@ module Hashset = struct
   let add set x = Hashtbl.add set x ()
   let iter f set = Hashtbl.iter (fun x _ -> f x) set
 end
+
+module Config = Config

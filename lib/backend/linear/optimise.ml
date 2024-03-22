@@ -1,6 +1,5 @@
 open Instruction
-
-let do_peephole = true
+open Common
 
 let apply_over_instructions f program =
   {
@@ -16,7 +15,7 @@ let apply_over_instructions f program =
   }
 
 let run_optimisations program =
-  if do_peephole then
+  if !Config.do_peephole then
     apply_over_instructions Peephole.boxunbox_opt program
     |> apply_over_instructions Peephole.storeload_opt
     |> apply_over_instructions Peephole.gotolabel_opt

@@ -1,3 +1,5 @@
+open Common
+
 (*
 todo - potentially quite slow to test for structural equality.
 
@@ -18,6 +20,13 @@ let iter_constant_opts program =
   loop_until_no_changes 0 program
 
 let run_middleend program =
-  iter_constant_opts program |> Direct_calls.transform_direct_call_program
-  |> Tail_mod_monoid.transform_tmm_program
-  |> Tail_call_optimise.transform_tail_call_program
+  ( (if !Config.do_constant_folding_and_prop then iter_constant_opts program
+     else program)
+  |> Direct_calls.transform_direct_call_program
+  |> fun program ->
+    if !Config.do_tail_mod_monoid then
+      Tail_mod_monoid.transform_tmm_program program
+    else program )
+  |> fun program ->
+  (*if !Config.do_tail_call_elimination then Tail_call_optimise.transform_tail_call_program program else program*)
+  Tail_call_optimise.transform_tail_call_program program

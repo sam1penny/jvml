@@ -335,7 +335,7 @@ let%expect_test "test one-arg tail call" =
   let program =
     {|
   val rec count = fun n -> if n = 0 then 1 else count (n - 1)
-  val test = print(count 5)
+  val test = print(count 20000)
   |}
   in
   let _ = build_and_run program in
@@ -348,7 +348,7 @@ let%expect_test "test multiple arg tail call" =
     if x = 0 then y
     else count2 (x - 1) y
 
-  val test = print(count2 5 6)
+  val test = print(count2 20000 6)
   |}
   in
   let _ = build_and_run program in
@@ -362,7 +362,7 @@ let%expect_test "test tail call with match" =
       | 0 -> 1
       | _ -> count (x - 1)
 
-  val test = print(count 5)
+  val test = print(count 20000)
   |}
   in
   let _ = build_and_run program in
