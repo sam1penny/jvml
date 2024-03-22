@@ -65,6 +65,9 @@ expr4:
   | UNIT { Parsed_ast.Unit $sloc }
   | LPAREN; e = expr; RPAREN { e }
   | LPAREN; exprs = tuple_sep(COMMA, expr); RPAREN {Parsed_ast.Tuple ($sloc, exprs)}
+  | LSQUARE; e = expr; RSQUARE {
+    Parsed_ast.App($sloc, Parsed_ast.Constr($sloc, "Cons$"), Parsed_ast.Tuple($sloc, [e; Parsed_ast.Constr($sloc, "Nil$")]))
+    }
   | LSQUARE; exprs = tuple_sep(SEMICOLON, expr); RSQUARE {
     List.fold_right (fun e lst ->
     Parsed_ast.App(
