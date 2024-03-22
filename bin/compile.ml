@@ -6,11 +6,7 @@ let add_opt opt () = opt_list := opt :: !opt_list
 
 let set_opt opt =
   match opt with
-  | "-opt-all" ->
-      Common.Config.do_constant_folding_and_prop := true;
-      Common.Config.do_peephole := true;
-      Common.Config.do_tail_call_elimination := true;
-      Common.Config.do_tail_mod_monoid := true
+  | "-opt-all" -> Common.Config.set_all_opt ()
   | "-peep" -> Common.Config.do_peephole := true
   | "-const-fp" -> Common.Config.do_constant_folding_and_prop := true
   | "-tmm" -> Common.Config.do_tail_mod_monoid := true

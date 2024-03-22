@@ -1,9 +1,14 @@
 let () =
   let string_program =
     {|
-    val rec count = fun n -> if n = 0 then 1 else count (n - 1)
+    val add1 =
+      let x = [1] in
+      match x with
+        | [] -> false
+        | _ -> true
   |}
   in
+  Common.Config.set_all_opt ();
   Parsing.Driver.parse_string string_program
   |> Typing.Infer.type_program_exn_from_string "test_env"
   |> Desugar.desugar_program |> Middle_end.Driver.run_middleend

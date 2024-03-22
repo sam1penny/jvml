@@ -1,5 +1,18 @@
 open Desugar.Desugared_ast
 
+(* todo - refactor into common place *)
+let con_index = function
+  | IntCon i -> i
+  | BoolCon b -> if b then 1l else 0l
+  | UnitCon -> 0l
+  | AdtCon (_, tag) -> tag
+
+let expr_index = function
+  | Int i -> i
+  | Bool b -> if b then 1l else 0l
+  | Unit -> 0l
+  | _ -> raise @@ Failure "called expr_index on non const expression!"
+
 let rec const_prop_expr const_tbl e =
   (*Desugared_ast.pp_expr e;*)
   let rec_const_prop = const_prop_expr const_tbl in
@@ -8,7 +21,7 @@ let rec const_prop_expr const_tbl e =
       match Hashtbl.find_opt const_tbl x with None -> e | Some c -> c)
   | Let (ty, x, e0, e1) -> (
       match e0 with
-      | Int _ | Bool _ | Unit ->
+      | Int _ | Bool _ | Unit | Constr _ ->
           let _ = Hashtbl.add const_tbl x e0 in
           rec_const_prop e1
       | _ ->
@@ -19,6 +32,43 @@ let rec const_prop_expr const_tbl e =
 
              But maybe these disappear after optimisations?
           *))
+  | If (ty, e0, e1, e2) -> (
+      match rec_const_prop e0 with
+      | Bool true -> rec_const_prop e1
+      | Bool false -> rec_const_prop e2
+      | e0' ->
+          let e1' = rec_const_prop e1 in
+          let e2' = rec_const_prop e2 in
+          If (ty, e0', e1', e2'))
+  | Switch (_, e, cases, maybe_fallback_opt) as switch_expr -> (
+      let e' = rec_const_prop e in
+      match e' with
+      | Int _ | Bool _ | Unit | Constr _ -> (
+          (* todo - temporary bodge until Constr carries around constructor index *)
+          let maybe_matched_expr =
+            match e' with
+            | Int _ | Bool _ | Unit ->
+                List.find_opt
+                  (fun (case_con, _) -> expr_index e' = con_index case_con)
+                  cases
+            | Constr (_, cname) ->
+                List.find_opt
+                  (function
+                    | AdtCon (case_cname, _), _ -> cname = case_cname
+                    | _ ->
+                        raise
+                        @@ Failure
+                             "illegal state, constructor in case expr should \
+                              be an ADTCon")
+                  cases
+            | _ -> raise @@ Failure "illegal state"
+          in
+          match (maybe_matched_expr, maybe_fallback_opt) with
+          | None, Some fallback_expr -> fallback_expr
+          (* no fallback, will raise match_exception at runtime, nothing we can simplify *)
+          | None, None -> switch_expr
+          | Some (_, matched_expr), _ -> matched_expr)
+      | _ -> switch_expr)
   | _ -> Desugar.Utils.map_over_sub_expr rec_const_prop e
 
 let const_prop_decl const_tbl decl =
