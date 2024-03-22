@@ -19,16 +19,17 @@ let set_opt opt =
 
 let speclist =
   [
-    ("-s", Arg.Set_string program_string, "Set string to compile");
-    ("-f", Arg.Set_string file, "Set file to compile");
-    ("-opt-all", Arg.Unit (add_opt "-opt-all"), "Enable all optimisations");
-    ("-peep", Arg.Unit (add_opt "-peep"), "Enable peephole optimisations");
+    ("-s", Arg.Set_string program_string, " Set string to compile");
+    ("-f", Arg.Set_string file, " Set file to compile");
+    ("-opt-all", Arg.Unit (add_opt "-opt-all"), " Enable all optimisations");
+    ("-peep", Arg.Unit (add_opt "-peep"), " Enable peephole optimisations");
     ( "-const-fp",
       Arg.Unit (add_opt "-const-fp"),
-      "Enable constant folding and propagation" );
-    ("-tmm", Arg.Unit (add_opt "-tmm"), "Enable tail recursion modulo monoid");
-    ("-tco", Arg.Unit (add_opt "-tco"), "Enable tail call optimisation");
+      " Enable constant folding and propagation" );
+    ("-tmm", Arg.Unit (add_opt "-tmm"), " Enable tail recursion modulo monoid");
+    ("-tco", Arg.Unit (add_opt "-tco"), " Enable tail call optimisation");
   ]
+  |> Arg.align
 
 let () =
   Arg.parse speclist
