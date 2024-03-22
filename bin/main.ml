@@ -1,11 +1,10 @@
 let () =
   let string_program =
     {|
-    val add1 =
-      let x = [1] in
+    val add1 = fun x -> fun y ->
       match x with
-        | [] -> false
-        | _ -> true
+        | 0 -> 1
+        | _ -> 0
   |}
   in
   Common.Config.set_all_opt ();

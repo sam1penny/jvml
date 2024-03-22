@@ -22,7 +22,10 @@ let rec const_prop_expr const_tbl e =
   | Let (ty, x, e0, e1) -> (
       let e0' = rec_const_prop e0 in
       match e0' with
-      | Int _ | Bool _ | Unit | Constr _ ->
+      (* constant propagation *)
+      | Int _ | Bool _ | Unit | Constr _
+      (* copy propagation *)
+      | Ident _ ->
           let _ = Hashtbl.add const_tbl x e0' in
           rec_const_prop e1
       | _ -> Let (ty, x, e0', rec_const_prop e1)
@@ -40,8 +43,10 @@ let rec const_prop_expr const_tbl e =
           let e1' = rec_const_prop e1 in
           let e2' = rec_const_prop e2 in
           If (ty, e0', e1', e2'))
-  | Switch (_, e, cases, maybe_fallback_opt) as switch_expr -> (
+  | Switch (ty, e, cases, maybe_fallback_opt) -> (
       let e' = rec_const_prop e in
+      let cases' = List.map (fun (con, case_expr) -> (con, rec_const_prop case_expr)) cases in
+      let maybe_fallback_opt' = Option.map rec_const_prop maybe_fallback_opt in
       match e' with
       | Int _ | Bool _ | Unit | Constr _ -> (
           (* todo - temporary bodge until Constr carries around constructor index *)
@@ -66,9 +71,9 @@ let rec const_prop_expr const_tbl e =
           match (maybe_matched_expr, maybe_fallback_opt) with
           | None, Some fallback_expr -> fallback_expr
           (* no fallback, will raise match_exception at runtime, nothing we can simplify *)
-          | None, None -> switch_expr
+          | None, None -> Switch(ty, e', cases', maybe_fallback_opt')
           | Some (_, matched_expr), _ -> matched_expr)
-      | _ -> switch_expr)
+      | _ -> Switch(ty, e', cases', maybe_fallback_opt'))
   | _ -> Desugar.Utils.map_over_sub_expr rec_const_prop e
 
 let const_prop_decl const_tbl decl =
