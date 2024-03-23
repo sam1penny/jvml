@@ -72,15 +72,15 @@ let%expect_test "test constant folding with long dependencies" =
              └──Ident x_$0 : int
              └──Int 2
     └──Val test2_$0
-       └──Fun x_$0 : int -> int
+       └──Fun x_$1 : int -> int
           └──Bop + : int
              └──Bop + : int
                 └──Bop + : int
                    └──Bop + : int
-                      └──Ident x_$0 : int
-                      └──Ident x_$0 : int
-                   └──Ident x_$0 : int
-                └──Ident x_$0 : int
+                      └──Ident x_$1 : int
+                      └──Ident x_$1 : int
+                   └──Ident x_$1 : int
+                └──Ident x_$1 : int
              └──Int 8
 
   |}]

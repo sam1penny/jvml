@@ -35,11 +35,14 @@ let fetch_current_version table key =
 
 let restore_previous_version table key = Hashtbl.remove table key
 
-let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
-  let rec_rename_expr = rename_expr most_recent_version in
+let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
+    (most_local_version : (string, string) Hashtbl.t) e =
+  let rec_rename_expr = rename_expr most_recent_version most_local_version in
   match e with
   | Int _ | Bool _ | Unit | Match_Failure -> e
-  | Ident (ty, var) -> Ident (ty, fetch_current_version most_recent_version var)
+  | Ident (ty, var) ->
+      if var = "print" then Ident (ty, "print_$0")
+      else Ident (ty, Hashtbl.find most_local_version var)
   | Bop (ty, e0, bop, e1) ->
       let e0' = rec_rename_expr e0 in
       let e1' = rec_rename_expr e1 in
@@ -51,8 +54,9 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
       If (ty, e0', e1', e2')
   | Fun (t0, t1, x, e) ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
+      let _ = Hashtbl.add most_local_version x x_versioned in
       let e' = rec_rename_expr e in
-      let () = restore_previous_version most_recent_version x in
+      let () = restore_previous_version most_local_version x in
       Fun (t0, t1, x_versioned, e')
   | App (ty, e0, e1) ->
       let e0' = rec_rename_expr e0 in
@@ -64,14 +68,16 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
   | Let (ty, x, e0, e1) ->
       let e0' = rec_rename_expr e0 in
       let x_versioned = fetch_next_version_and_update most_recent_version x in
+      let _ = Hashtbl.add most_local_version x x_versioned in
       let e1' = rec_rename_expr e1 in
-      let () = restore_previous_version most_recent_version x in
+      let () = restore_previous_version most_local_version x in
       Let (ty, x_versioned, e0', e1')
   | LetRec (ty, x, e0, e1) ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
+      let _ = Hashtbl.add most_local_version x x_versioned in
       let e0' = rec_rename_expr e0 in
       let e1' = rec_rename_expr e1 in
-      restore_previous_version most_recent_version x;
+      let () = restore_previous_version most_local_version x in
       LetRec (ty, x_versioned, e0', e1')
   | Constr (ty, cname) -> Constr (ty, cname)
   | Seq (ty, es) -> Seq (ty, List.map rec_rename_expr es)
@@ -95,25 +101,30 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t) e =
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
 
-let rec rename_decl most_recent_version d =
+let rec rename_decl most_recent_version most_local_version d =
   match d with
   | Val (ty, x, e) ->
-      let e' = rename_expr most_recent_version e in
+      let e' = rename_expr most_recent_version most_local_version e in
       let x_versioned = fetch_next_version_and_update most_recent_version x in
+      let _ = Hashtbl.add most_local_version x x_versioned in
       Val (ty, x_versioned, e')
   | ValRec (ty, x, e) ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
-      ValRec (ty, x_versioned, rename_expr most_recent_version e)
+      let _ = Hashtbl.add most_local_version x x_versioned in
+      ValRec
+        (ty, x_versioned, rename_expr most_recent_version most_local_version e)
   | Type (ty, params, tname, type_constructors) ->
       Type (ty, params, tname, type_constructors)
-  | And decls -> And (List.map (rename_decl most_recent_version) decls)
+  | And decls ->
+      And (List.map (rename_decl most_recent_version most_local_version) decls)
 
 let rename_program program =
   let renamings = Hashtbl.create 10 in
+  let local_renamings = Hashtbl.create 10 in
   let renamed_program =
     List.fold_left
       (fun renamed_program_rev decl ->
-        rename_decl renamings decl :: renamed_program_rev)
+        rename_decl renamings local_renamings decl :: renamed_program_rev)
       [] program
     |> List.rev
   in

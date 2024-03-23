@@ -228,12 +228,12 @@ let%expect_test "test mixing of monoid operations is not optimised" =
                       └──Int 1
                 └──Int 3
     └──ValRec bar_$0
-       └──Fun x_$0 : int -> int
+       └──Fun x_$1 : int -> int
           └──Bop + : int
              └──Bop * : int
                 └──Int 3
                 └──Int 2
              └──Direct_app : foo_$0
                 └──Bop - : int
-                   └──Ident x_$0 : int
+                   └──Ident x_$1 : int
                    └──Int 1 |}]

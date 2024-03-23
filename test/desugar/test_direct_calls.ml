@@ -25,10 +25,10 @@ let%expect_test "test single arg direct call toplevel definition" =
              └──Ident x_$0 : int
              └──Int 1
     └──ValRec bar_$0
-       └──Fun x_$0 : int -> 'a
+       └──Fun x_$1 : int -> 'a
           └──Direct_app : bar_$0
              └──Bop - : int
-                └──Ident x_$0 : int
+                └──Ident x_$1 : int
                 └──Int 1
     └──Val test_$0
        └──Seq
@@ -57,10 +57,10 @@ let%expect_test "test single arg direct call nested let" =
        └──Direct_app : bar_$0
           └──Int 3
     └──ValRec qux_$0
-       └──Fun x_$0 : int -> 'c
+       └──Fun x_$1 : int -> 'c
           └──Direct_app : qux_$0
              └──Bop - : int
-                └──Ident x_$0 : int
+                └──Ident x_$1 : int
                 └──Int 1
     └──ValRec baz_$0
        └──Fun z_$0 : 'a -> 'b

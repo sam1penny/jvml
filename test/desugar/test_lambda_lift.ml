@@ -55,14 +55,14 @@ let%expect_test "test avoid capturing of already lifted argument" =
              └──Ident x_$0 : int
              └──Int 2
     └──Val quad_$0
-       └──Fun x_$0 : int -> int
+       └──Fun x_$1 : int -> int
           └──Bop * : int
              └──App
                 └──Ident double_$0 : int -> int
-                └──Ident x_$0 : int
+                └──Ident x_$1 : int
              └──App
                 └──Ident double_$0 : int -> int
-                └──Ident x_$0 : int
+                └──Ident x_$1 : int
     └──Val test_$0
        └──App
           └──Ident print_$0 : int -> unit
