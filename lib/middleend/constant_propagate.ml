@@ -45,7 +45,9 @@ let rec const_prop_expr const_tbl e =
           If (ty, e0', e1', e2'))
   | Switch (ty, e, cases, maybe_fallback_opt) -> (
       let e' = rec_const_prop e in
-      let cases' = List.map (fun (con, case_expr) -> (con, rec_const_prop case_expr)) cases in
+      let cases' =
+        List.map (fun (con, case_expr) -> (con, rec_const_prop case_expr)) cases
+      in
       let maybe_fallback_opt' = Option.map rec_const_prop maybe_fallback_opt in
       match e' with
       | Int _ | Bool _ | Unit | Constr _ -> (
@@ -71,9 +73,9 @@ let rec const_prop_expr const_tbl e =
           match (maybe_matched_expr, maybe_fallback_opt) with
           | None, Some fallback_expr -> fallback_expr
           (* no fallback, will raise match_exception at runtime, nothing we can simplify *)
-          | None, None -> Switch(ty, e', cases', maybe_fallback_opt')
+          | None, None -> Switch (ty, e', cases', maybe_fallback_opt')
           | Some (_, matched_expr), _ -> matched_expr)
-      | _ -> Switch(ty, e', cases', maybe_fallback_opt'))
+      | _ -> Switch (ty, e', cases', maybe_fallback_opt'))
   | _ -> Desugar.Utils.map_over_sub_expr rec_const_prop e
 
 let const_prop_decl const_tbl decl =
