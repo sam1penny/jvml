@@ -83,7 +83,11 @@ let const_prop_decl const_tbl decl =
     Desugar.Utils.map_over_decl_exprs (const_prop_expr const_tbl) decl
   in
   Desugar.Utils.clear_shared_decl_seen prop_decl;
-  prop_decl
+  match prop_decl with
+  | Val (_, x, ((Int _ | Bool _ | Unit | Constr _ | Ident _) as e)) ->
+      let _ = Hashtbl.add const_tbl x e in
+      prop_decl
+  | _ -> prop_decl
 
 let const_prop_program program =
   let const_tbl = Hashtbl.create 10 in
