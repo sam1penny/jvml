@@ -27,7 +27,7 @@ let rec constant_fold_bop ty e0 bop e1 =
   (* associative bop with no side effects *)
   | ADD, Bop (_, e0_0, ADD, Int i0_1), Int i1 ->
       Bop (ty, e0_0, ADD, Int (Int32.add i0_1 i1))
-  | MUL, Bop (_, e0_0, ADD, Int i0_1), Int i1 ->
+  | MUL, Bop (_, e0_0, MUL, Int i0_1), Int i1 ->
       Bop (ty, e0_0, MUL, Int (Int32.add i0_1 i1))
   (* associative + commutative, move constant to right for subcall *)
   | ADD, Bop (ty', e0_0, ADD, Int i0_1), e1 ->
