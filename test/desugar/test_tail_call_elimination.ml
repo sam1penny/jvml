@@ -15,7 +15,7 @@ let%expect_test "test one-arg tail call" =
   let _ = parse_type_desugar_tco_print program in
   [%expect
     {|
-    └──ValRec count_$0
+    └──Val count_$0
        └──Fun n_$0 : int -> int
           └──While true
              └──If
@@ -43,7 +43,7 @@ let%expect_test "test multiple arg tail call" =
   let _ = parse_type_desugar_tco_print program in
   [%expect
     {|
-    └──ValRec count2_$0
+    └──Val count2_$0
        └──Fun x_$0 : int -> 'a -> 'a
           └──Fun y_$0 : 'a -> 'a
              └──While true
@@ -75,7 +75,7 @@ let%expect_test "test tail call with match" =
   let _ = parse_type_desugar_tco_print program in
   [%expect
     {|
-    └──ValRec count_$0
+    └──Val count_$0
        └──Fun x_$0 : int -> int
           └──While true
              └──Let desugar_t0_$0
@@ -115,7 +115,7 @@ let%expect_test "test tail call with ADT" =
        └──constructors
           └──N : tag=0
           └──C of ('a * 'a list) : tag=1
-    └──ValRec length_tr_$0
+    └──Val length_tr_$0
        └──Fun l_$0 : 'a list -> int -> int
           └──Fun acc_$0 : int -> int
              └──While true

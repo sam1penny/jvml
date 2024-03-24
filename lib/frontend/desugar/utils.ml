@@ -86,6 +86,33 @@ let iter_over_decl_exprs f d =
   in
   ()
 
+let fold_left_over_sub_expr f acc e =
+  match e with
+  | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure -> acc
+  | Bop (_, e0, _, e1) -> f (f acc e0) e1
+  | If (_, e0, e1, e2) -> f (f (f acc e0) e1) e2
+  | Fun (_, _, _, e) -> f acc e
+  | App (_, e0, e1) -> f (f acc e0) e1
+  | Direct_app (_, _, _, _, arg_es) -> List.fold_left f acc arg_es
+  | Tuple (_, es) | Seq (_, es) -> List.fold_left f acc es
+  | Let (_, _, e0, e1) | LetRec (_, _, e0, e1) -> f (f acc e0) e1
+  | TupleGet (_, _, e) | ConstructorGet (_, _, e) -> f acc e
+  | Switch (_, e, cases, maybe_fallback_expr) -> (
+      List.map (fun (_, case_expr) -> case_expr) cases
+      |> List.fold_left f (f acc e)
+      |> fun acc' ->
+      match maybe_fallback_expr with
+      | None -> acc'
+      | Some fallback_expr -> f acc' fallback_expr)
+  | Shared_Expr (e_ref, _, seen) ->
+      if !seen then acc
+      else (
+        seen := true;
+        f acc !e_ref)
+  | While_true e | Return e -> f acc e
+  | Assign_Seq assigns ->
+      List.map (fun (_, _, e) -> e) assigns |> List.fold_left f acc
+
 let rec clear_shared_expr_seen e =
   match e with
   | Shared_Expr (_, _, seen) -> seen := false

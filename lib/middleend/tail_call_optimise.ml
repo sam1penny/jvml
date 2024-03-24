@@ -3,6 +3,17 @@
 open Desugar.Desugared_ast
 open Common
 
+let rec makes_recursive_call_expr fn_name acc e =
+  match e with
+  | Ident (_, x) -> acc || x = fn_name
+  | Direct_app (_, _, _, name, arg_es) ->
+      acc || name = fn_name
+      || List.fold_left (makes_recursive_call_expr fn_name) acc arg_es
+  | _ ->
+      Desugar.Utils.fold_left_over_sub_expr
+        (fun acc e' -> acc || makes_recursive_call_expr fn_name acc e')
+        acc e
+
 let name_generator () =
   let n = ref 0 in
   fun () ->
@@ -152,6 +163,17 @@ let transform_tail_call_expr name_gen fn_name funargs e =
   | e, true -> While_true e
   | e, false -> e
 
+(*
+todo - if transformation causes a function to no longer be recursive,
+replace with a Val.
+
+todo - replace 'return' with 'break' - then we can inline TCO'd functions.
+slighly less trivial than compiling 'return', since we must remember while loop
+after in order to GOTO out of it
+
+(this means it can later be replaced with an inline,
+once we have also replaced BOTH todos)
+*)
 let rec transform_tail_call_decl decl =
   match decl with
   | ValRec (ty, x, e) ->
@@ -161,7 +183,14 @@ let rec transform_tail_call_decl decl =
       let transformed_expr =
         Desugar.Utils.replace_funargs funargs transformed_body
       in
-      ValRec (ty, x, transformed_expr)
+      let () = Desugar.Utils.clear_shared_expr_seen transformed_expr in
+      let transformed_decl =
+        match makes_recursive_call_expr x false transformed_expr with
+        | true -> ValRec (ty, x, transformed_expr)
+        | false -> Val (ty, x, transformed_expr)
+      in
+      let () = Desugar.Utils.clear_shared_decl_seen transformed_decl in
+      transformed_decl
   | And decls -> And (List.map transform_tail_call_decl decls)
   | _ -> decl
 

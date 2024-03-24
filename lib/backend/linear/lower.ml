@@ -674,8 +674,6 @@ let rec compile_decl label_gen env toplevel = function
           (fun env (name, _) ->
             Value_env.add_local_var name (static_label_gen.ref_label ()) env)
           env funargs
-        |> Value_env.add_static_method x static_method_details
-        |> Value_env.add_static_field x closure_details
       in
 
       let static_defs, c, static_smethods =
@@ -691,15 +689,22 @@ let rec compile_decl label_gen env toplevel = function
         }
       in
 
-      clear_shared_expr_labels body;
-
-      (* compile closure *)
-      let closure_defs, c, closure_smethods =
-        compile_expr label_gen env toplevel e
-      in
       let env' =
         Value_env.add_static_field x closure_details env
         |> Value_env.add_static_method x static_method_details
+      in
+      (* compile closure *)
+      let closure_body =
+        Desugared_ast.Direct_app
+          ( Desugared_ast.get_expr_type body,
+            List.map (fun (_, ty) -> ty) funargs,
+            Desugared_ast.get_expr_type body,
+            x,
+            List.map (fun (arg, ty) -> Desugared_ast.Ident (ty, arg)) funargs )
+      in
+      let closure_e = Desugar.Utils.replace_funargs funargs closure_body in
+      let closure_defs, c, closure_smethods =
+        compile_expr label_gen env' toplevel closure_e
       in
       let new_toplevel = StringSet.add x toplevel in
       ( static_defs @ closure_defs,
