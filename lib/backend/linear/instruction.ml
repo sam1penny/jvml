@@ -53,7 +53,6 @@ type instruction =
   | SWITCH of switch_type * (Int32.t * string) list * string
   | MATCH_FAILURE
   | CONSTRUCTOR_INDEX of string
-  | RETURN
 [@@deriving show]
 
 type closure = {

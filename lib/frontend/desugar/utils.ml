@@ -62,7 +62,7 @@ let map_over_sub_expr f e =
         expr_ref := f !expr_ref;
         Shared_Expr (expr_ref, label_opt, seen))
   | While_true e -> While_true (f e)
-  | Return e -> Return (f e)
+  | Break e -> Break (f e)
   | Assign_Seq assigns ->
       Assign_Seq (List.map (fun (x, ty, e) -> (x, ty, f e)) assigns)
 
@@ -109,7 +109,7 @@ let fold_left_over_sub_expr f acc e =
       else (
         seen := true;
         f acc !e_ref)
-  | While_true e | Return e -> f acc e
+  | While_true e | Break e -> f acc e
   | Assign_Seq assigns ->
       List.map (fun (_, _, e) -> e) assigns |> List.fold_left f acc
 

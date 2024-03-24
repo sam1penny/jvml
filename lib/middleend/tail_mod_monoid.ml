@@ -38,7 +38,7 @@ let shallow_map_tail_positions f e =
         seen := true;
         e_ref := f !e_ref;
         e)
-  | While_true _ | Return _ | Assign_Seq _ ->
+  | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure
            "tail rec constructs should not be present before calling \
@@ -77,7 +77,7 @@ let rec has_tmm_expr fn_name e =
            (fun e -> Option.map rec_has_tmm e |> Option.join)
            maybe_fallback_expr
   | Shared_Expr (e_ref, _, _) -> rec_has_tmm !e_ref
-  | While_true _ | Return _ | Assign_Seq _ ->
+  | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure
            "tail rec constructs should not be present before calling \

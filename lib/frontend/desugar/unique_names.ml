@@ -97,7 +97,7 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
         seen := true;
         expr_ref := rec_rename_expr !expr_ref;
         Shared_Expr (expr_ref, label_opt, seen))
-  | While_true _ | Return _ | Assign_Seq _ ->
+  | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
 

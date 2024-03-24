@@ -105,7 +105,7 @@ let free_vars_with_types_expr bound e =
     | Match_Failure -> StringMap.empty
     | Shared_Expr (e, _, _) -> aux bound free !e
     | While_true e -> aux bound free e
-    | Return e -> aux bound free e
+    | Break e -> aux bound free e
     | Assign_Seq assignments ->
         List.map
           (fun (x, ty, e) ->
@@ -157,7 +157,7 @@ let rec clear_shared_expr_labels e =
       Option.iter clear_shared_expr_labels fallback_opt
   | Shared_Expr (_, lab_opt_ref, _) -> lab_opt_ref := None
   | While_true e -> clear_shared_expr_labels e
-  | Return e -> clear_shared_expr_labels e
+  | Break e -> clear_shared_expr_labels e
   | Assign_Seq assignments ->
       List.iter (fun (_, _, e) -> clear_shared_expr_labels e) assignments
 
@@ -187,11 +187,11 @@ let determine_switch_strategy arg_type =
   | Typed_ast.TyInt -> LOOKUP
   | _ -> raise @@ Failure "attempted to switch on unsupported type"
 
-let expr_is_return e =
+let expr_is_break e =
   let open Desugared_ast in
   match e with
-  | Return _ -> true
-  | Shared_Expr ({ contents = Return _ }, _, _) -> true
+  | Break _ -> true
+  | Shared_Expr ({ contents = Break _ }, _, _) -> true
   | _ -> false
 
 let compile_expr_list compile_func es =
@@ -201,24 +201,26 @@ let compile_expr_list compile_func es =
   let smethods = List.map (fun (_, _, smethods) -> smethods) linear_es in
   (defs, ecode, smethods)
 
-let rec compile_expr label_gen env top_level_bindings e =
+let rec compile_expr label_gen env top_level_bindings after_while_loop e =
   let open Desugared_ast in
   (* curried for convenience *)
-  let compile_expr_rec = compile_expr label_gen env top_level_bindings in
+  let compile_expr_rec =
+    compile_expr label_gen env top_level_bindings after_while_loop
+  in
   match e with
   | Int i -> ([], [ PUSH_INT i; BOX_INT ], [])
   | Bool b -> ([], [ PUSH_BOOL b; BOX_BOOL ], [])
   | Ident (_, x) -> ([], Value_env.lookup x env, [])
   | Unit -> ([], [ PUSH_UNIT ], [])
   | Bop (_, e0, bop, e1) ->
-      compile_bop label_gen env top_level_bindings e0 e1 bop
+      compile_bop label_gen env top_level_bindings after_while_loop e0 e1 bop
   | If (_, e0, e1, e2) ->
       let else_label = label_gen.ctrl_label () in
       let defs0, c0, s0 = compile_expr_rec e0 in
       let defs1, c1, s1 = compile_expr_rec e1 in
       let defs2, c2, s2 = compile_expr_rec e2 in
       let maybe_goto_after, maybe_label_after =
-        match expr_is_return e1 with
+        match expr_is_break e1 with
         | true -> ([], [])
         | false ->
             let after_label = label_gen.ctrl_label () in
@@ -230,7 +232,7 @@ let rec compile_expr label_gen env top_level_bindings e =
         @ c1 @ maybe_goto_after @ [ LABEL else_label ] @ c2 @ maybe_label_after,
         s0 @ s1 @ s2 )
   | Fun (t0, t1, x, e) ->
-      compile_anon_lambda_expr label_gen env top_level_bindings
+      compile_anon_lambda_expr label_gen env top_level_bindings after_while_loop
         (convert_type t0, convert_type t1, x, e)
   | App (ty, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in
@@ -253,7 +255,7 @@ let rec compile_expr label_gen env top_level_bindings e =
       let x_label = label_gen.ref_label () in
       let env_with_x = Value_env.add_local_var x x_label env in
       let defs1, c1, s1 =
-        compile_expr label_gen env_with_x top_level_bindings e1
+        compile_expr label_gen env_with_x top_level_bindings after_while_loop e1
       in
       (defs0 @ defs1, c0 @ [ STORE_REF x_label ] @ c1, s0 @ s1)
   | LetRec (_, x, e0, e1) ->
@@ -263,9 +265,11 @@ let rec compile_expr label_gen env top_level_bindings e =
           env
       in
       let new_toplevel = StringSet.add x top_level_bindings in
-      let defs0, c0, s0 = compile_expr label_gen env_with_x new_toplevel e0 in
+      let defs0, c0, s0 =
+        compile_expr label_gen env_with_x new_toplevel after_while_loop e0
+      in
       let defs1, c1, s1 =
-        compile_expr label_gen env_with_x top_level_bindings e1
+        compile_expr label_gen env_with_x top_level_bindings after_while_loop e1
       in
       ( defs0 @ defs1,
         c0
@@ -278,7 +282,8 @@ let rec compile_expr label_gen env top_level_bindings e =
   | Constr (_, cname) -> ([], Value_env.lookup cname env, [])
   | Tuple (_, ts) ->
       let defs, lowered_tuple_code, smethods =
-        lower_tuple_eles_to_array label_gen env top_level_bindings ts
+        lower_tuple_eles_to_array label_gen env top_level_bindings
+          after_while_loop ts
       in
       ( defs,
         [ ALLOC_OBJ "Tuple" ] @ lowered_tuple_code
@@ -305,14 +310,14 @@ let rec compile_expr label_gen env top_level_bindings e =
         List.map (fun (defs, _, _) -> defs) compiled_case_exprs |> List.flatten
       in
 
-      let case_is_return = List.map expr_is_return case_exprs in
+      let case_is_return = List.map expr_is_break case_exprs in
       let case_code_with_labels =
         List.map (fun (_, code, _) -> code) compiled_case_exprs
         |> List.combine case_is_return
-        |> List.map (fun (is_return, code) ->
+        |> List.map (fun (is_break, code) ->
                let label = label_gen.ctrl_label () in
                let maybe_goto_after =
-                 if is_return then [] else [ GOTO after_label ]
+                 if is_break then [] else [ GOTO after_label ]
                in
                (label, [ LABEL label ] @ code @ maybe_goto_after))
       in
@@ -358,7 +363,7 @@ let rec compile_expr label_gen env top_level_bindings e =
           in
           let default_label = label_gen.ctrl_label () in
           let maybe_goto_after =
-            if expr_is_return fallback_expr then [] else [ GOTO after_label ]
+            if expr_is_break fallback_expr then [] else [ GOTO after_label ]
           in
           let default_code =
             [ LABEL default_label ] @ default_code @ maybe_goto_after
@@ -381,11 +386,20 @@ let rec compile_expr label_gen env top_level_bindings e =
       | Some lab -> ([], [ GOTO lab ], []))
   | While_true e ->
       let loop_lab = label_gen.ctrl_label () in
+      let after_loop = label_gen.ctrl_label () in
+      let defs, code, static_methods =
+        compile_expr label_gen env top_level_bindings (Some after_loop) e
+      in
+      ( defs,
+        [ LABEL loop_lab ] @ code @ [ GOTO loop_lab; LABEL after_loop ],
+        static_methods )
+  | Break e -> (
       let defs, code, static_methods = compile_expr_rec e in
-      (defs, [ LABEL loop_lab ] @ code @ [ GOTO loop_lab ], static_methods)
-  | Return e ->
-      let defs, code, static_methods = compile_expr_rec e in
-      (defs, code @ [ RETURN ], static_methods)
+      match after_while_loop with
+      | Some after_lab -> (defs, code @ [ GOTO after_lab ], static_methods)
+      | None ->
+          raise
+          @@ Failure "Found a break outside of a while loop -- illegal state")
   | Assign_Seq assignments ->
       let compiled =
         List.map
@@ -404,8 +418,10 @@ let rec compile_expr label_gen env top_level_bindings e =
 
       (defs, code, static_methods)
 
-and compile_bop label_gen env top_level_bindings e0 e1 =
-  let compile_expr_rec = compile_expr label_gen env top_level_bindings in
+and compile_bop label_gen env top_level_bindings after_while_loop e0 e1 =
+  let compile_expr_rec =
+    compile_expr label_gen env top_level_bindings after_while_loop
+  in
   function
   | (ADD | SUB | MUL | DIV) as int_to_int_op ->
       let defs0, c0, s0 = compile_expr_rec e0 in
@@ -476,7 +492,7 @@ and compile_bop label_gen env top_level_bindings e0 e1 =
       let defs1, c1, smethods1 = compile_expr_rec e1 in
       (defs0 @ defs1, c0 @ c1 @ [ BOP EQ; BOX_BOOL ], smethods0 @ smethods1)
 
-and compile_anon_lambda_expr label_gen env top_level_bindings
+and compile_anon_lambda_expr label_gen env top_level_bindings after_while_loop
     (arg_type, return_type, x, e) =
   let fvars_with_types =
     free_vars_with_types_expr (StringSet.add x top_level_bindings) e
@@ -496,7 +512,7 @@ and compile_anon_lambda_expr label_gen env top_level_bindings
       body_env fvars_with_types
   in
   let defs, ecode, smethods =
-    compile_expr body_label_gen body_env top_level_bindings e
+    compile_expr body_label_gen body_env top_level_bindings after_while_loop e
   in
   compile_anon_lambda label_gen env fvars_with_types defs
     (arg_type, return_type, ecode)
@@ -526,7 +542,7 @@ and compile_anon_lambda label_gen env fvars_with_types defs
     @ [ CONSTRUCT_OBJ (closure_label, List.rev fvar_types) ],
     smethods )
 
-and compile_dyn_lambda_expr label_gen env top_level_bindings
+and compile_dyn_lambda_expr label_gen env top_level_bindings after_while_loop
     (arg_type, return_type, x, e) =
   let fvars_with_types =
     free_vars_with_types_expr (StringSet.add x top_level_bindings) e
@@ -546,7 +562,7 @@ and compile_dyn_lambda_expr label_gen env top_level_bindings
   in
 
   let defs, ecode, smethods =
-    compile_expr body_label_gen body_env top_level_bindings e
+    compile_expr body_label_gen body_env top_level_bindings after_while_loop e
   in
   compile_dyn_lambda label_gen env fvars_with_types defs
     (arg_type, return_type, ecode)
@@ -575,7 +591,8 @@ and compile_dyn_lambda label_gen env fvars_with_types defs
       ],
     smethods @ [ lifted_method ] )
 
-and lower_tuple_eles_to_array label_gen env top_level_bindings es =
+and lower_tuple_eles_to_array label_gen env top_level_bindings after_while_loop
+    es =
   let prelude =
     [ PUSH_INT (Int32.of_int (List.length es)); ALLOC_ARRAY "java/lang/Object" ]
   in
@@ -583,7 +600,7 @@ and lower_tuple_eles_to_array label_gen env top_level_bindings es =
     List.mapi
       (fun i e ->
         let edefs, ecode, smethods =
-          compile_expr label_gen env top_level_bindings e
+          compile_expr label_gen env top_level_bindings after_while_loop e
         in
         ( edefs,
           [ DUP; PUSH_INT (Int32.of_int i) ] @ ecode @ [ STORE_ARRAY ],
@@ -677,7 +694,7 @@ let rec compile_decl label_gen env toplevel = function
       in
 
       let static_defs, c, static_smethods =
-        compile_expr static_label_gen static_env toplevel body
+        compile_expr static_label_gen static_env toplevel None body
       in
 
       let static_method =
@@ -704,7 +721,7 @@ let rec compile_decl label_gen env toplevel = function
       in
       let closure_e = Desugar.Utils.replace_funargs funargs closure_body in
       let closure_defs, c, closure_smethods =
-        compile_expr label_gen env' toplevel closure_e
+        compile_expr label_gen env' toplevel None closure_e
       in
       let new_toplevel = StringSet.add x toplevel in
       ( static_defs @ closure_defs,
@@ -713,7 +730,7 @@ let rec compile_decl label_gen env toplevel = function
         env',
         new_toplevel )
   | Desugared_ast.Val (ty, x, e) ->
-      let defs, c, smethods = compile_expr label_gen env toplevel e in
+      let defs, c, smethods = compile_expr label_gen env toplevel None e in
       let env' = Value_env.add_static_field x (get_closure_details ty x) env in
       let new_toplevel = StringSet.add x toplevel in
       ( defs,
@@ -745,7 +762,7 @@ let rec compile_decl label_gen env toplevel = function
       in
 
       let static_defs, c, static_smethods =
-        compile_expr static_label_gen static_env toplevel body
+        compile_expr static_label_gen static_env toplevel None body
       in
 
       let static_method =
@@ -774,7 +791,7 @@ let rec compile_decl label_gen env toplevel = function
 
       let closure_e = Desugar.Utils.replace_funargs funargs new_body in
       let closure_defs, c, closure_body =
-        compile_expr label_gen env' new_toplevel closure_e
+        compile_expr label_gen env' new_toplevel None closure_e
       in
       ( static_defs @ closure_defs,
         c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],

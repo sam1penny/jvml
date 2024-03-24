@@ -126,7 +126,7 @@ let free_vars_with_types_expr bound e =
               StringMap.union takeleft acc_by_indent fallback_by_ident ))
     | Match_Failure -> (StringMap.empty, StringMap.empty)
     | Shared_Expr (e, _, _) -> rec_aux !e
-    | While_true _ | Return _ | Assign_Seq _ ->
+    | While_true _ | Break _ | Assign_Seq _ ->
         raise
         @@ Failure "tail rec constructs should not be present in lambda_lift"
   in
@@ -288,7 +288,7 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
         let defs, e = rec_lift_lambdas_expr !e_ref in
         e_ref := e;
         (defs, Shared_Expr (e_ref, label_ref, seen)))
-  | While_true _ | Return _ | Assign_Seq _ ->
+  | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
 

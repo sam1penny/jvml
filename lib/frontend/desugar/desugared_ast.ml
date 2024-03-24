@@ -43,7 +43,7 @@ type expr =
   (* ref to expr, label (in compiled repr) *)
   | Shared_Expr of expr ref * string option ref * bool ref
   | While_true of expr
-  | Return of expr
+  | Break of expr
   (* Sequence of assignments, special case as assign does not produce a 'unit' on the stack *)
   | Assign_Seq of (string * Typed_ast.type_expr * expr) list
 
@@ -83,7 +83,7 @@ let rec get_expr_type = function
   | Match_Failure -> TyVar (desugared_tvar_cnter ())
   | Shared_Expr ({ contents = e }, _, _) -> get_expr_type e
   | While_true e -> get_expr_type e
-  | Return e -> get_expr_type e
+  | Break e -> get_expr_type e
   | Assign_Seq _ -> Typed_ast.TyUnit
 
 (* huge bodge to get match_failure working
@@ -120,7 +120,7 @@ let string_of_expr_node =
   | Match_Failure -> "Match_Failure"
   | Shared_Expr (_, _, _) -> "Shared"
   | While_true _ -> "While true"
-  | Return _ -> "Return"
+  | Break _ -> "Break"
   | Assign_Seq _ -> sprintf "Assign_Seq"
 
 let pp_con ?(indent = "") con =
@@ -186,7 +186,7 @@ let rec pp_expr ?(indent = "") expr =
   | Shared_Expr ({ contents = shared }, _, _) ->
       pp_node expr;
       pp_rec_expr shared
-  | While_true e | Return e ->
+  | While_true e | Break e ->
       pp_node expr;
       pp_rec_expr e
   | Assign_Seq assigns ->

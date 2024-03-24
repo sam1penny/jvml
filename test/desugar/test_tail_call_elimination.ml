@@ -22,7 +22,7 @@ let%expect_test "test one-arg tail call" =
                 └──Bop = : bool
                    └──Ident n_$0 : int
                    └──Int 0
-                └──Return
+                └──Break
                    └──Int 1
                 └──Assign_Seq
                    └── assign n_$0 : int =
@@ -51,7 +51,7 @@ let%expect_test "test multiple arg tail call" =
                    └──Bop = : bool
                       └──Ident x_$0 : int
                       └──Int 0
-                   └──Return
+                   └──Break
                       └──Ident y_$0 : 'a
                    └──Assign_Seq
                       └── assign x_$0 : int =
@@ -84,7 +84,7 @@ let%expect_test "test tail call with match" =
                    └──Ident desugar_t0_$0 : int
                    └── <case>
                       └──Int(0)
-                      └──Return
+                      └──Break
                          └──Shared
                             └──Int 1
                    └── <fallback>
@@ -125,7 +125,7 @@ let%expect_test "test tail call with ADT" =
                       └──Ident desugar_t1_$0 : 'a list
                       └── <case>
                          └──N : tag=0
-                         └──Return
+                         └──Break
                             └──Shared
                                └──Ident acc_$0 : int
                       └── <case>

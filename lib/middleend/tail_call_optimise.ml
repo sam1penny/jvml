@@ -88,10 +88,10 @@ let rec transform_tail_call_expr_inner name_gen fn_name funargs e =
       let transformed_e2, did_tail_call_e2 = rec_transform_tc e2 in
       if did_tail_call_e1 || did_tail_call_e2 then
         let e1' =
-          if did_tail_call_e1 then transformed_e1 else Return transformed_e1
+          if did_tail_call_e1 then transformed_e1 else Break transformed_e1
         in
         let e2' =
-          if did_tail_call_e2 then transformed_e2 else Return transformed_e2
+          if did_tail_call_e2 then transformed_e2 else Break transformed_e2
         in
         (If (ty, e0, e1', e2'), true)
       else (e, false)
@@ -132,7 +132,7 @@ let rec transform_tail_call_expr_inner name_gen fn_name funargs e =
           List.map
             (fun (con, (trans_case_expr, did_tail_call)) ->
               if did_tail_call then (con, trans_case_expr)
-              else (con, Return trans_case_expr))
+              else (con, Break trans_case_expr))
             transformed_cases
         in
 
@@ -140,7 +140,7 @@ let rec transform_tail_call_expr_inner name_gen fn_name funargs e =
           Option.map
             (fun (trans_fallback_expr, did_tail_call) ->
               if did_tail_call then trans_fallback_expr
-              else Return trans_fallback_expr)
+              else Break trans_fallback_expr)
             transformed_fallback
         in
         (Switch (ty, e0, cases', maybe_fallback_expr'), true)
@@ -152,7 +152,7 @@ let rec transform_tail_call_expr_inner name_gen fn_name funargs e =
         let transformed_e, did_tail_call = rec_transform_tc !e_ref in
         e_ref := transformed_e;
         (e, did_tail_call))
-  | While_true _ | Return _ | Assign_Seq _ ->
+  | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure
            "tail rec constructs should not be present before calling \
@@ -163,17 +163,6 @@ let transform_tail_call_expr name_gen fn_name funargs e =
   | e, true -> While_true e
   | e, false -> e
 
-(*
-todo - if transformation causes a function to no longer be recursive,
-replace with a Val.
-
-todo - replace 'return' with 'break' - then we can inline TCO'd functions.
-slighly less trivial than compiling 'return', since we must remember while loop
-after in order to GOTO out of it
-
-(this means it can later be replaced with an inline,
-once we have also replaced BOTH todos)
-*)
 let rec transform_tail_call_decl decl =
   match decl with
   | ValRec (ty, x, e) ->
