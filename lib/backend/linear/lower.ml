@@ -710,6 +710,7 @@ let rec compile_decl label_gen env toplevel = function
         Value_env.add_static_field x closure_details env
         |> Value_env.add_static_method x static_method_details
       in
+      let new_toplevel = StringSet.add x toplevel in
       (* compile closure *)
       let closure_body =
         Desugared_ast.Direct_app
@@ -721,9 +722,8 @@ let rec compile_decl label_gen env toplevel = function
       in
       let closure_e = Desugar.Utils.replace_funargs funargs closure_body in
       let closure_defs, c, closure_smethods =
-        compile_expr label_gen env' toplevel None closure_e
+        compile_expr label_gen env' new_toplevel None closure_e
       in
-      let new_toplevel = StringSet.add x toplevel in
       ( static_defs @ closure_defs,
         c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
         [ static_method ] @ static_smethods @ closure_smethods,
