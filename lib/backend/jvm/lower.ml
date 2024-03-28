@@ -46,9 +46,9 @@ let rec lower_type = function
   | TyBool -> "java/lang/Boolean"
   | TyFun _ -> "java/util/function/Function"
   | TyAny -> "java/lang/Object"
-  | TyUnit -> "Unit"
-  | TyCustom c -> String.capitalize_ascii c
-  | TyTuple _ -> "Tuple"
+  | TyUnit -> "sam/generated/Unit"
+  | TyCustom c -> Printf.sprintf "sam/generated/%s" (String.capitalize_ascii c)
+  | TyTuple _ -> "sam/generated/Tuple"
   | TyArray t -> lower_type t
 
 let rec lower_type_as_descriptor ty =
@@ -104,8 +104,8 @@ let lower_dyn_closure lifted captured_tys arg_type return_type =
        java/lang/invoke/LambdaMetafactory metafactory \
        (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; \
        MethodType (Ljava/lang/Object;)Ljava/lang/Object; MethodHandle \
-       invokeStatic Method Foo %s (%s)L%s; MethodType (L%s;)L%s; : apply \
-       (%s)Ljava/util/function/Function;"
+       invokeStatic Method sam/generated/Foo %s (%s)L%s; MethodType (L%s;)L%s; \
+       : apply (%s)Ljava/util/function/Function;"
       lifted
       (lower_type_list (captured_tys @ [ arg_type ]))
       (lower_type return_type) (lower_type arg_type) (lower_type return_type)
@@ -132,7 +132,8 @@ let lower_instruction ctrl_gen clazz = function
   | BOX_BOOL ->
       [ "invokestatic Method java/lang/Boolean valueOf (Z)Ljava/lang/Boolean;" ]
   | UNBOX_BOOL -> [ "invokevirtual Method java/lang/Boolean booleanValue ()Z" ]
-  | PUSH_UNIT -> [ "getstatic Field Unit INSTANCE LUnit;" ]
+  | PUSH_UNIT ->
+      [ "getstatic Field sam/generated/Unit INSTANCE Lsam/generated/Unit;" ]
   | BOP bop -> lower_bop ctrl_gen bop
   | STORE_REF r -> [ store_ref r ]
   | LOAD_REF r -> [ load_ref r ]
@@ -142,16 +143,18 @@ let lower_instruction ctrl_gen clazz = function
   | LABEL l -> [ sprintf "%s:" l ]
   | LOAD_FIELD (f, ty) ->
       [
-        sprintf "getfield Field %s %s %s" clazz f (lower_type_as_descriptor ty);
+        sprintf "getfield Field sam/generated/%s %s %s" clazz f
+          (lower_type_as_descriptor ty);
       ]
   | STORE_FIELD (f, ty) ->
       [
-        sprintf "putfield Field %s %s %s" clazz f (lower_type_as_descriptor ty);
+        sprintf "putfield Field sam/generated/%s %s %s" clazz f
+          (lower_type_as_descriptor ty);
       ]
-  | ALLOC_OBJ name -> [ sprintf "new %s" name; "dup" ]
+  | ALLOC_OBJ name -> [ sprintf "new sam/generated/%s" name; "dup" ]
   | CONSTRUCT_OBJ (name, tys) ->
       [
-        sprintf "invokespecial Method %s <init> (%s)V" name
+        sprintf "invokespecial Method sam/generated/%s <init> (%s)V" name
           (lower_type_list tys);
       ]
   | ALLOC_ARRAY name -> [ sprintf "anewarray %s" name ]
@@ -165,14 +168,20 @@ let lower_instruction ctrl_gen clazz = function
         sprintf "checkcast %s" (lower_type ty);
       ]
   | LOAD_STATIC (clazz, f, ty) ->
-      [ sprintf "getstatic Field %s %s L%s;" clazz f (lower_type ty) ]
+      [
+        sprintf "getstatic Field sam/generated/%s %s L%s;" clazz f
+          (lower_type ty);
+      ]
   | STORE_STATIC (clazz, f, ty) ->
-      [ sprintf "putstatic Field %s %s L%s;" clazz f (lower_type ty) ]
+      [
+        sprintf "putstatic Field sam/generated/%s %s L%s;" clazz f
+          (lower_type ty);
+      ]
   | CREATE_DYNAMIC_CLOSURE (lifted, captured_tys, arg_type, return_type) ->
       lower_dyn_closure lifted captured_tys arg_type return_type
   | TUPLE_GET (ty, i) ->
       [
-        "getfield Field Tuple data [Ljava/lang/Object;";
+        "getfield Field sam/generated/Tuple data [Ljava/lang/Object;";
         load_int i;
         "aaload";
         sprintf "checkcast %s" (lower_type ty);
@@ -180,23 +189,26 @@ let lower_instruction ctrl_gen clazz = function
   | CONSTRUCTOR_GET (ty, cname) ->
       (* todo - cast once on switch case entry rather than on each get *)
       [
-        sprintf "checkcast %s" cname;
-        sprintf "getfield Field %s val L%s;" cname (lower_type ty);
+        sprintf "checkcast sam/generated/%s" cname;
+        sprintf "getfield Field sam/generated/%s val L%s;" cname (lower_type ty);
       ]
   | SWITCH (switch_type, cases, default_lab) ->
       lower_switch switch_type cases default_lab
   | CONSTRUCTOR_INDEX tname ->
-      [ sprintf "getfield Field %s tag I" (String.capitalize_ascii tname) ]
+      [
+        sprintf "getfield Field sam/generated/%s tag I"
+          (String.capitalize_ascii tname);
+      ]
   | MATCH_FAILURE ->
       [
-        "new MatchFailure";
+        "new sam/generated/MatchFailure";
         "dup";
-        "invokespecial Method MatchFailure <init> ()V";
+        "invokespecial Method sam/generated/MatchFailure <init> ()V";
         "athrow";
       ]
   | STATIC_APPLY (name, arg_tys, ret_ty, actual_return_ty) ->
       [
-        sprintf "invokestatic Method Foo %s (%s)L%s;" name
+        sprintf "invokestatic Method sam/generated/Foo %s (%s)L%s;" name
           (lower_type_list arg_tys) (lower_type ret_ty);
         sprintf "checkcast %s" (lower_type actual_return_ty);
       ]
@@ -217,7 +229,8 @@ let lower_body indent clazz b =
 let lower_constructor_args args =
   List.map
     (* todo - consider making private (then requires invokespecial) *)
-      (fun (name, ty) -> sprintf ".field public %s L%s;" name (lower_type ty))
+      (fun (name, ty) ->
+      sprintf ".field public sam/generated/%s L%s;" name (lower_type ty))
     args
   |> String.concat "\n"
 
@@ -227,7 +240,8 @@ let lower_constructor_body indent name constructor_args =
       [
         "aload_0";
         load_ref (i + 1);
-        sprintf "putfield Field %s %s L%s;" name field (lower_type ty);
+        sprintf "putfield Field sam/generated/%s %s L%s;" name field
+          (lower_type ty);
       ]
       |> List.map (fun i -> indent ^ i)
       |> String.concat "\n")
@@ -238,7 +252,7 @@ let lower_closure (c : closure) =
   let indent = "    " in
   sprintf
     {|
-.class public %s
+.class public sam/generated/%s
 .super java/lang/Object
 .implements java/util/function/Function
 %s
@@ -287,7 +301,7 @@ let lower_type_interface (ti : type_interface) =
   sprintf
     {|
 .version 62 0
-.class public super abstract %s
+.class public super abstract sam/generated/%s
 .super java/lang/Object
 .field tag I
 .permittedsubclasses %s
@@ -303,20 +317,21 @@ L4:     return
 .end class
 |}
     ti.name
-    (String.concat " " ti.constructors)
+    (List.map (fun c -> "sam/generated/" ^ c) ti.constructors
+    |> String.concat " ")
 
 let lower_value_constructor (vc : constructor) =
   sprintf
     {|
 .version 62 0
-.class public final super %s
-.super %s
+.class public final super sam/generated/%s
+.super sam/generated/%s
 %s
 
 .method public <init> : (%s)V
     .code stack 2 locals 3
 L0:     aload_0
-L1:     invokespecial Method %s <init> ()V
+L1:     invokespecial Method sam/generated/%s <init> ()V
 %s
 %s
 L14:    return
@@ -370,14 +385,19 @@ L34:    ireturn
     (Option.map (fun arg -> "L" ^ lower_type arg ^ ";") vc.arg
     |> Option.value ~default:"")
     vc.tname
-    ([ "aload_0"; load_int vc.tag; sprintf "putfield Field %s tag I" vc.name ]
+    ([
+       "aload_0";
+       load_int vc.tag;
+       sprintf "putfield Field sam/generated/%s tag I" vc.name;
+     ]
     |> String.concat "\n")
     (Option.map
        (fun arg ->
          [
            "aload_0";
            "aload_1";
-           sprintf "putfield Field %s val L%s;" vc.name (lower_type arg);
+           sprintf "putfield Field sam/generated/%s val L%s;" vc.name
+             (lower_type arg);
          ]
          |> String.concat "\n")
        vc.arg
@@ -393,7 +413,8 @@ L34:    ireturn
            {|ldc " ("|};
            call_stringbuilder_append;
            "aload_0";
-           sprintf "getfield Field %s val L%s;" vc.name (lower_type arg);
+           sprintf "getfield Field sam/generated/%s val L%s;" vc.name
+             (lower_type arg);
            call_stringbuilder_append;
            {|ldc ")"|};
            call_stringbuilder_append;
@@ -406,10 +427,10 @@ L34:    ireturn
          sprintf
            {|
 L20:    aload_0
-L21:    getfield Field %s val L%s;
+L21:    getfield Field sam/generated/%s val L%s;
 L24:    aload_1
-L25:    checkcast %s
-L28:    getfield Field %s val L%s;
+L25:    checkcast sam/generated/%s
+L28:    getfield Field sam/generated/%s val L%s;
 L31:    invokevirtual Method java/lang/Object equals (Ljava/lang/Object;)Z
       |}
            vc.name (lower_type arg) vc.name vc.name (lower_type arg))
@@ -439,7 +460,7 @@ let lower_static_method static_method =
     (lower_type static_method.return_type)
     (max_stack_depth static_method.body)
     (num_local_vars (List.length static_method.args) static_method.body)
-    (lower_body "     " "Foo" static_method.body)
+    (lower_body "     " "sam/generated/Foo" static_method.body)
 
 let lower_field_defs p =
   List.filter_map
@@ -454,7 +475,7 @@ let produce_instruction_bytecode (p, static_methods) =
   sprintf
     {|
 .version 52 0
-.class public Foo
+.class public sam/generated/Foo
 .super java/lang/Object
 %s
 .method public static main : ([Ljava/lang/String;)V
@@ -471,13 +492,13 @@ let produce_instruction_bytecode (p, static_methods) =
 .end class
 |}
     (lower_field_defs p) (max_stack_depth p) (num_local_vars 1 p)
-    (lower_body "        " "Foo" p)
+    (lower_body "        " "sam/generated/Foo" p)
     (List.map lower_static_method static_methods |> String.concat "\n")
 
 let external_lib =
   {|
 .version 62 0
-.class public super MatchFailure
+.class public super sam/generated/MatchFailure
 .super java/lang/RuntimeException
 
 .method public <init> : ()V
@@ -491,7 +512,7 @@ let external_lib =
 
 ; my custom tuple class
 .version 62 0
-.class public super Tuple
+.class public super sam/generated/Tuple
 .super java/lang/Object
 .field public data [Ljava/lang/Object;
 
@@ -501,7 +522,7 @@ L0:     aload_0
 L1:     invokespecial Method java/lang/Object <init> ()V
 L4:     aload_0
 L5:     aload_1
-L6:     putfield Field Tuple data [Ljava/lang/Object;
+L6:     putfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L9:     return
 
     .end code
@@ -510,7 +531,7 @@ L9:     return
 .method public toString : ()Ljava/lang/String;
     .code stack 1 locals 1
 L0:     aload_0
-L1:     getfield Field Tuple data [Ljava/lang/Object;
+L1:     getfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L4:     invokestatic Method java/util/Arrays toString ([Ljava/lang/Object;)Ljava/lang/String;
 L7:     areturn
 
@@ -520,10 +541,10 @@ L7:     areturn
 .method public equals : (Ljava/lang/Object;)Z
     .code stack 2 locals 2
 L0:     aload_0
-L1:     getfield Field Tuple data [Ljava/lang/Object;
+L1:     getfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L4:     aload_1
-L5:     checkcast Tuple
-L8:     getfield Field Tuple data [Ljava/lang/Object;
+L5:     checkcast sam/generated/Tuple
+L8:     getfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L11:    invokestatic Method java/util/Arrays equals ([Ljava/lang/Object;[Ljava/lang/Object;)Z
 L14:    ireturn
 
@@ -533,7 +554,7 @@ L14:    ireturn
 .method public hashCode : ()I
     .code stack 1 locals 1
 L0:     aload_0
-L1:     getfield Field Tuple data [Ljava/lang/Object;
+L1:     getfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L4:     invokestatic Method java/util/Arrays hashCode ([Ljava/lang/Object;)I
 L7:     ireturn
 
@@ -542,9 +563,9 @@ L7:     ireturn
 .sourcefile "Tuple.java"
 .end class
 
-.class public super Unit
+.class public super sam/generated/Unit
 .super java/lang/Object
-.field public static INSTANCE LUnit;
+.field public static INSTANCE Lsam/generated/Unit;
 
 .method private <init> : ()V
     .code stack 1 locals 1
@@ -558,22 +579,16 @@ L7:     ireturn
     .code stack 1 locals 1
 L0:     ldc "()"
 L2:     areturn
-L3:
-        .linenumbertable
-            L0 7
-        .end linenumbertable
-        .localvariabletable
-            0 is this LUnit; from L0 to L3
-        .end localvariabletable
+
     .end code
 .end method
 
 .method static <clinit> : ()V
     .code stack 2 locals 0
-      new Unit
+      new sam/generated/Unit
       dup
-      invokespecial Method Unit <init> ()V
-      putstatic Field Unit INSTANCE LUnit;
+      invokespecial Method sam/generated/Unit <init> ()V
+      putstatic Field sam/generated/Unit INSTANCE Lsam/generated/Unit;
       return
     .end code
 .end method
@@ -582,7 +597,7 @@ L3:
 ; my custom list class
 
 .version 65 0
-.class public super abstract List$
+.class public super abstract sam/generated/List$
 .super java/lang/Object
 .field tag I
 
@@ -594,21 +609,21 @@ L4:     return
 
     .end code
 .end method
-.permittedsubclasses Cons$ Nil$
+.permittedsubclasses sam/generated/Cons$ sam/generated/Nil$
 .end class
 
 
 .version 65 0
-.class public final super Nil$
-.super List$
+.class public final super sam/generated/Nil$
+.super sam/generated/List$
 
 .method public <init> : ()V
     .code stack 2 locals 1
 L0:     aload_0
-L1:     invokespecial Method List$ <init> ()V
+L1:     invokespecial Method sam/generated/List$ <init> ()V
         aload_0
         iconst_0
-        putfield Field Nil$ tag I
+        putfield Field sam/generated/Nil$ tag I
 L4:     return
 
     .end code
@@ -625,20 +640,20 @@ L2:     areturn
 
 
 .version 65 0
-.class public final super Cons$
-.super List$
-.field public val LTuple;
+.class public final super sam/generated/Cons$
+.super sam/generated/List$
+.field public val Lsam/generated/Tuple;
 
-.method public <init> : (LTuple;)V
+.method public <init> : (Lsam/generated/Tuple;)V
     .code stack 2 locals 2
 L0:     aload_0
-L1:     invokespecial Method List$ <init> ()V
+L1:     invokespecial Method sam/generated/List$ <init> ()V
 L4:     aload_0
 L5:     aload_1
-L6:     putfield Field Cons$ val LTuple;
+L6:     putfield Field sam/generated/Cons$ val Lsam/generated/Tuple;
         aload_0
         iconst_1
-        putfield Field Cons$ tag I
+        putfield Field sam/generated/Cons$ tag I
 L9:     return
 
     .end code
@@ -654,19 +669,19 @@ L9:     astore_1
 L10:    aload_0
 L11:    astore_2
 
-        .stack append Object java/lang/StringBuilder Object Cons$
+        .stack append Object java/lang/StringBuilder Object sam/generated/Cons$
 L12:    aload_2
-L13:    getfield Field Cons$ val LTuple;
-L16:    getfield Field Tuple data [Ljava/lang/Object;
+L13:    getfield Field sam/generated/Cons$ val Lsam/generated/Tuple;
+L16:    getfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L19:    iconst_1
 L20:    aaload
 L21:    invokevirtual Method java/lang/Object getClass ()Ljava/lang/Class;
-L24:    ldc Class Nil$
+L24:    ldc Class sam/generated/Nil$
 L26:    if_acmpeq L64
 L29:    aload_1
 L30:    aload_2
-L31:    getfield Field Cons$ val LTuple;
-L34:    getfield Field Tuple data [Ljava/lang/Object;
+L31:    getfield Field sam/generated/Cons$ val Lsam/generated/Tuple;
+L34:    getfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L37:    iconst_0
 L38:    aaload
 L39:    invokevirtual Method java/lang/StringBuilder append (Ljava/lang/Object;)Ljava/lang/StringBuilder;
@@ -674,19 +689,19 @@ L42:    ldc ";"
 L44:    invokevirtual Method java/lang/StringBuilder append (Ljava/lang/String;)Ljava/lang/StringBuilder;
 L47:    pop
 L48:    aload_2
-L49:    getfield Field Cons$ val LTuple;
-L52:    getfield Field Tuple data [Ljava/lang/Object;
+L49:    getfield Field sam/generated/Cons$ val Lsam/generated/Tuple;
+L52:    getfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L55:    iconst_1
 L56:    aaload
-L57:    checkcast Cons$
+L57:    checkcast sam/generated/Cons$
 L60:    astore_2
 L61:    goto L12
 
         .stack same
 L64:    aload_1
 L65:    aload_2
-L66:    getfield Field Cons$ val LTuple;
-L69:    getfield Field Tuple data [Ljava/lang/Object;
+L66:    getfield Field sam/generated/Cons$ val Lsam/generated/Tuple;
+L69:    getfield Field sam/generated/Tuple data [Ljava/lang/Object;
 L72:    iconst_0
 L73:    aaload
 L74:    invokevirtual Method java/lang/StringBuilder append (Ljava/lang/Object;)Ljava/lang/StringBuilder;
@@ -702,12 +717,12 @@ L87:    areturn
 .end class
 
 .version 62 0
-.class public super Std
+.class public super sam/generated/Std
 .super java/lang/Object
 .field public static print Ljava/util/function/Function; .fieldattributes
-    .signature Ljava/util/function/Function<Ljava/lang/Object;LUnit;>;
+    .signature Ljava/util/function/Function<Ljava/lang/Object;Lsam/generated/Unit;>;
 .end fieldattributes
-.field public static Nil$ LList$;
+.field public static Nil$ Lsam/generated/List$;
 .field public static Cons$ Ljava/util/function/Function;
 
 .method public <init> : ()V
@@ -716,21 +731,15 @@ L0:     aload_0
 L1:     invokespecial Method java/lang/Object <init> ()V
 L4:     return
 L5:
-        .linenumbertable
-            L0 3
-        .end linenumbertable
-        .localvariabletable
-            0 is this LStd; from L0 to L5
-        .end localvariabletable
     .end code
 .end method
 
-.method private static synthetic lambda$static$0 : (Ljava/lang/Object;)LUnit;
+.method private static synthetic lambda$static$0 : (Ljava/lang/Object;)Lsam/generated/Unit;
     .code stack 2 locals 1
 L0:     getstatic Field java/lang/System out Ljava/io/PrintStream;
 L3:     aload_0
 L4:     invokevirtual Method java/io/PrintStream println (Ljava/lang/Object;)V
-L7:     getstatic Field Unit INSTANCE LUnit;
+L7:     getstatic Field sam/generated/Unit INSTANCE Lsam/generated/Unit;
 L10:    areturn
 L11:
         .linenumbertable
@@ -743,12 +752,12 @@ L11:
     .end code
 .end method
 
-.method private static synthetic lambda$static$1 : (LTuple;)LCons$;
+.method private static synthetic lambda$static$1 : (Lsam/generated/Tuple;)Lsam/generated/Cons$;
     .code stack 3 locals 1
-        new Cons$
+        new sam/generated/Cons$
         dup
         aload_0
-        invokespecial Method Cons$ <init> (LTuple;)V
+        invokespecial Method sam/generated/Cons$ <init> (Lsam/generated/Tuple;)V
         areturn
 
     .end code
@@ -758,15 +767,15 @@ L11:
 .method static <clinit> : ()V
     .code stack 2 locals 0
 L0:     invokedynamic [_25]
-L5:     putstatic Field Std print Ljava/util/function/Function;
+L5:     putstatic Field sam/generated/Std print Ljava/util/function/Function;
 
-        new Nil$
+        new sam/generated/Nil$
         dup
-        invokespecial Method Nil$ <init> ()V
-        putstatic Field Std Nil$ LList$;
+        invokespecial Method sam/generated/Nil$ <init> ()V
+        putstatic Field sam/generated/Std Nil$ Lsam/generated/List$;
 
         invokedynamic [_100]
-        putstatic Field Std Cons$ Ljava/util/function/Function;
+        putstatic Field sam/generated/Std Cons$ Ljava/util/function/Function;
 
         return
 L9:
@@ -780,9 +789,9 @@ L9:
 .innerclasses
     java/lang/invoke/MethodHandles$Lookup java/lang/invoke/MethodHandles Lookup public static final
 .end innerclasses
-.const [_25] = InvokeDynamic invokeStatic Method java/lang/invoke/LambdaMetafactory metafactory (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; MethodType (Ljava/lang/Object;)Ljava/lang/Object; [_59] MethodType (Ljava/lang/Object;)LUnit; : apply ()Ljava/util/function/Function;
-.const [_59] = MethodHandle invokeStatic Method Std lambda$static$0 (Ljava/lang/Object;)LUnit;
-.const [_100] = InvokeDynamic invokeStatic Method java/lang/invoke/LambdaMetafactory metafactory (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; MethodType (Ljava/lang/Object;)Ljava/lang/Object; [_101] MethodType (LTuple;)LCons$; : apply ()Ljava/util/function/Function;
-.const [_101] = MethodHandle invokeStatic Method Std lambda$static$1 (LTuple;)LCons$;
+.const [_25] = InvokeDynamic invokeStatic Method java/lang/invoke/LambdaMetafactory metafactory (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; MethodType (Ljava/lang/Object;)Ljava/lang/Object; [_59] MethodType (Ljava/lang/Object;)Lsam/generated/Unit; : apply ()Ljava/util/function/Function;
+.const [_59] = MethodHandle invokeStatic Method sam/generated/Std lambda$static$0 (Ljava/lang/Object;)Lsam/generated/Unit;
+.const [_100] = InvokeDynamic invokeStatic Method java/lang/invoke/LambdaMetafactory metafactory (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; MethodType (Ljava/lang/Object;)Ljava/lang/Object; [_101] MethodType (Lsam/generated/Tuple;)Lsam/generated/Cons$; : apply ()Ljava/util/function/Function;
+.const [_101] = MethodHandle invokeStatic Method sam/generated/Std lambda$static$1 (Lsam/generated/Tuple;)Lsam/generated/Cons$;
 .end class
 |}
