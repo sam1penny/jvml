@@ -120,3 +120,80 @@ let rec clear_shared_expr_seen e =
 
 let clear_shared_decl_seen d = iter_over_decl_exprs clear_shared_expr_seen d
 let clear_shared_program_seen program = List.iter clear_shared_decl_seen program
+
+let rec map_over_expr_texprs f expr =
+  match expr with
+  | Int _ | Bool _ | Unit | Match_Failure -> expr
+  | Ident (ty, x) -> Ident (f ty, x)
+  | Bop (ty, e0, op, e1) ->
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      Bop (ty', e0', op, e1')
+  | If (ty, e0, e1, e2) ->
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      let e2' = map_over_expr_texprs f e2 in
+      If (ty', e0', e1', e2')
+  | Fun (t0, t1, x, e) ->
+      let t0' = f t0 in
+      let t1' = f t1 in
+      Fun (t0', t1', x, map_over_expr_texprs f e)
+  | App (ty, e0, e1) ->
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      App (ty', e0', e1')
+  | Direct_app (ty, arg_tys, ret_ty, name, arg_es) ->
+      let ty' = f ty in
+      let arg_tys' = List.map f arg_tys in
+      let ret_ty' = f ret_ty in
+      let arg_es' = List.map (map_over_expr_texprs f) arg_es in
+      Direct_app (ty', arg_tys', ret_ty', name, arg_es')
+  | Tuple (ty, es) ->
+      let ty' = f ty in
+      Tuple (ty', List.map (map_over_expr_texprs f) es)
+  | Switch (ty, e, cases, maybe_fallback_expr) ->
+      let ty' = f ty in
+      let e' = map_over_expr_texprs f e in
+      let cases' =
+        List.map
+          (fun (case_con, case_expr) ->
+            (case_con, map_over_expr_texprs f case_expr))
+          cases
+      in
+      let maybe_fallback_expr' =
+        Option.map (map_over_expr_texprs f) maybe_fallback_expr
+      in
+      Switch (ty', e', cases', maybe_fallback_expr')
+  | Let (ty, x, e0, e1) ->
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      Let (ty', x, e0', e1')
+  | LetRec (ty, x, e0, e1) ->
+      let ty' = f ty in
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      LetRec (ty', x, e0', e1')
+  | Constr (ty, cname) -> Constr (f ty, cname)
+  | Seq (ty, es) ->
+      let ty' = f ty in
+      Seq (ty', List.map (map_over_expr_texprs f) es)
+  | ConstructorGet (ty, cname, e) ->
+      let ty' = f ty in
+      ConstructorGet (ty', cname, map_over_expr_texprs f e)
+  | TupleGet (ty, i, e) ->
+      let ty' = f ty in
+      TupleGet (ty', i, map_over_expr_texprs f e)
+  | Shared_Expr (e_ref, _, _) ->
+      let _ = map_over_expr_texprs f !e_ref in
+      expr
+  | While_true e -> While_true (map_over_expr_texprs f e)
+  | Break e -> Break (map_over_expr_texprs f e)
+  | Assign_Seq assigns ->
+      Assign_Seq
+        (List.map
+           (fun (x, ty, e) -> (x, f ty, map_over_expr_texprs f e))
+           assigns)

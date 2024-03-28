@@ -1,3 +1,5 @@
+Common.Config.set_all_opt ()
+
 let build_and_run prog =
   let _ = if not (Sys.file_exists "tmp/") then Sys.mkdir "tmp/" 0o755 in
   let tmp = open_out "tmp/test.j" in
