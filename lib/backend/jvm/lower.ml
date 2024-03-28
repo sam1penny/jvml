@@ -226,7 +226,7 @@ let lower_constructor_body indent name constructor_args =
     (fun i (field, ty) ->
       [
         "aload_0";
-        sprintf "aload_%i" (i + 1);
+        load_ref (i + 1);
         sprintf "putfield Field %s %s L%s;" name field (lower_type ty);
       ]
       |> List.map (fun i -> indent ^ i)
