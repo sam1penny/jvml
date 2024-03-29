@@ -115,7 +115,9 @@ let fold_left_over_sub_expr f acc e =
 
 let rec clear_shared_expr_seen e =
   match e with
-  | Shared_Expr (_, _, seen) -> seen := false
+  | Shared_Expr (e_ref, _, seen) ->
+      seen := false;
+      clear_shared_expr_seen !e_ref
   | _ -> iter_over_sub_expr clear_shared_expr_seen e
 
 let clear_shared_decl_seen d = iter_over_decl_exprs clear_shared_expr_seen d

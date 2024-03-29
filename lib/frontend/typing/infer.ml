@@ -698,10 +698,10 @@ let type_program_exn input program =
       let to_internal_loc (x, y) =
         (Pp_loc.Position.of_lexing x, Pp_loc.Position.of_lexing y)
       in
-      Pp_loc.pp ~input Format.std_formatter [ to_internal_loc loc ];
+      let _ = Pp_loc.pp ~input Format.std_formatter [ to_internal_loc loc ] in
       (* todo install exception printers and raise exception *)
-      Format.printf "Error: %s\n" message;
-      Format.print_flush ();
+      let _ = Format.printf "Error: %s\n" message in
+      let _ = Format.pp_print_flush Format.std_formatter () in
       raise (Failure "error in type inference")
 
 let type_program_exn_from_file filename program =
