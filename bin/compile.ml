@@ -30,6 +30,9 @@ let speclist =
        Default 10" );
     ("-tmm", Arg.Unit (add_opt "-tmm"), " Enable tail recursion modulo monoid");
     ("-tco", Arg.Unit (add_opt "-tco"), " Enable tail call optimisation");
+    ( "-dyn-lambdas",
+      Arg.Set Common.Config.use_dynamic_lambdas,
+      " Compile lambas using invokedynamic" );
   ]
   |> Arg.align
 

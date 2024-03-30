@@ -232,8 +232,14 @@ let rec compile_expr label_gen env top_level_bindings after_while_loop e =
         @ c1 @ maybe_goto_after @ [ LABEL else_label ] @ c2 @ maybe_label_after,
         s0 @ s1 @ s2 )
   | Fun (t0, t1, x, e) ->
-      compile_anon_lambda_expr label_gen env top_level_bindings after_while_loop
-        (convert_type t0, convert_type t1, x, e)
+      if !Common.Config.use_dynamic_lambdas then
+        compile_dyn_lambda_expr label_gen env top_level_bindings
+          after_while_loop
+          (convert_type t0, convert_type t1, x, e)
+      else
+        compile_anon_lambda_expr label_gen env top_level_bindings
+          after_while_loop
+          (convert_type t0, convert_type t1, x, e)
   | App (ty, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in
       let defs1, c1, s1 = compile_expr_rec e1 in
