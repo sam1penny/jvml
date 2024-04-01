@@ -48,7 +48,7 @@ let rec desugared_ast_of_expr constructors_by_type expr =
   | Typed_ast.Constr (_, ty, cname) -> Constr (ty, cname)
   | Typed_ast.Seq (_, ty, es) -> Seq (ty, List.map rec_desugar es)
 
-let desugared_ast_of_type_constructor tag = function
+let desugared_ast_of_value_constructor tag = function
   | Typed_ast.DeclConstr (_, cname, ty_opt) ->
       DeclConstr (cname, Int32.of_int tag, ty_opt)
 
@@ -61,7 +61,7 @@ let desugared_ast_of_decl constructors_by_type = function
         ValRec (ty, x, desugared_ast_of_expr constructors_by_type e) )
   | Typed_ast.Type (_, ty, params, tname, constructors) ->
       let desugared_constructors =
-        List.mapi desugared_ast_of_type_constructor constructors
+        List.mapi desugared_ast_of_value_constructor constructors
       in
       let casecons_by_name =
         List.fold_left

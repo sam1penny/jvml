@@ -113,8 +113,8 @@ let rec rename_decl most_recent_version most_local_version d =
       let _ = Hashtbl.add most_local_version x x_versioned in
       ValRec
         (ty, x_versioned, rename_expr most_recent_version most_local_version e)
-  | Type (ty, params, tname, type_constructors) ->
-      Type (ty, params, tname, type_constructors)
+  | Type (ty, params, tname, value_constructors) ->
+      Type (ty, params, tname, value_constructors)
   | And decls ->
       And (List.map (rename_decl most_recent_version most_local_version) decls)
 
