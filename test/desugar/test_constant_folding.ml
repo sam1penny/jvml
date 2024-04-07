@@ -84,3 +84,63 @@ let%expect_test "test constant folding with long dependencies" =
              └──Int 8
 
   |}]
+
+let%expect_test "test constant folding edge cases - unusual associativity" =
+  let program =
+    {|
+   val test1 = fun x -> 1 + (x + 1)
+   val test2 = fun x -> 1 + (1 + x)
+   val test3 = fun x -> 1 + (x + (x + 1))
+   val test4 = fun x -> 1 + (x + (1 + x))
+   |}
+  in
+  let _ = parse_type_desugar_fold_print program in
+  [%expect
+    {|
+    └──Val test1_$0
+       └──Fun x_$0 : int -> int
+          └──Bop + : int
+             └──Int 2
+             └──Ident x_$0 : int
+    └──Val test2_$0
+       └──Fun x_$1 : int -> int
+          └──Bop + : int
+             └──Int 2
+             └──Ident x_$1 : int
+    └──Val test3_$0
+       └──Fun x_$2 : int -> int
+          └──Bop + : int
+             └──Int 2
+             └──Bop + : int
+                └──Ident x_$2 : int
+                └──Ident x_$2 : int
+    └──Val test4_$0
+       └──Fun x_$3 : int -> int
+          └──Bop + : int
+             └──Int 2
+             └──Bop + : int
+                └──Ident x_$3 : int
+                └──Ident x_$3 : int
+
+  |}]
+
+let%expect_test "long dependency over unusual assocativity" =
+  let program = {|
+   val test = fun x -> 1 + (x + (x + x + (x + 1)))
+  |} in
+  let _ = parse_type_desugar_fold_print program in
+  [%expect
+    {|
+     └──Val test_$0
+        └──Fun x_$0 : int -> int
+           └──Bop + : int
+              └──Int 2
+              └──Bop + : int
+                 └──Ident x_$0 : int
+                 └──Bop + : int
+                    └──Bop + : int
+                       └──Ident x_$0 : int
+                       └──Ident x_$0 : int
+                    └──Ident x_$0 : int
+
+   |}]
