@@ -12,6 +12,7 @@ type bop =
   | FLOAT_SUB
   | FLOAT_MUL
   | FLOAT_DIV
+  | STRING_CONCAT
 
 let show_bop = function
   | ADD -> "+"
@@ -27,6 +28,7 @@ let show_bop = function
   | FLOAT_SUB -> "-."
   | FLOAT_MUL -> "*."
   | FLOAT_DIV -> "/."
+  | STRING_CONCAT -> "^"
 
 let pp_bop formatter bop = Format.fprintf formatter "@[%s@]" (show_bop bop)
 let ( >>=? ) x f = Result.bind x f

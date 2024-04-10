@@ -39,7 +39,7 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
     (most_local_version : (string, string) Hashtbl.t) e =
   let rec_rename_expr = rename_expr most_recent_version most_local_version in
   match e with
-  | Int _ | Float _ | Bool _ | Unit | Match_Failure -> e
+  | Int _ | Float _ | String _ | Bool _ | Unit | Match_Failure -> e
   | Ident (ty, var) ->
       if var = "print" then Ident (ty, "print_$0")
       else Ident (ty, Hashtbl.find most_local_version var)

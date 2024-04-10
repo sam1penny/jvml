@@ -469,3 +469,34 @@ let%expect_test "test floats" =
     20.0
     1.3333334
     1.0 |}]
+
+let%expect_test "test strings" =
+  let program =
+    {|
+  val x = print("abc")
+  val y = print("ABC")
+  val z = print("aBc523")
+  val a = print("a" ^ "b")
+  val b = print("a" ^ "b" ^ "c")
+
+  val test =
+    let poly = fun x -> x in
+    let foo = "abc" in
+    let concata = fun y -> "a" ^ y in
+    do {
+    print(poly foo);
+    print(concata foo)
+    }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+  abc
+  ABC
+  aBc523
+  ab
+  abc
+  abc
+  aabc
+
+|}]

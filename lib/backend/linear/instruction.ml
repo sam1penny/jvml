@@ -11,11 +11,13 @@ type standard_bop =
   | FLOAT_SUB
   | FLOAT_MUL
   | FLOAT_DIV
+  | STRING_CONCAT
 [@@deriving show]
 
 type type_expr =
   | TyInt
   | TyFloat
+  | TyString
   | TyBool
   | TyUnit
   | TyCustom of string
@@ -38,6 +40,7 @@ type instruction =
   | BOX_BOOL
   | UNBOX_BOOL
   | PUSH_UNIT
+  | PUSH_STRING of string
   | STORE_REF of int
   | LOAD_REF of int
   | IFZERO of string

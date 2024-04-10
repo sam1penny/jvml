@@ -19,6 +19,7 @@ let float = int '.' int
 let letter = ['a'-'z' 'A'-'Z']
 let lowercase_indent = (['a'-'z'] | '_') (letter | ['0'-'9'] | '_' | '\'')*
 let uppercase_ident = (['A'-'Z'] | '_') (letter | ['0'-'9'] | '_' | '\'')*
+let any_string_without_quote = "[^\"]*"
 
 rule token = parse
     | white {token lexbuf}
@@ -34,6 +35,8 @@ rule token = parse
     | "-." { FLOAT_SUB }
     | "*." { FLOAT_MUL }
     | "/." { FLOAT_DIV }
+    | '\"' { QUOTATION_MARK }
+    | "^" { STRING_CONCAT }
     | '=' { EQ }
     | '<' { LT }
     | '>' { GT }
@@ -72,6 +75,7 @@ rule token = parse
     | "do" { DO }
     | lowercase_indent { LOWERCASE_IDENT (Lexing.lexeme lexbuf)}
     | uppercase_ident { UPPERCASE_IDENT (Lexing.lexeme lexbuf)}
+    | any_string_without_quote { ANY_STRING (Lexing.lexeme lexbuf )}
     | eof { EOF }
     | '\n' { next_line lexbuf; token lexbuf }
     | _  as c { raise (SyntaxError ("Unknown Character: " ^ (String.make 1 c)))}

@@ -7,6 +7,7 @@ let get_expr_type =
   function
   | Int _ -> TyInt
   | Float _ -> TyFloat
+  | String _ -> TyString
   | Ident (_, t, _) -> t
   | Bool _ -> TyBool
   | Unit _ -> TyUnit
@@ -41,7 +42,7 @@ end)
 let rec tyvars_from_type ty =
   let open Typed_ast in
   match ty with
-  | TyInt | TyFloat | TyBool | TyUnit -> StringSet.empty
+  | TyInt | TyFloat | TyString | TyBool | TyUnit -> StringSet.empty
   | TyVar v -> StringSet.singleton v
   | TyTuple ts ->
       List.fold_left
@@ -80,7 +81,7 @@ let get_pattern_type = function
 let rec map_over_texpr_vars f =
   let open Typed_ast in
   function
-  | (TyInt | TyFloat | TyBool | TyUnit) as ty -> ty
+  | (TyInt | TyFloat | TyString | TyBool | TyUnit) as ty -> ty
   | TyVar v -> f v
   | TyTuple ts -> TyTuple (List.map (map_over_texpr_vars f) ts)
   | TyFun (t0, t1) ->
@@ -109,7 +110,7 @@ let rec map_over_pat_texprs f pat =
 let rec map_over_expr_texprs f expr =
   let open Typed_ast in
   match expr with
-  | Int _ | Float _ | Bool _ | Unit _ -> expr
+  | Int _ | Float _ | String _ | Bool _ | Unit _ -> expr
   | Ident (loc, ty, x) -> Ident (loc, f ty, x)
   | Bop (loc, ty, e0, op, e1) ->
       let ty' = f ty in
@@ -359,6 +360,7 @@ let rec type_expr unifications nt env expr =
   match expr with
   | Parsed_ast.Int (loc, i) -> Ok (Typed_ast.Int (loc, i))
   | Parsed_ast.Float (loc, f) -> Ok (Typed_ast.Float (loc, f))
+  | Parsed_ast.String (loc, s) -> Ok (Typed_ast.String (loc, s))
   | Parsed_ast.Bool (loc, b) -> Ok (Typed_ast.Bool (loc, b))
   | Parsed_ast.Unit loc -> Ok (Typed_ast.Unit loc)
   | Parsed_ast.Ident (loc, v) -> (

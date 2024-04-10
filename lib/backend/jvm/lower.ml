@@ -2,7 +2,7 @@ open Linear.Instruction
 open Printf
 
 let stack_size_change = function
-  | PUSH_INT _ | PUSH_FLOAT _ | PUSH_BOOL _ | PUSH_UNIT -> 1
+  | PUSH_INT _ | PUSH_FLOAT _ | PUSH_BOOL _ | PUSH_UNIT | PUSH_STRING _ -> 1
   | BOX_INT | BOX_FLOAT | BOX_BOOL | UNBOX_INT | UNBOX_BOOL | UNBOX_FLOAT -> 0
   | STORE_REF _ -> -1
   | LOAD_REF _ -> 1
@@ -44,6 +44,7 @@ let num_local_vars nargs prog =
 let rec lower_type = function
   | TyInt -> "java/lang/Integer"
   | TyFloat -> "java/lang/Float"
+  | TyString -> "java/lang/String"
   | TyBool -> "java/lang/Boolean"
   | TyFun _ -> "java/util/function/Function"
   | TyAny -> "java/lang/Object"
@@ -54,8 +55,8 @@ let rec lower_type = function
 
 let rec lower_type_as_descriptor ty =
   match ty with
-  | TyInt | TyFloat | TyBool | TyFun _ | TyAny | TyUnit | TyCustom _ | TyTuple _
-    ->
+  | TyInt | TyFloat | TyString | TyBool | TyFun _ | TyAny | TyUnit | TyCustom _
+  | TyTuple _ ->
       "L" ^ lower_type ty ^ ";"
   | TyArray t -> "[" ^ lower_type_as_descriptor t
 
@@ -88,6 +89,11 @@ let lower_bop ctrl_gen = function
         false_label ^ ":";
         "iconst_0";
         after_label ^ ":";
+      ]
+  | STRING_CONCAT ->
+      [
+        "invokevirtual Method java/lang/String concat \
+         (Ljava/lang/String;)Ljava/lang/String;";
       ]
 
 let load_int = function
@@ -150,6 +156,7 @@ let lower_instruction ctrl_gen clazz = function
   | UNBOX_BOOL -> [ "invokevirtual Method java/lang/Boolean booleanValue ()Z" ]
   | PUSH_UNIT ->
       [ "getstatic Field sam/generated/Unit INSTANCE Lsam/generated/Unit;" ]
+  | PUSH_STRING s -> [ sprintf "ldc \"%s\"" s ]
   | BOP bop -> lower_bop ctrl_gen bop
   | STORE_REF r -> [ store_ref r ]
   | LOAD_REF r -> [ load_ref r ]

@@ -7,6 +7,7 @@
 %token <float> FLOAT
 %token <string> LOWERCASE_IDENT
 %token <string> UPPERCASE_IDENT
+%token <string> ANY_STRING
 
 %token LPAREN, RPAREN
 %token TRUE, FALSE, AND, OR, IF, THEN, ELSE, EQ, LT, GT
@@ -14,15 +15,16 @@
 %token UNIT, COMMA, APOSTROPHE, LET, IN, REC
 %token DO, SEMICOLON, LCURLY, RCURLY, LSQUARE, RSQUARE
 %token CONS, EMPTY_LIST
+%token QUOTATION_MARK
 %token EOF
 
 %token TYPE, TINT, TBOOL, TUNIT, OF
 %token VAL
 
-%token ADD, SUB, MUL, DIV
+%token ADD, SUB, MUL, DIV, STRING_CONCAT
 %token FLOAT_ADD, FLOAT_SUB, FLOAT_MUL, FLOAT_DIV
 
-%left ADD, SUB, FLOAT_ADD, FLOAT_SUB
+%left ADD, SUB, FLOAT_ADD, FLOAT_SUB, STRING_CONCAT
 %left MUL, FLOAT_MUL, DIV, FLOAT_DIV, AND, OR, EQ, LT, GT
 
 %right ARROW, CONS
@@ -58,12 +60,16 @@ prog:
   | GT { Common.GT }
   | AND { Common.AND }
   | OR { Common.OR }
+  | STRING_CONCAT { Common.STRING_CONCAT }
 
 (* expressions in decreasing order of precedence *)
 
 expr4:
   | i = INT { Parsed_ast.Int ($sloc, i) }
   | f = FLOAT { Parsed_ast.Float ($sloc, f) }
+  | QUOTATION_MARK; s = LOWERCASE_IDENT; QUOTATION_MARK { Parsed_ast.String ($sloc, s)}
+  | QUOTATION_MARK; s = UPPERCASE_IDENT; QUOTATION_MARK { Parsed_ast.String ($sloc, s)}
+  | QUOTATION_MARK; s = ANY_STRING; QUOTATION_MARK { Parsed_ast.String ($sloc, s)}
   | i = LOWERCASE_IDENT {Parsed_ast.Ident ($sloc, i)}
   | i = UPPERCASE_IDENT {Parsed_ast.Constr ($sloc, i)}
   | EMPTY_LIST {Parsed_ast.Constr($sloc, "Nil$")}

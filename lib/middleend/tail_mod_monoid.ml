@@ -13,8 +13,9 @@ open Common
 
 let shallow_map_tail_positions f e =
   match e with
-  | Int _ | Float _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure | Fun _
-  | App _ | Tuple _ | TupleGet _ | ConstructorGet _ | Bop _ | Direct_app _ ->
+  | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
+  | Match_Failure | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _
+  | Bop _ | Direct_app _ ->
       e
   | If (ty, e0, e1, e2) -> If (ty, e0, f e1, f e2)
   | Let (ty, x, e0, e1) -> Let (ty, x, e0, f e1)
@@ -49,8 +50,9 @@ let or_else f k o = match o with None -> f k | Some _ -> o
 let rec has_tmm_expr fn_name e =
   let rec_has_tmm = has_tmm_expr fn_name in
   match e with
-  | Int _ | Float _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure | Fun _
-  | App _ | Tuple _ | TupleGet _ | ConstructorGet _ | Direct_app _ ->
+  | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
+  | Match_Failure | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _
+  | Direct_app _ ->
       None
   | Bop (_, _, ((ADD | MUL) as bop), Direct_app (_, _, _, name, _))
     when name = fn_name ->

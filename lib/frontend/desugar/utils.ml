@@ -20,7 +20,9 @@ let rec map_over_decl_exprs f d =
 
 let map_over_sub_expr f e =
   match e with
-  | Int _ | Float _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure -> e
+  | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
+  | Match_Failure ->
+      e
   | Bop (ty, e0, bop, e1) ->
       let e0' = f e0 in
       let e1' = f e1 in
@@ -88,7 +90,9 @@ let iter_over_decl_exprs f d =
 
 let fold_left_over_sub_expr f acc e =
   match e with
-  | Int _ | Float _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure -> acc
+  | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
+  | Match_Failure ->
+      acc
   | Bop (_, e0, _, e1) -> f (f acc e0) e1
   | If (_, e0, e1, e2) -> f (f (f acc e0) e1) e2
   | Fun (_, _, _, e) -> f acc e
@@ -125,7 +129,7 @@ let clear_shared_program_seen program = List.iter clear_shared_decl_seen program
 
 let rec map_over_expr_texprs f expr =
   match expr with
-  | Int _ | Float _ | Bool _ | Unit | Match_Failure -> expr
+  | Int _ | Float _ | String _ | Bool _ | Unit | Match_Failure -> expr
   | Ident (ty, x) -> Ident (f ty, x)
   | Bop (ty, e0, op, e1) ->
       let ty' = f ty in
