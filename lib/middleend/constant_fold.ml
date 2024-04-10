@@ -29,8 +29,8 @@ let constant_fold_bop ty e0 bop e1 =
   (* associative + commutative => foldable
      1. (x + i0) + i1 -> x + (i0 + i1)
      2. (i0 + x) + i1 -> x + (i0 + i1)
-     3. i0 + (i1 + x) -> (i0 + i1) + x
-     4. i0 + (x + i1) -> (i0 + i1) + x
+     3. i0 + (i1 + x) -> x + (i0 + i1)
+     4. i0 + (x + i1) -> x + (i0 + i1)
   *)
   | ADD, Bop (_, e0_0, ADD, Int i0_1), Int i1 ->
       Bop (ty, e0_0, ADD, Int (Int32.add i0_1 i1))

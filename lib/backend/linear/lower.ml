@@ -621,7 +621,7 @@ and lower_tuple_eles_to_array label_gen env top_level_bindings after_while_loop
   in
   (defs, prelude @ maincode, smethods)
 
-let lower_type_constructor tname
+let lower_value_constructor tname
     (Desugared_ast.DeclConstr (cname, tag, type_expr_opt)) =
   Constructor
     { name = cname; tag; tname; arg = Option.map convert_type type_expr_opt }
@@ -804,7 +804,7 @@ let rec compile_decl label_gen env toplevel = function
         [ static_method ] @ static_smethods @ closure_body,
         env',
         new_toplevel )
-  | Desugared_ast.Type (ty, _, tname, type_constructors) ->
+  | Desugared_ast.Type (ty, _, tname, value_constructors) ->
       let class_tname = String.capitalize_ascii tname in
       let typei =
         Type_interface
@@ -813,11 +813,11 @@ let rec compile_decl label_gen env toplevel = function
             constructors =
               List.map
                 (function Desugared_ast.DeclConstr (cname, _, _) -> cname)
-                type_constructors;
+                value_constructors;
           }
       in
       let tconstrs =
-        List.map (lower_type_constructor class_tname) type_constructors
+        List.map (lower_value_constructor class_tname) value_constructors
       in
       (* current bodge - adding static fields for creating constructors *)
       let defs, code, smethods, env =
@@ -829,7 +829,7 @@ let rec compile_decl label_gen env toplevel = function
                 (Option.map convert_type type_expr_op)
             in
             (defs @ accdefs, code @ acccode, smethods @ accsmethods, env))
-          type_constructors ([], [], [], env)
+          value_constructors ([], [], [], env)
       in
       ([ typei ] @ tconstrs @ defs, code, smethods, env, toplevel)
   (* not a nice hack, but we know all decls within an 'AND' are val/valrec *)
