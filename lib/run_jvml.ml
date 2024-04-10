@@ -10,21 +10,28 @@ let run_frontend filename =
   Parsing.Driver.parse_string filename |> Typing.Driver.type_program |> fun p ->
   Result.bind p (fun program -> Ok (Desugar.desugar_program program))
 
-let run_frontend_exn filename program =
+let run_frontend_exn_from_file filename program =
   Parsing.Driver.parse_string program
   |> Typing.Infer.type_program_exn_from_file filename
   |> Desugar.desugar_program
 
-let linear_ir_from_string filename program =
-  run_frontend_exn filename program
+let run_frontend_exn_from_string program_text =
+  Parsing.Driver.parse_string program_text
+  |> Typing.Infer.type_program_exn_from_string program_text
+  |> Desugar.desugar_program
+
+let linear_ir_from_string program_text =
+  run_frontend_exn_from_string program_text
   |> Middle_end.Driver.run_middleend |> Linear.Driver.lower_program_to_linear_ir
   |> Linear.Instruction.show_program
 
-let compile_program_from_string ?(filename = "no_file") program =
-  run_frontend_exn filename program
-  |> Middle_end.Driver.run_middleend |> Linear.Driver.lower_program_to_linear_ir
-  |> Jvm.Driver.lower_ir
+let run_backend typed_tree =
+  Middle_end.Driver.run_middleend typed_tree
+  |> Linear.Driver.lower_program_to_linear_ir |> Jvm.Driver.lower_ir
 
-let compile_program_from_file file =
-  let program_text = file_to_string file in
-  compile_program_from_string ~filename:file program_text
+let compile_program_from_string program_text =
+  run_frontend_exn_from_string program_text |> run_backend
+
+let compile_program_from_file filename =
+  let program_text = file_to_string filename in
+  run_frontend_exn_from_file filename program_text |> run_backend

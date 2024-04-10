@@ -1,6 +1,8 @@
 let usage_msg = "compile -s <program_string> -f <file> <options>"
-let program_string = ref ""
-let file = ref ""
+
+type program_input = String of string | File of string
+
+let program_input = ref None
 let opt_list : string list ref = ref []
 let add_opt opt () = opt_list := opt :: !opt_list
 
@@ -16,8 +18,12 @@ let set_opt opt =
 
 let speclist =
   [
-    ("-s", Arg.Set_string program_string, " Set string to compile");
-    ("-f", Arg.Set_string file, " Set file to compile");
+    ( "-s",
+      Arg.String (fun x -> program_input := Some (String x)),
+      " Set string to compile" );
+    ( "-f",
+      Arg.String (fun x -> program_input := Some (File x)),
+      " Set file to compile" );
     ("-opt-all", Arg.Unit (add_opt "-opt-all"), " Enable all optimisations");
     ("-peep", Arg.Unit (add_opt "-peep"), " Enable peephole optimisations");
     ( "-const-fp",
@@ -43,12 +49,11 @@ let () =
       exit 0)
     usage_msg;
   List.iter set_opt !opt_list;
-  let program_text =
-    if !program_string != "" then !program_string
-    else if !file != "" then Jvml.Run_jvml.file_to_string !file
-    else (
-      print_endline usage_msg;
+  (match !program_input with
+  | Some (File filename) -> Jvml.Run_jvml.compile_program_from_file filename
+  | Some (String program_text) ->
+      Jvml.Run_jvml.compile_program_from_string program_text
+  | None ->
+      prerr_endline usage_msg;
       exit 0)
-  in
-  Jvml.Run_jvml.compile_program_from_string ~filename:!file program_text
   |> print_endline
