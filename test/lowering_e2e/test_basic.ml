@@ -451,3 +451,21 @@ let%expect_test "test trmm - test one call suitable for trmc, one not" =
     8
     13
   |}]
+
+let%expect_test "test floats" =
+  let program =
+    {|
+  val test = do {
+    print(1.0 +. 5.0);
+    print(2.0 *. 10.0);
+    print(4.0 /. 3.0);
+    print(4.0 -. 3.0)
+    }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    6.0
+    20.0
+    1.3333334
+    1.0 |}]

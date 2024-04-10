@@ -4,6 +4,7 @@ type loc = Lexing.position * Lexing.position
 
 type type_expr =
   | TyInt
+  | TyFloat
   | TyBool
   | TyUnit
   | TyCustom of type_expr list * string
@@ -14,6 +15,7 @@ type type_expr =
 
 type expr =
   | Int of loc * Int32.t
+  | Float of loc * float
   | Ident of loc * type_expr * string
   | Bool of loc * bool
   | Unit of loc
@@ -51,6 +53,7 @@ let bop_arg_type nt ty =
   match ty with
   | ADD | SUB | MUL | DIV | LT | GT -> TyInt
   | AND | OR -> TyBool
+  | FLOAT_ADD | FLOAT_SUB | FLOAT_MUL | FLOAT_DIV -> TyFloat
   | EQ -> nt ()
 
 let bop_return_type ty =
@@ -58,10 +61,12 @@ let bop_return_type ty =
   match ty with
   | ADD | SUB | MUL | DIV -> TyInt
   | AND | OR | LT | GT | EQ -> TyBool
+  | FLOAT_ADD | FLOAT_SUB | FLOAT_MUL | FLOAT_DIV -> TyFloat
 
 (* printing *)
 let rec pp_texpr = function
   | TyInt -> "int"
+  | TyFloat -> "float"
   | TyBool -> "bool"
   | TyUnit -> "unit"
   | TyVar v -> v
@@ -87,6 +92,7 @@ let string_of_expr_node =
   let open Printf in
   function
   | Int (_, i) -> sprintf "Int %ld" i
+  | Float (_, f) -> sprintf "Float %f" f
   | Bool (_, b) -> sprintf "Bool %b" b
   | Ident (_, ty, ident) -> sprintf "Ident %s : %s" ident (pp_texpr ty)
   | Unit _ -> "()"
@@ -138,7 +144,7 @@ let rec pp_expr ?(indent = "") expr =
   let pp_node n = printf "%s└──%s\n" indent (string_of_expr_node n) in
   let pp_rec_expr = pp_expr ~indent:(indent ^ "   ") in
   match expr with
-  | Int _ | Bool _ | Ident _ | Unit _ | Constr _ -> pp_node expr
+  | Int _ | Float _ | Bool _ | Ident _ | Unit _ | Constr _ -> pp_node expr
   | Bop (_, _, e0, _, e1) ->
       pp_node expr;
       pp_rec_expr e0;

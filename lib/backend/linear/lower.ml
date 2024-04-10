@@ -43,6 +43,7 @@ let rec intersperse sep = function
 
 let rec convert_type = function
   | Typed_ast.TyInt -> Instruction.TyInt
+  | Typed_ast.TyFloat -> Instruction.TyFloat
   | Typed_ast.TyBool -> Instruction.TyBool
   | Typed_ast.TyUnit -> Instruction.TyUnit
   | Typed_ast.TyVar _ -> Instruction.TyAny
@@ -58,7 +59,7 @@ let free_vars_with_types_expr bound e =
   let open Desugared_ast in
   let takeleft _ x _ = Some x in
   let rec aux bound free = function
-    | Int _ | Bool _ | Unit | Constr _ -> free
+    | Int _ | Float _ | Bool _ | Unit | Constr _ -> free
     | Ident (ty, i) ->
         if StringSet.mem i bound then free else StringMap.add i ty free
     | Bop (_, e0, _, e1) ->
@@ -128,7 +129,7 @@ todo - refactor with Desugar.Utils
 let rec clear_shared_expr_labels e =
   let open Desugared_ast in
   match e with
-  | Int _ | Bool _ | Unit | Constr _ | Ident _ | Match_Failure -> ()
+  | Int _ | Float _ | Bool _ | Unit | Constr _ | Ident _ | Match_Failure -> ()
   | Bop (_, e0, _, e1) ->
       clear_shared_expr_labels e0;
       clear_shared_expr_labels e1
@@ -209,6 +210,7 @@ let rec compile_expr label_gen env top_level_bindings after_while_loop e =
   in
   match e with
   | Int i -> ([], [ PUSH_INT i; BOX_INT ], [])
+  | Float f -> ([], [ PUSH_FLOAT f; BOX_FLOAT ], [])
   | Bool b -> ([], [ PUSH_BOOL b; BOX_BOOL ], [])
   | Ident (_, x) -> ([], Value_env.lookup x env, [])
   | Unit -> ([], [ PUSH_UNIT ], [])
@@ -442,6 +444,20 @@ and compile_bop label_gen env top_level_bindings after_while_loop e0 e1 =
       ( defs0 @ defs1,
         c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ]
         @ [ BOP (standardise_bop int_to_int_op); BOX_INT ],
+        s0 @ s1 )
+  | (FLOAT_ADD | FLOAT_SUB | FLOAT_MUL | FLOAT_DIV) as float_to_float_op ->
+      let defs0, c0, s0 = compile_expr_rec e0 in
+      let defs1, c1, s1 = compile_expr_rec e1 in
+      let standardise_bop = function
+        | Common.FLOAT_ADD -> Instruction.FLOAT_ADD
+        | Common.FLOAT_SUB -> Instruction.FLOAT_SUB
+        | Common.FLOAT_MUL -> Instruction.FLOAT_MUL
+        | Common.FLOAT_DIV -> Instruction.FLOAT_DIV
+        | _ -> assert false
+      in
+      ( defs0 @ defs1,
+        c0 @ [ UNBOX_FLOAT ] @ c1 @ [ UNBOX_FLOAT ]
+        @ [ BOP (standardise_bop float_to_float_op); BOX_FLOAT ],
         s0 @ s1 )
   | (LT | GT) as int_to_bool_op ->
       let defs0, c0, s0 = compile_expr_rec e0 in

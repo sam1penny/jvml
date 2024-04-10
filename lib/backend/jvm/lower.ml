@@ -2,8 +2,8 @@ open Linear.Instruction
 open Printf
 
 let stack_size_change = function
-  | PUSH_INT _ | PUSH_BOOL _ | PUSH_UNIT -> 1
-  | BOX_INT | BOX_BOOL | UNBOX_INT | UNBOX_BOOL -> 0
+  | PUSH_INT _ | PUSH_FLOAT _ | PUSH_BOOL _ | PUSH_UNIT -> 1
+  | BOX_INT | BOX_FLOAT | BOX_BOOL | UNBOX_INT | UNBOX_BOOL | UNBOX_FLOAT -> 0
   | STORE_REF _ -> -1
   | LOAD_REF _ -> 1
   | IFZERO _ | IFNONZERO _ -> -1
@@ -43,6 +43,7 @@ let num_local_vars nargs prog =
 
 let rec lower_type = function
   | TyInt -> "java/lang/Integer"
+  | TyFloat -> "java/lang/Float"
   | TyBool -> "java/lang/Boolean"
   | TyFun _ -> "java/util/function/Function"
   | TyAny -> "java/lang/Object"
@@ -53,7 +54,8 @@ let rec lower_type = function
 
 let rec lower_type_as_descriptor ty =
   match ty with
-  | TyInt | TyBool | TyFun _ | TyAny | TyUnit | TyCustom _ | TyTuple _ ->
+  | TyInt | TyFloat | TyBool | TyFun _ | TyAny | TyUnit | TyCustom _ | TyTuple _
+    ->
       "L" ^ lower_type ty ^ ";"
   | TyArray t -> "[" ^ lower_type_as_descriptor t
 
@@ -69,6 +71,10 @@ let lower_bop ctrl_gen = function
   | SUB -> [ "isub" ]
   | MUL -> [ "imul" ]
   | DIV -> [ "idiv" ]
+  | FLOAT_ADD -> [ "fadd" ]
+  | FLOAT_SUB -> [ "fsub" ]
+  | FLOAT_MUL -> [ "fmul" ]
+  | FLOAT_DIV -> [ "fdiv" ]
   | EQ ->
       [ "invokevirtual Method java/lang/Object equals (Ljava/lang/Object;)Z" ]
   | (LT | GT) as bop ->
@@ -88,6 +94,12 @@ let load_int = function
   | -1l -> "iconst_m1"
   | (0l | 1l | 2l | 3l | 4l | 5l) as n -> sprintf "iconst_%ld" n
   | n -> sprintf "ldc %ld" n
+
+let load_float = function
+  | 0.0 -> "fconst_0"
+  | 1.0 -> "fconst_1"
+  | 2.0 -> "fconst_2"
+  | f -> sprintf "ldc %ff" f
 
 let store_ref = function
   | (0 | 1 | 2 | 3) as n -> sprintf "astore_%i" n
@@ -128,6 +140,10 @@ let lower_instruction ctrl_gen clazz = function
   | BOX_INT ->
       [ "invokestatic Method java/lang/Integer valueOf (I)Ljava/lang/Integer;" ]
   | UNBOX_INT -> [ "invokevirtual Method java/lang/Integer intValue ()I" ]
+  | PUSH_FLOAT f -> [ load_float f ]
+  | BOX_FLOAT ->
+      [ "invokestatic Method java/lang/Float valueOf (F)Ljava/lang/Float;" ]
+  | UNBOX_FLOAT -> [ "invokevirtual Method java/lang/Float floatValue ()F" ]
   | PUSH_BOOL b -> [ (if b then "iconst_1" else "iconst_0") ]
   | BOX_BOOL ->
       [ "invokestatic Method java/lang/Boolean valueOf (Z)Ljava/lang/Boolean;" ]

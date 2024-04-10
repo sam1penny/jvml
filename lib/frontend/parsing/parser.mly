@@ -4,6 +4,7 @@
 %}
 
 %token <Int32.t> INT
+%token <float> FLOAT
 %token <string> LOWERCASE_IDENT
 %token <string> UPPERCASE_IDENT
 
@@ -19,9 +20,10 @@
 %token VAL
 
 %token ADD, SUB, MUL, DIV
+%token FLOAT_ADD, FLOAT_SUB, FLOAT_MUL, FLOAT_DIV
 
-%left ADD, SUB
-%left MUL, DIV, AND, OR, EQ, LT, GT
+%left ADD, SUB, FLOAT_ADD, FLOAT_SUB
+%left MUL, FLOAT_MUL, DIV, FLOAT_DIV, AND, OR, EQ, LT, GT
 
 %right ARROW, CONS
 
@@ -47,6 +49,10 @@ prog:
   | SUB { Common.SUB }
   | MUL {Common.MUL }
   | DIV { Common.DIV }
+  | FLOAT_ADD { Common.FLOAT_ADD }
+  | FLOAT_SUB { Common.FLOAT_SUB }
+  | FLOAT_MUL { Common.FLOAT_MUL }
+  | FLOAT_DIV { Common.FLOAT_DIV }
   | EQ  { Common.EQ }
   | LT  { Common.LT }
   | GT { Common.GT }
@@ -57,6 +63,7 @@ prog:
 
 expr4:
   | i = INT { Parsed_ast.Int ($sloc, i) }
+  | f = FLOAT { Parsed_ast.Float ($sloc, f) }
   | i = LOWERCASE_IDENT {Parsed_ast.Ident ($sloc, i)}
   | i = UPPERCASE_IDENT {Parsed_ast.Constr ($sloc, i)}
   | EMPTY_LIST {Parsed_ast.Constr($sloc, "Nil$")}

@@ -1,4 +1,17 @@
-type bop = ADD | SUB | MUL | DIV | EQ | LT | GT | AND | OR
+type bop =
+  | ADD
+  | SUB
+  | MUL
+  | DIV
+  | EQ
+  | LT
+  | GT
+  | AND
+  | OR
+  | FLOAT_ADD
+  | FLOAT_SUB
+  | FLOAT_MUL
+  | FLOAT_DIV
 
 let show_bop = function
   | ADD -> "+"
@@ -10,6 +23,10 @@ let show_bop = function
   | EQ -> "="
   | AND -> "&&"
   | OR -> "||"
+  | FLOAT_ADD -> "+."
+  | FLOAT_SUB -> "-."
+  | FLOAT_MUL -> "*."
+  | FLOAT_DIV -> "/."
 
 let pp_bop formatter bop = Format.fprintf formatter "@[%s@]" (show_bop bop)
 let ( >>=? ) x f = Result.bind x f

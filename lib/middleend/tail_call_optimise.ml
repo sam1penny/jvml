@@ -77,7 +77,8 @@ let rec transform_tail_call_expr_inner name_gen fn_name funargs e =
     transform_tail_call_expr_inner name_gen fn_name funargs
   in
   match e with
-  | Int _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure -> (e, false)
+  | Int _ | Float _ | Ident _ | Bool _ | Unit | Constr _ | Match_Failure ->
+      (e, false)
   | Bop _ | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _ -> (e, false)
   | Direct_app (_, _, _, name, arg_es) when name = fn_name ->
       let assignments = generate_argument_assignments name_gen funargs arg_es in

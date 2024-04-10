@@ -14,6 +14,7 @@ let rec desugared_ast_of_expr constructors_by_type expr =
   let rec_desugar = desugared_ast_of_expr constructors_by_type in
   match expr with
   | Typed_ast.Int (_, i) -> Int i
+  | Typed_ast.Float (_, f) -> Float f
   | Typed_ast.Ident (_, ty, x) -> Ident (ty, x)
   | Typed_ast.Bool (_, b) -> Bool b
   | Typed_ast.Unit _ -> Unit

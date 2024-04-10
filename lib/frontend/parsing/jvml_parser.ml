@@ -3,7 +3,7 @@ open Parsed_ast
 exception CustomParserError of loc * string
 
 let rec check_letrec = function
-  | (Int _ | Ident _ | Constr _ | Bool _ | Unit _) as e -> e
+  | (Int _ | Float _ | Ident _ | Constr _ | Bool _ | Unit _) as e -> e
   | Bop (loc, e0, op, e1) -> Bop (loc, check_letrec e0, op, check_letrec e1)
   | If (loc, e0, e1, e2) ->
       If (loc, check_letrec e0, check_letrec e1, check_letrec e2)

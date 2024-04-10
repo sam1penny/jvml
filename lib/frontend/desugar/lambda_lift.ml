@@ -36,7 +36,7 @@ let free_vars_with_types_expr bound e =
   let rec aux bound free e =
     let rec_aux = aux bound free in
     match e with
-    | Int _ | Bool _ | Unit | Constr _ -> (free, StringMap.empty)
+    | Int _ | Float _ | Bool _ | Unit | Constr _ -> (free, StringMap.empty)
     | Ident (ty, i) ->
         ( (if StringSet.mem i bound then free else StringMap.add i ty free),
           StringMap.empty )
@@ -190,7 +190,7 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
     (lifted_defs, lifted_es)
   in
   match e with
-  | Int _ | Bool _ | Unit | Constr _ | Match_Failure -> ([], e)
+  | Int _ | Float _ | Bool _ | Unit | Constr _ | Match_Failure -> ([], e)
   | Ident (_, i) as e_ident -> (
       match Hashtbl.find_opt free_var_tbl i with
       | None -> ([], e_ident)

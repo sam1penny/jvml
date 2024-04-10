@@ -1,8 +1,21 @@
 (* standard binary op - not a short circuiting operator *)
-type standard_bop = ADD | SUB | MUL | DIV | EQ | LT | GT [@@deriving show]
+type standard_bop =
+  | ADD
+  | SUB
+  | MUL
+  | DIV
+  | EQ
+  | LT
+  | GT
+  | FLOAT_ADD
+  | FLOAT_SUB
+  | FLOAT_MUL
+  | FLOAT_DIV
+[@@deriving show]
 
 type type_expr =
   | TyInt
+  | TyFloat
   | TyBool
   | TyUnit
   | TyCustom of string
@@ -18,6 +31,9 @@ type instruction =
   | PUSH_INT of Int32.t
   | BOX_INT
   | UNBOX_INT
+  | PUSH_FLOAT of float
+  | BOX_FLOAT
+  | UNBOX_FLOAT
   | PUSH_BOOL of bool
   | BOX_BOOL
   | UNBOX_BOOL

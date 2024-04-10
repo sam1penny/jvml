@@ -4,6 +4,7 @@ type loc = Lexing.position * Lexing.position
 
 type expr =
   | Int of loc * Int32.t
+  | Float of loc * float
   | Ident of loc * string
   | Constr of loc * string
   | Bool of loc * bool
@@ -30,6 +31,7 @@ and pattern =
 
 type type_expr =
   | TyInt of loc
+  | TyFloat of loc
   | TyBool of loc
   | TyUnit of loc
   | TyCustom of loc * type_expr list * string
@@ -46,6 +48,7 @@ type decl =
 
 let get_expr_loc = function
   | Int (loc, _) -> loc
+  | Float (loc, _) -> loc
   | Ident (loc, _) -> loc
   | Bool (loc, _) -> loc
   | Unit loc -> loc
@@ -74,6 +77,7 @@ let string_of_expr_node =
   let open Printf in
   function
   | Int (_, i) -> sprintf "Int %ld" i
+  | Float (_, f) -> sprintf "Float %f" f
   | Bool (_, b) -> sprintf "Bool %b" b
   | Ident (_, ident) -> sprintf "Ident %s" ident
   | Unit _ -> "()"
@@ -102,6 +106,7 @@ let string_of_pat_node =
 
 let rec pp_texpr = function
   | TyInt _ -> "int"
+  | TyFloat _ -> "float"
   | TyBool _ -> "bool"
   | TyUnit _ -> "unit"
   | TyVar (_, v) -> v
@@ -144,7 +149,7 @@ let rec pp_expr ?(indent = "") expr =
   let pp_node n = printf "%s└──%s\n" indent (string_of_expr_node n) in
   let pp_rec_expr = pp_expr ~indent:(indent ^ "   ") in
   match expr with
-  | Int _ | Bool _ | Ident _ | Unit _ | Constr _ -> pp_node expr
+  | Int _ | Float _ | Bool _ | Ident _ | Unit _ | Constr _ -> pp_node expr
   | Bop (_, e0, _, e1) ->
       pp_node expr;
       pp_rec_expr e0;

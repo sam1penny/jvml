@@ -17,6 +17,7 @@ type con =
 
 type expr =
   | Int of Int32.t
+  | Float of float
   | Ident of Typed_ast.type_expr * string
   | Bool of bool
   | Unit
@@ -65,6 +66,7 @@ let desugared_tvar_cnter =
 
 let rec get_expr_type = function
   | Int _ -> Typed_ast.TyInt
+  | Float _ -> Typed_ast.TyFloat
   | Ident (t, _) -> t
   | Bool _ -> Typed_ast.TyBool
   | Unit -> Typed_ast.TyUnit
@@ -97,6 +99,7 @@ let string_of_expr_node =
   let open Printf in
   function
   | Int i -> sprintf "Int %ld" i
+  | Float f -> sprintf "Float %f" f
   | Bool b -> sprintf "Bool %b" b
   | Ident (ty, ident) -> sprintf "Ident %s : %s" ident (Typed_ast.pp_texpr ty)
   | Unit -> "()"
@@ -135,7 +138,7 @@ let rec pp_expr ?(indent = "") expr =
   let pp_node n = printf "%s└──%s\n" indent (string_of_expr_node n) in
   let pp_rec_expr = pp_expr ~indent:(indent ^ "   ") in
   match expr with
-  | Int _ | Bool _ | Ident _ | Unit | Constr _ -> pp_node expr
+  | Int _ | Float _ | Bool _ | Ident _ | Unit | Constr _ -> pp_node expr
   | Bop (_, e0, _, e1) ->
       pp_node expr;
       pp_rec_expr e0;

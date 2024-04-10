@@ -15,6 +15,7 @@ let next_line lexbuf =
 
 let white = [' ' '\t']+
 let int = '-'? ['0'-'9']+
+let float = int '.' int
 let letter = ['a'-'z' 'A'-'Z']
 let lowercase_indent = (['a'-'z'] | '_') (letter | ['0'-'9'] | '_' | '\'')*
 let uppercase_ident = (['A'-'Z'] | '_') (letter | ['0'-'9'] | '_' | '\'')*
@@ -22,12 +23,17 @@ let uppercase_ident = (['A'-'Z'] | '_') (letter | ['0'-'9'] | '_' | '\'')*
 rule token = parse
     | white {token lexbuf}
     | int { INT (Int32.of_string (Lexing.lexeme lexbuf)) }
+    | float { FLOAT (float_of_string (Lexing.lexeme lexbuf)) }
     | '(' { LPAREN }
     | ')' { RPAREN }
     | '+' { ADD }
     | '-' { SUB }
     | '*' { MUL }
     | '/' { DIV }
+    | "+." { FLOAT_ADD }
+    | "-." { FLOAT_SUB }
+    | "*." { FLOAT_MUL }
+    | "/." { FLOAT_DIV }
     | '=' { EQ }
     | '<' { LT }
     | '>' { GT }

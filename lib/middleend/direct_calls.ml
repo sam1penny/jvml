@@ -33,7 +33,7 @@ let maybe_transform_direct env e =
 let rec transform_direct_call_expr env e =
   let rec_transform_direct = transform_direct_call_expr env in
   match e with
-  | Int _ | Bool _ | Unit | Ident _ | Constr _ | Match_Failure -> e
+  | Int _ | Float _ | Bool _ | Unit | Ident _ | Constr _ | Match_Failure -> e
   | Bop (ty, e0, bop, e1) ->
       Bop (ty, rec_transform_direct e0, bop, rec_transform_direct e1)
   | If (ty, e0, e1, e2) ->
