@@ -53,9 +53,8 @@ let rec transform_direct_call_expr env e =
             (ret_ty, ty_args, fun_ty_ret, name, List.map rec_transform_direct es)
       )
   | Direct_app _ ->
-      raise
-      @@ Failure
-           "illegal state to spot direct_app within transform_direct_call_expr"
+      e
+      (* already transformed before running trmc, no more transformations possible *)
   | Tuple (ty, es) -> Tuple (ty, List.map rec_transform_direct es)
   | Let (ty, x, e0, e1) ->
       let e0' = rec_transform_direct e0 in
@@ -97,6 +96,7 @@ let rec transform_direct_call_expr env e =
   | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in direct_calls"
+  | Hole | Set_Tuple _ -> raise @@ Failure "todo3"
 
 let update_env env = function
   | Val (_, x, (Fun _ as e)) | ValRec (_, x, e) ->

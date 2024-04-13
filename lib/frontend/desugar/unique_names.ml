@@ -39,7 +39,7 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
     (most_local_version : (string, string) Hashtbl.t) e =
   let rec_rename_expr = rename_expr most_recent_version most_local_version in
   match e with
-  | Int _ | Float _ | String _ | Bool _ | Unit | Match_Failure -> e
+  | Int _ | Float _ | String _ | Bool _ | Unit | Match_Failure | Hole -> e
   | Ident (ty, var) ->
       if var = "print" then Ident (ty, "print_$0")
       else Ident (ty, Hashtbl.find most_local_version var)
@@ -100,6 +100,11 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
   | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
+  | Set_Tuple (e0, e1, e2) ->
+      let e0' = rec_rename_expr e0 in
+      let e1' = rec_rename_expr e1 in
+      let e2' = rec_rename_expr e2 in
+      Set_Tuple (e0', e1', e2')
 
 let rec rename_decl most_recent_version most_local_version d =
   match d with

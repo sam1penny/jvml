@@ -33,10 +33,10 @@ let beta_reduce_decl d =
 let rec size_expr_helper e =
   match e with
   | Int _ | Float _ | String _ | Bool _ | Unit | Ident _ | Constr _
-  | Match_Failure ->
+  | Match_Failure | Hole ->
       1
   | Bop (_, e0, _, e1) -> 1 + size_expr_helper e0 + size_expr_helper e1
-  | If (_, e0, e1, e2) ->
+  | If (_, e0, e1, e2) | Set_Tuple (e0, e1, e2) ->
       1 + size_expr_helper e0 + size_expr_helper e1 + size_expr_helper e2
   | Fun (_, _, _, e) -> 1 + size_expr_helper e
   | App (_, e0, e1) -> 1 + size_expr_helper e0 + size_expr_helper e1
@@ -240,7 +240,9 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
     inline_expr size_tbl code_tbl occurrence_tbl
   in
   match e with
-  | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Match_Failure -> e
+  | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Match_Failure | Hole
+    ->
+      e
   | Ident (ty, x) ->
       if consider_inline size_tbl code_tbl occurrence_tbl context x then
         Hashtbl.find code_tbl x |> copy_shared_exprs |> instantiate_type ty
@@ -341,6 +343,11 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
       TupleGet (ty, i, rec_inline_expr_without_ctx context es)
   | ConstructorGet (ty, x, es) ->
       ConstructorGet (ty, x, rec_inline_expr_without_ctx context es)
+  | Set_Tuple (e0, e1, e2) ->
+      let e0' = rec_inline_expr_without_ctx OtherCtx e0 in
+      let e1' = rec_inline_expr_without_ctx OtherCtx e1 in
+      let e2' = rec_inline_expr_without_ctx OtherCtx e2 in
+      Set_Tuple (e0', e1', e2')
 
 let rec inline_decl size_tbl code_tbl occurrence_tbl d =
   let inlined_decl =

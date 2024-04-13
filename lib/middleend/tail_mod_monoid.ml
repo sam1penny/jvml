@@ -11,40 +11,6 @@ open Desugar.Desugared_ast
 open Typing
 open Common
 
-let shallow_map_tail_positions f e =
-  match e with
-  | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
-  | Match_Failure | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _
-  | Bop _ | Direct_app _ ->
-      e
-  | If (ty, e0, e1, e2) -> If (ty, e0, f e1, f e2)
-  | Let (ty, x, e0, e1) -> Let (ty, x, e0, f e1)
-  | LetRec (ty, x, e0, e1) -> LetRec (ty, x, e0, f e1)
-  | Seq (ty, es) ->
-      let last, rev_rest =
-        let reversed = List.rev es in
-        (List.hd reversed, List.tl reversed)
-      in
-      Seq (ty, List.rev (f last :: rev_rest))
-  | Switch (ty, e, cases, maybe_fallback_expr) ->
-      let cases' =
-        List.map (fun (con, case_expr) -> (con, f case_expr)) cases
-      in
-      let maybe_fallback_expr' = Option.map f maybe_fallback_expr in
-      Switch (ty, e, cases', maybe_fallback_expr')
-  (* unsafe if shared, need to add option field *)
-  | Shared_Expr (e_ref, _, seen) ->
-      if !seen then e
-      else (
-        seen := true;
-        e_ref := f !e_ref;
-        e)
-  | While_true _ | Break _ | Assign_Seq _ ->
-      raise
-      @@ Failure
-           "tail rec constructs should not be present before calling \
-            tail_call_optimise"
-
 let or_else f k o = match o with None -> f k | Some _ -> o
 
 let rec has_tmm_expr fn_name e =
@@ -52,7 +18,7 @@ let rec has_tmm_expr fn_name e =
   match e with
   | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
   | Match_Failure | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _
-  | Direct_app _ ->
+  | Direct_app _ | Hole | Set_Tuple _ ->
       None
   | Bop (_, _, ((ADD | MUL) as bop), Direct_app (_, _, _, name, _))
     when name = fn_name ->
@@ -181,7 +147,7 @@ let rec transform_tmm_expr modulo_bop fn_name e =
       | Direct_app _, _ -> pass_to_accumulator modulo_bop transformed_e0 e1
       | _, Direct_app _ -> pass_to_accumulator modulo_bop e0 transformed_e1
       | _ -> pass_to_accumulator modulo_bop transformed_e0 transformed_e1)
-  | _ -> shallow_map_tail_positions rec_transform_tmm e
+  | _ -> Desugar.Utils.shallow_map_tail_positions rec_transform_tmm e
 
 let rec transform_tmm_decl decl =
   match decl with

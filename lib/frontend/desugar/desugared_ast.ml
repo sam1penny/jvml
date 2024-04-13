@@ -48,6 +48,9 @@ type expr =
   | Break of expr
   (* Sequence of assignments, special case as assign does not produce a 'unit' on the stack *)
   | Assign_Seq of (string * Typed_ast.type_expr * expr) list
+  | Hole
+  (* e1[e0] = e2 *)
+  | Set_Tuple of expr * expr * expr
 
 type type_constr = DeclConstr of string * Int32.t * Typed_ast.type_expr option
 
@@ -89,6 +92,8 @@ let rec get_expr_type = function
   | While_true e -> get_expr_type e
   | Break e -> get_expr_type e
   | Assign_Seq _ -> Typed_ast.TyUnit
+  | Hole -> raise @@ Failure "called get_expr_type on Hole!"
+  | Set_Tuple _ -> Typed_ast.TyUnit
 
 (* huge bodge to get match_failure working
 
@@ -128,6 +133,8 @@ let string_of_expr_node =
   | While_true _ -> "While true"
   | Break _ -> "Break"
   | Assign_Seq _ -> sprintf "Assign_Seq"
+  | Hole -> "Hole"
+  | Set_Tuple (_, _, _) -> "Set_Tuple"
 
 let pp_con ?(indent = "") con =
   match con with
@@ -205,6 +212,12 @@ let rec pp_expr ?(indent = "") expr =
             (Typed_ast.pp_texpr ty);
           pp_expr ~indent:(assign_indent ^ "   ") e)
         assigns
+  | Hole -> pp_node expr
+  | Set_Tuple (e0, e1, e2) ->
+      pp_node expr;
+      pp_rec_expr e0;
+      pp_rec_expr e1;
+      pp_rec_expr e2
 
 and pp_case indent (pattern, expr) =
   printf "%s└── <case>\n" indent;

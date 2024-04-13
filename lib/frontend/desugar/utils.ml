@@ -67,6 +67,12 @@ let map_over_sub_expr f e =
   | Break e -> Break (f e)
   | Assign_Seq assigns ->
       Assign_Seq (List.map (fun (x, ty, e) -> (x, ty, f e)) assigns)
+  | Hole -> Hole
+  | Set_Tuple (e0, e1, e2) ->
+      let e0' = f e0 in
+      let e1' = f e1 in
+      let e2' = f e2 in
+      Set_Tuple (e0', e1', e2')
 
 let iter_over_sub_expr f e =
   let _ =
@@ -91,7 +97,7 @@ let iter_over_decl_exprs f d =
 let fold_left_over_sub_expr f acc e =
   match e with
   | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
-  | Match_Failure ->
+  | Match_Failure | Hole ->
       acc
   | Bop (_, e0, _, e1) -> f (f acc e0) e1
   | If (_, e0, e1, e2) -> f (f (f acc e0) e1) e2
@@ -116,6 +122,7 @@ let fold_left_over_sub_expr f acc e =
   | While_true e | Break e -> f acc e
   | Assign_Seq assigns ->
       List.map (fun (_, _, e) -> e) assigns |> List.fold_left f acc
+  | Set_Tuple (e0, e1, e2) -> f (f (f acc e0) e1) e2
 
 let rec clear_shared_expr_seen e =
   match e with
@@ -203,3 +210,56 @@ let rec map_over_expr_texprs f expr =
         (List.map
            (fun (x, ty, e) -> (x, f ty, map_over_expr_texprs f e))
            assigns)
+  | Hole -> Hole
+  | Set_Tuple (e0, e1, e2) ->
+      let e0' = map_over_expr_texprs f e0 in
+      let e1' = map_over_expr_texprs f e1 in
+      let e2' = map_over_expr_texprs f e2 in
+      Set_Tuple (e0', e1', e2')
+
+let shallow_map_tail_positions f e =
+  match e with
+  | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
+  | Match_Failure | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _
+  | Bop _ | Direct_app _ | Hole | Set_Tuple _ ->
+      e
+  | If (ty, e0, e1, e2) -> If (ty, e0, f e1, f e2)
+  | Let (ty, x, e0, e1) -> Let (ty, x, e0, f e1)
+  | LetRec (ty, x, e0, e1) -> LetRec (ty, x, e0, f e1)
+  | Seq (ty, es) ->
+      let last, rev_rest =
+        let reversed = List.rev es in
+        (List.hd reversed, List.tl reversed)
+      in
+      Seq (ty, List.rev (f last :: rev_rest))
+  | Switch (ty, e, cases, maybe_fallback_expr) ->
+      let cases' =
+        List.map (fun (con, case_expr) -> (con, f case_expr)) cases
+      in
+      let maybe_fallback_expr' = Option.map f maybe_fallback_expr in
+      Switch (ty, e, cases', maybe_fallback_expr')
+  (* unsafe if shared, need to add option field *)
+  | Shared_Expr (e_ref, _, seen) ->
+      if !seen then e
+      else (
+        seen := true;
+        e_ref := f !e_ref;
+        e)
+  | While_true _ | Break _ | Assign_Seq _ ->
+      raise @@ Failure "tail rec constructs should not be present yet!"
+
+let duplicate_shared_exprs_once e =
+  let shared_expr_tbl = Hashtbl.create 10 in
+  let rec duplicate_shared_exprs_once_inner e =
+    match e with
+    | Shared_Expr (e_ref, _, _) -> (
+        match Hashtbl.find_opt shared_expr_tbl e_ref with
+        | None ->
+            let new_e = duplicate_shared_exprs_once_inner !e_ref in
+            let copy = Shared_Expr (ref new_e, ref None, ref false) in
+            Hashtbl.add shared_expr_tbl e_ref copy;
+            copy
+        | Some shared_expr -> shared_expr)
+    | _ -> map_over_sub_expr duplicate_shared_exprs_once_inner e
+  in
+  duplicate_shared_exprs_once_inner e

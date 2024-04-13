@@ -500,3 +500,59 @@ let%expect_test "test strings" =
   aabc
 
 |}]
+
+(* testing for tail recursion modulo cons*)
+
+let%expect_test "test tail rec mod cons List.map" =
+  let program =
+    {|
+val rec map = fun f -> fun l ->
+  match l with
+    | [] -> []
+    | x::xs -> f x :: map f xs
+
+val test = print(map (fun x -> x + 1) [1;2;3])
+|}
+  in
+  let _ = build_and_run program in
+  [%expect {|[2;3;4]|}]
+
+let%expect_test "test tail rec mod cons multiple choices one branch" =
+  let program =
+    {|
+type expr = Int of int | If of expr * expr * expr
+
+val rec map_tail = fun f -> fun e ->
+  match e with
+    | Int i -> f e
+    | If (e0, e1, e2) -> If(e0, map_tail f e1, map_tail f e2)
+
+val test_expr = If (Int 1, If(Int 2, Int 3, Int 4), If(Int 5, Int 6, Int 7))
+
+val test =
+  let replace_with_ten = fun x -> Int 10 in
+  print(map_tail replace_with_ten test_expr)
+|}
+  in
+  let _ = build_and_run program in
+  [%expect
+    {| If ([Int (1), If ([Int (2), Int (10), Int (10)]), If ([Int (5), Int (10), Int (10)])]) |}]
+
+let%expect_test "test tail rec mod cons multiple choices multiple branches" =
+  let program =
+    {|
+type 'a fancy_list = N | C of 'a * 'a fancy_list | Z of 'a fancy_list * 'a
+
+val rec fancy_map = fun f -> fun l ->
+  match l with
+    | N -> N
+    | C(x, xs) -> C(f x, fancy_map f xs)
+    | Z(xs, x) -> Z(fancy_map f xs, f x)
+
+val test =
+  let fancy = C(1, Z(C(3, Z(N, 4)), 2)) in
+  print(fancy_map (fun x -> x + 1) fancy)
+|}
+  in
+  let _ = build_and_run program in
+  [%expect {| C ([2, Z ([C ([4, Z ([N, 5])]), 3])]) |}]

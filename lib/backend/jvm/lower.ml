@@ -9,8 +9,8 @@ let stack_size_change = function
   | IFZERO _ | IFNONZERO _ -> -1
   | GOTO _ | LABEL _ -> 0
   | BOP _ -> 1
-  | LOAD_FIELD _ -> 0
-  | STORE_FIELD _ -> -2
+  | LOAD_FIELD _ | LOAD_FIELD_ANY_CLASS _ -> 0
+  | STORE_FIELD _ | STORE_FIELD_ANY_CLASS _ -> -2
   | ALLOC_OBJ _ -> 2
   | CONSTRUCT_OBJ (_, tys) -> -1 + List.length tys
   | ALLOC_ARRAY _ -> 0
@@ -31,6 +31,7 @@ let stack_size_change = function
   | MATCH_FAILURE -> 2
   | CONSTRUCTOR_INDEX _ -> 0
   | STATIC_APPLY (_, ty_args, _, _) -> 1 - List.length ty_args
+  | NULL -> 1
 
 let max_stack_depth prog =
   List.map stack_size_change prog
@@ -169,7 +170,17 @@ let lower_instruction ctrl_gen clazz = function
         sprintf "getfield Field sam/generated/%s %s %s" clazz f
           (lower_type_as_descriptor ty);
       ]
+  | LOAD_FIELD_ANY_CLASS (clazz, f, ty) ->
+      [
+        sprintf "getfield Field sam/generated/%s %s %s" clazz f
+          (lower_type_as_descriptor ty);
+      ]
   | STORE_FIELD (f, ty) ->
+      [
+        sprintf "putfield Field sam/generated/%s %s %s" clazz f
+          (lower_type_as_descriptor ty);
+      ]
+  | STORE_FIELD_ANY_CLASS (clazz, f, ty) ->
       [
         sprintf "putfield Field sam/generated/%s %s %s" clazz f
           (lower_type_as_descriptor ty);
@@ -235,6 +246,7 @@ let lower_instruction ctrl_gen clazz = function
           (lower_type_list arg_tys) (lower_type ret_ty);
         sprintf "checkcast %s" (lower_type actual_return_ty);
       ]
+  | NULL -> [ "aconst_null" ]
 
 let should_indent = function LABEL _ -> false | _ -> true
 

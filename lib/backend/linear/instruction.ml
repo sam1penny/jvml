@@ -72,6 +72,9 @@ type instruction =
   | SWITCH of switch_type * (Int32.t * string) list * string
   | MATCH_FAILURE
   | CONSTRUCTOR_INDEX of string
+  | NULL
+  | LOAD_FIELD_ANY_CLASS of string * string * type_expr
+  | STORE_FIELD_ANY_CLASS of string * string * type_expr
 [@@deriving show]
 
 type closure = {

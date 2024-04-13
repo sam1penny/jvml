@@ -115,6 +115,7 @@ let free_vars_with_types_expr bound e =
             if StringSet.mem x bound then StringMap.add x ty m else m)
           assignments
         |> List.fold_left (StringMap.union takeleft) StringMap.empty
+    | Hole | Set_Tuple _ -> raise @@ Failure "todo1"
   in
 
   aux bound StringMap.empty e
@@ -164,6 +165,7 @@ let rec clear_shared_expr_labels e =
   | Break e -> clear_shared_expr_labels e
   | Assign_Seq assignments ->
       List.iter (fun (_, _, e) -> clear_shared_expr_labels e) assignments
+  | Hole | Set_Tuple _ -> raise @@ Failure "todo2"
 
 let con_index = function
   | Desugared_ast.IntCon i -> i
@@ -429,6 +431,19 @@ let rec compile_expr label_gen env top_level_bindings after_while_loop e =
       in
 
       (defs, code, static_methods)
+  | Hole -> ([], [ NULL ], [])
+  (* e1[e0] = e2 *)
+  | Set_Tuple (e0, e1, e2) ->
+      let defs0, code0, smethods0 = compile_expr_rec e0 in
+      let defs1, code1, smethods1 = compile_expr_rec e1 in
+      let defs2, code2, smethods2 = compile_expr_rec e2 in
+      let code =
+        code1
+        @ [ LOAD_FIELD_ANY_CLASS ("Tuple", "data", TyArray TyAny) ]
+        @ code0 @ [ UNBOX_INT ] @ code2 @ [ STORE_ARRAY ] @ [ PUSH_UNIT ]
+      in
+
+      (defs0 @ defs1 @ defs2, code, smethods0 @ smethods1 @ smethods2)
 
 and compile_bop label_gen env top_level_bindings after_while_loop e0 e1 =
   let compile_expr_rec =

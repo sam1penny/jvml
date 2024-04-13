@@ -29,6 +29,7 @@ let run_middleend program =
   (if !Config.do_tail_mod_monoid then
      Tail_mod_monoid.transform_tmm_program program
    else program)
+  |> Trmc.transform_tmc_program
   |> fun program ->
   if !Config.do_tail_call_elimination then
     Tail_call_optimise.transform_tail_call_program program

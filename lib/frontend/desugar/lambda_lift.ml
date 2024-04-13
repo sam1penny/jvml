@@ -36,7 +36,7 @@ let free_vars_with_types_expr bound e =
   let rec aux bound free e =
     let rec_aux = aux bound free in
     match e with
-    | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ ->
+    | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Hole ->
         (free, StringMap.empty)
     | Ident (ty, i) ->
         ( (if StringSet.mem i bound then free else StringMap.add i ty free),
@@ -49,7 +49,7 @@ let free_vars_with_types_expr bound e =
           StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
         in
         (free, fvs_by_ident)
-    | If (_, e0, e1, e2) ->
+    | If (_, e0, e1, e2) | Set_Tuple (e0, e1, e2) ->
         let free0, fvs_by_ident0 = rec_aux e0 in
         let free1, fvs_by_ident1 = rec_aux e1 in
         let free2, fvs_by_ident2 = rec_aux e2 in
@@ -191,7 +191,8 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
     (lifted_defs, lifted_es)
   in
   match e with
-  | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Match_Failure ->
+  | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Match_Failure | Hole
+    ->
       ([], e)
   | Ident (_, i) as e_ident -> (
       match Hashtbl.find_opt free_var_tbl i with
@@ -293,6 +294,11 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
   | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
+  | Set_Tuple (e0, e1, e2) ->
+      let defs0, e0' = rec_lift_lambdas_expr e0 in
+      let defs1, e1' = rec_lift_lambdas_expr e1 in
+      let defs2, e2' = rec_lift_lambdas_expr e2 in
+      (defs0 @ defs1 @ defs2, Set_Tuple (e0', e1', e2'))
 
 let lift_lambdas_decl free_var_map decl =
   match decl with
