@@ -575,7 +575,7 @@ and compile_anon_lambda label_gen env fvars_with_types defs
     Closure
       {
         name = closure_label;
-        constructor_args = fvars_with_types;
+        constructor_args = List.rev fvars_with_types;
         arg_type;
         return_type;
         body = body_code;

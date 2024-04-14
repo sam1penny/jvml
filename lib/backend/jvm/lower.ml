@@ -264,8 +264,7 @@ let lower_body indent clazz b =
 let lower_constructor_args args =
   List.map
     (* todo - consider making private (then requires invokespecial) *)
-      (fun (name, ty) ->
-      sprintf ".field public sam/generated/%s L%s;" name (lower_type ty))
+      (fun (name, ty) -> sprintf ".field public %s L%s;" name (lower_type ty))
     args
   |> String.concat "\n"
 
