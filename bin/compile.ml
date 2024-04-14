@@ -14,6 +14,7 @@ let set_opt opt =
   | "-tmm" -> Common.Config.do_tail_mod_monoid := true
   | "-tco" -> Common.Config.do_tail_call_elimination := true
   | "-inline" -> Common.Config.do_inlining := true
+  | "-tmc" -> Common.Config.do_tail_mod_cons := true
   | _ -> raise @@ Failure ("Unknown opt: " ^ opt)
 
 let speclist =
@@ -36,6 +37,7 @@ let speclist =
        Default 10" );
     ("-tmm", Arg.Unit (add_opt "-tmm"), " Enable tail recursion modulo monoid");
     ("-tco", Arg.Unit (add_opt "-tco"), " Enable tail call optimisation");
+    ("-tmc", Arg.Unit (add_opt "-tmc"), " Enable tail recursion modulo cons");
     ( "-dyn-lambdas",
       Arg.Set Common.Config.use_dynamic_lambdas,
       " Compile lambas using invokedynamic" );
