@@ -214,9 +214,10 @@ let transform_tmc_decl decl =
             transform_tmc_dps_expr fname
               (Desugar.Utils.duplicate_shared_exprs_once body)
           in
-          Desugar.Utils.clear_shared_decl_seen decl;
+          Desugar.Utils.clear_shared_expr_seen dps_body;
 
           let dps_body = replace_call_with_dps fname dummy_ty dps_body in
+          Desugar.Utils.clear_shared_expr_seen dps_body;
           (* temporarily wack in random type, hope it isn't checked *)
           let dps_ty =
             Typed_ast.TyFun
@@ -239,6 +240,7 @@ let transform_tmc_decl decl =
           in
 
           let no_dps_body = transform_tmc_nodps_expr fname body in
+          Desugar.Utils.clear_shared_expr_seen no_dps_body;
           let no_dps_fun = Desugar.Utils.replace_funargs funargs no_dps_body in
           [
             ValRec (dps_ty, fname ^ "_dps", dps_fun);
