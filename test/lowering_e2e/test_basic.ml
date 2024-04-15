@@ -556,3 +556,34 @@ val test =
   in
   let _ = build_and_run program in
   [%expect {| C ([2, Z ([C ([4, Z ([N, 5])]), 3])]) |}]
+
+(*
+tests for <= and >=
+*)
+
+let%expect_test "test <= and >=" =
+  let program =
+    {|
+
+  val test_leq = do {
+    print(0 <= 1);
+    print(1 <= 1);
+    print(2 <= 1)
+  }
+
+  val test_geq = do {
+    print(0 >= 1);
+    print(1 >= 1);
+    print(2 >= 1)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    true
+    true
+    false
+    false
+    true
+    true
+  |}]

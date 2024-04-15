@@ -478,11 +478,16 @@ and compile_bop label_gen env top_level_bindings after_while_loop e0 e1 =
         c0 @ [ UNBOX_FLOAT ] @ c1 @ [ UNBOX_FLOAT ]
         @ [ BOP (standardise_bop float_to_float_op); BOX_FLOAT ],
         s0 @ s1 )
-  | (LT | GT) as int_to_bool_op ->
+  | (LT | GT | LEQ | GEQ) as int_to_bool_op ->
       let defs0, c0, s0 = compile_expr_rec e0 in
       let defs1, c1, s1 = compile_expr_rec e1 in
       let standard_bop =
-        if int_to_bool_op = LT then Instruction.LT else Instruction.GT
+        match int_to_bool_op with
+        | LT -> Instruction.LT
+        | GT -> Instruction.GT
+        | LEQ -> Instruction.LEQ
+        | GEQ -> Instruction.GEQ
+        | _ -> assert false
       in
       ( defs0 @ defs1,
         c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP standard_bop; BOX_BOOL ],

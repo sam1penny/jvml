@@ -10,7 +10,7 @@
 %token <string> ANY_STRING
 
 %token LPAREN, RPAREN
-%token TRUE, FALSE, AND, OR, IF, THEN, ELSE, EQ, LT, GT
+%token TRUE, FALSE, AND, OR, IF, THEN, ELSE, EQ, LT, GT, LEQ, GEQ
 %token FUN, ARROW, MATCH, BAR, WITH, UNDERSCORE
 %token UNIT, COMMA, APOSTROPHE, LET, IN, REC
 %token DO, SEMICOLON, LCURLY, RCURLY, LSQUARE, RSQUARE
@@ -25,7 +25,7 @@
 %token FLOAT_ADD, FLOAT_SUB, FLOAT_MUL, FLOAT_DIV
 
 %left ADD, SUB, FLOAT_ADD, FLOAT_SUB, STRING_CONCAT
-%left MUL, FLOAT_MUL, DIV, FLOAT_DIV, AND, OR, EQ, LT, GT
+%left MUL, FLOAT_MUL, DIV, FLOAT_DIV, AND, OR, EQ, LT, GT, LEQ, GEQ
 
 %right ARROW, CONS
 
@@ -58,6 +58,8 @@ prog:
   | EQ  { Common.EQ }
   | LT  { Common.LT }
   | GT { Common.GT }
+  | LEQ { Common.LEQ }
+  | GEQ { Common.GEQ }
   | AND { Common.AND }
   | OR { Common.OR }
   | STRING_CONCAT { Common.STRING_CONCAT }

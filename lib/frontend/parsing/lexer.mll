@@ -40,6 +40,8 @@ rule token = parse
     | '=' { EQ }
     | '<' { LT }
     | '>' { GT }
+    | "<=" { LEQ }
+    | ">=" { GEQ }
     | "&&" { AND }
     | "||" { OR }
     | "()" { UNIT }

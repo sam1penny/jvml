@@ -7,6 +7,8 @@ type standard_bop =
   | EQ
   | LT
   | GT
+  | LEQ
+  | GEQ
   | FLOAT_ADD
   | FLOAT_SUB
   | FLOAT_MUL

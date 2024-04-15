@@ -53,7 +53,7 @@ type decl =
 let bop_arg_type nt ty =
   let open Common in
   match ty with
-  | ADD | SUB | MUL | DIV | LT | GT -> TyInt
+  | ADD | SUB | MUL | DIV | LT | GT | LEQ | GEQ -> TyInt
   | AND | OR -> TyBool
   | FLOAT_ADD | FLOAT_SUB | FLOAT_MUL | FLOAT_DIV -> TyFloat
   | STRING_CONCAT -> TyString
@@ -63,7 +63,7 @@ let bop_return_type ty =
   let open Common in
   match ty with
   | ADD | SUB | MUL | DIV -> TyInt
-  | AND | OR | LT | GT | EQ -> TyBool
+  | AND | OR | LT | GT | LEQ | GEQ | EQ -> TyBool
   | FLOAT_ADD | FLOAT_SUB | FLOAT_MUL | FLOAT_DIV -> TyFloat
   | STRING_CONCAT -> TyString
 

@@ -79,10 +79,17 @@ let lower_bop ctrl_gen = function
   | FLOAT_DIV -> [ "fdiv" ]
   | EQ ->
       [ "invokevirtual Method java/lang/Object equals (Ljava/lang/Object;)Z" ]
-  | (LT | GT) as bop ->
+  | (LT | GT | LEQ | GEQ) as bop ->
       let false_label = ctrl_gen () in
       let after_label = ctrl_gen () in
-      let comparison = if bop = LT then "if_icmpge" else "if_icmple" in
+      let comparison =
+        match bop with
+        | LT -> "if_icmpge"
+        | GT -> "if_icmple"
+        | LEQ -> "if_icmpgt"
+        | GEQ -> "if_icmplt"
+        | _ -> assert false
+      in
       [
         comparison ^ " " ^ false_label;
         "iconst_1";

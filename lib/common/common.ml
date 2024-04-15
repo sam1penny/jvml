@@ -6,6 +6,8 @@ type bop =
   | EQ
   | LT
   | GT
+  | LEQ
+  | GEQ
   | AND
   | OR
   | FLOAT_ADD
@@ -21,6 +23,8 @@ let show_bop = function
   | SUB -> "-"
   | LT -> "<"
   | GT -> ">"
+  | LEQ -> "<="
+  | GEQ -> ">="
   | EQ -> "="
   | AND -> "&&"
   | OR -> "||"
