@@ -19,12 +19,12 @@ let float = int '.' int
 let letter = ['a'-'z' 'A'-'Z']
 let lowercase_indent = (['a'-'z'] | '_') (letter | ['0'-'9'] | '_' | '\'')*
 let uppercase_ident = (['A'-'Z'] | '_') (letter | ['0'-'9'] | '_' | '\'')*
-let any_string_without_quote = "[^\"]*"
 
 rule token = parse
     | white {token lexbuf}
     | int { INT (Int32.of_string (Lexing.lexeme lexbuf)) }
     | float { FLOAT (float_of_string (Lexing.lexeme lexbuf)) }
+    | '"'   { read_string (Buffer.create 17) lexbuf }
     | '(' { LPAREN }
     | ')' { RPAREN }
     | '+' { ADD }
@@ -35,7 +35,6 @@ rule token = parse
     | "-." { FLOAT_SUB }
     | "*." { FLOAT_MUL }
     | "/." { FLOAT_DIV }
-    | '\"' { QUOTATION_MARK }
     | "^" { STRING_CONCAT }
     | '=' { EQ }
     | '<' { LT }
@@ -77,7 +76,30 @@ rule token = parse
     | "do" { DO }
     | lowercase_indent { LOWERCASE_IDENT (Lexing.lexeme lexbuf)}
     | uppercase_ident { UPPERCASE_IDENT (Lexing.lexeme lexbuf)}
-    | any_string_without_quote { ANY_STRING (Lexing.lexeme lexbuf )}
     | eof { EOF }
+    | "(*" { comment lexbuf; token lexbuf }
     | '\n' { next_line lexbuf; token lexbuf }
     | _  as c { raise (SyntaxError ("Unknown Character: " ^ (String.make 1 c)))}
+(* copied from Real World OCaml *)
+and read_string buf =
+  parse
+  | '"'       { STRING (Buffer.contents buf) }
+  | '\\' '/'  { Buffer.add_char buf '/'; read_string buf lexbuf }
+  | '\\' '\\' { Buffer.add_char buf '\\'; read_string buf lexbuf }
+  | '\\' 'b'  { Buffer.add_char buf '\b'; read_string buf lexbuf }
+  | '\\' 'f'  { Buffer.add_char buf '\012'; read_string buf lexbuf }
+  | '\\' 'n'  { Buffer.add_char buf '\n'; read_string buf lexbuf }
+  | '\\' 'r'  { Buffer.add_char buf '\r'; read_string buf lexbuf }
+  | '\\' 't'  { Buffer.add_char buf '\t'; read_string buf lexbuf }
+  | [^ '"' '\\']+
+    { Buffer.add_string buf (Lexing.lexeme lexbuf);
+      read_string buf lexbuf
+    }
+  | _ { raise (SyntaxError ("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
+  | eof { raise (SyntaxError ("String is not terminated")) }
+(* copied from Compiler Construction *)
+and comment = parse
+  | "*)" { () }
+  | '\n' { next_line lexbuf; comment lexbuf }
+  | "(*" {comment lexbuf; comment lexbuf }
+  | _ { comment lexbuf }

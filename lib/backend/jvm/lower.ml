@@ -164,7 +164,7 @@ let lower_instruction ctrl_gen clazz = function
   | UNBOX_BOOL -> [ "invokevirtual Method java/lang/Boolean booleanValue ()Z" ]
   | PUSH_UNIT ->
       [ "getstatic Field sam/generated/Unit INSTANCE Lsam/generated/Unit;" ]
-  | PUSH_STRING s -> [ sprintf "ldc \"%s\"" s ]
+  | PUSH_STRING s -> [ sprintf "ldc \"%s\"" (String.escaped s) ]
   | BOP bop -> lower_bop ctrl_gen bop
   | STORE_REF r -> [ store_ref r ]
   | LOAD_REF r -> [ load_ref r ]

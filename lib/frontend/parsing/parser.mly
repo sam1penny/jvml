@@ -5,9 +5,9 @@
 
 %token <Int32.t> INT
 %token <float> FLOAT
+%token <string> STRING
 %token <string> LOWERCASE_IDENT
 %token <string> UPPERCASE_IDENT
-%token <string> ANY_STRING
 
 %token LPAREN, RPAREN
 %token TRUE, FALSE, AND, OR, IF, THEN, ELSE, EQ, LT, GT, LEQ, GEQ
@@ -15,7 +15,6 @@
 %token UNIT, COMMA, APOSTROPHE, LET, IN, REC
 %token DO, SEMICOLON, LCURLY, RCURLY, LSQUARE, RSQUARE
 %token CONS, EMPTY_LIST
-%token QUOTATION_MARK
 %token EOF
 
 %token TYPE, TINT, TBOOL, TUNIT, OF
@@ -69,9 +68,7 @@ prog:
 expr4:
   | i = INT { Parsed_ast.Int ($sloc, i) }
   | f = FLOAT { Parsed_ast.Float ($sloc, f) }
-  | QUOTATION_MARK; s = LOWERCASE_IDENT; QUOTATION_MARK { Parsed_ast.String ($sloc, s)}
-  | QUOTATION_MARK; s = UPPERCASE_IDENT; QUOTATION_MARK { Parsed_ast.String ($sloc, s)}
-  | QUOTATION_MARK; s = ANY_STRING; QUOTATION_MARK { Parsed_ast.String ($sloc, s)}
+  | s = STRING { Parsed_ast.String ($sloc, s) }
   | i = LOWERCASE_IDENT {Parsed_ast.Ident ($sloc, i)}
   | i = UPPERCASE_IDENT {Parsed_ast.Constr ($sloc, i)}
   | EMPTY_LIST {Parsed_ast.Constr($sloc, "Nil$")}
