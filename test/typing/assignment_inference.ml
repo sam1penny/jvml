@@ -55,12 +55,13 @@ let%expect_test "use generic list" =
     [
       Type
         ( [ "'a" ],
-          "list",
+          "my_list",
           [
             DeclConstr ("N", None);
             DeclConstr
               ( "C",
-                Some (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "list") ])
+                Some
+                  (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "my_list") ])
               );
           ] );
       Val ("x", Constr "N");
@@ -69,12 +70,13 @@ let%expect_test "use generic list" =
     ]
   in
   type_progam_and_pp x;
-  [%expect {|
+  [%expect
+    {|
   Ok(
-  'a list
-  'a list
-  int list
-  'a -> 'a list
+  'a my_list
+  'a my_list
+  int my_list
+  'a -> 'a my_list
   )
 |}]
 
@@ -83,12 +85,13 @@ let%expect_test "incorrectly use generic list" =
     [
       Type
         ( [ "'a" ],
-          "list",
+          "my_list",
           [
             DeclConstr ("N", None);
             DeclConstr
               ( "C",
-                Some (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "list") ])
+                Some
+                  (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "my_list") ])
               );
           ] );
       Val
@@ -174,12 +177,13 @@ let%expect_test "test pattern matching constructor" =
     [
       Type
         ( [ "'a" ],
-          "list",
+          "my_list",
           [
             DeclConstr ("N", None);
             DeclConstr
               ( "C",
-                Some (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "list") ])
+                Some
+                  (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "my_list") ])
               );
           ] );
       ValRec
@@ -208,10 +212,11 @@ let%expect_test "test pattern matching constructor" =
     ]
   in
   type_progam_and_pp x;
-  [%expect {|
+  [%expect
+    {|
     Ok(
-    'a list
-    ('a -> 'b) -> 'a list -> 'b list
+    'a my_list
+    ('a -> 'b) -> 'a my_list -> 'b my_list
     ) |}]
 
 let%expect_test "variable escaping toplevel scope" =

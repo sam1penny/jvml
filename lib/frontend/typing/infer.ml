@@ -657,10 +657,12 @@ let type_decl unifications nt env type_env = function
             env',
             type_env' )
 
+let external_type_env = StringMap.singleton "list" 1
+
 let type_decl_from_scratch decl =
   let u = Unifications.create 20 in
   let env = external_env in
-  let type_env = StringMap.empty in
+  let type_env = external_type_env in
   let type_gen = make_new_type () in
   type_decl u type_gen env type_env decl >>=? fun (declnode, _, _) ->
   let state = simplify_texpr_state () in
@@ -672,7 +674,7 @@ let type_decl_from_scratch decl =
 let type_program program =
   let u = Unifications.create 20 in
   let env = external_env in
-  let type_env = StringMap.empty in
+  let type_env = external_type_env in
   let type_gen = make_new_type () in
   List.fold_left
     (fun acc decl ->
