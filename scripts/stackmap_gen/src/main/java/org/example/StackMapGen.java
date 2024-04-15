@@ -8,25 +8,29 @@ import org.objectweb.asm.Opcodes;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Vector;
 
 /*
 credit - https://stackoverflow.com/questions/46622206/any-way-to-regenerate-stackmap-from-byte-code
 */
 
 public class StackMapGen {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws ClassNotFoundException, NoSuchFieldException, IllegalAccessException {
         if (args.length == 0) {
             System.out.println("supply argument of class file!");
             return;
         }
+
         String filename = args[0];
         try {
             byte[] bytecode = Files.readAllBytes(Path.of(filename));
             ClassReader cr = new ClassReader(bytecode);
 // passing cr to ClassWriter to enable optimizations
-            ClassWriter cw = new ClassWriter(cr, ClassWriter.COMPUTE_FRAMES);
+            LocalClassWriter cw = new LocalClassWriter(cr, ClassWriter.COMPUTE_FRAMES);
             cr.accept(new ClassVisitor(Opcodes.ASM5, cw) {
                 @Override
                 public MethodVisitor visitMethod(int access, String name, String desc,
