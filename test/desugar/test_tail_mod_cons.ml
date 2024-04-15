@@ -19,34 +19,34 @@ let%expect_test "test List.map" =
   [%expect
     {|
     └──ValRec map_$0_dps
-       └──Fun dst : () -> int -> ('a -> 'b) -> 'a list$ -> unit
-          └──Fun i : int -> ('a -> 'b) -> 'a list$ -> unit
-             └──Fun f_$0 : ('a -> 'b) -> 'a list$ -> unit
-                └──Fun l_$0 : 'a list$ -> unit
+       └──Fun dst : () -> int -> ('a -> 'b) -> 'a list -> unit
+          └──Fun i : int -> ('a -> 'b) -> 'a list -> unit
+             └──Fun f_$0 : ('a -> 'b) -> 'a list -> unit
+                └──Fun l_$0 : 'a list -> unit
                    └──Let desugar_t0_$0
-                      └──Ident l_$0 : 'a list$
+                      └──Ident l_$0 : 'a list
                       └──Switch
-                         └──Ident desugar_t0_$0 : 'a list$
+                         └──Ident desugar_t0_$0 : 'a list
                          └── <case>
                             └──Nil$ : tag=0
                             └──Shared
                                └──Set_Tuple
                                   └──Ident i : int
                                   └──Ident dst : ()
-                                  └──Constructor Nil$ : 'b list$
+                                  └──Constructor Nil$ : 'b list
                          └── <case>
                             └──Cons$ : tag=1
                             └──Shared
                                └──Let x_$0
                                   └──Get 0
                                      └──GetArg
-                                        └──Ident desugar_t0_$0 : 'a list$
+                                        └──Ident desugar_t0_$0 : 'a list
                                   └──Let xs_$0
                                      └──Get 1
                                         └──GetArg
-                                           └──Ident desugar_t0_$0 : 'a list$
+                                           └──Ident desugar_t0_$0 : 'a list
                                      └──Let dst'
-                                        └──Tuple : ('b * 'b list$)
+                                        └──Tuple : ('b * 'b list)
                                            └──App
                                               └──Ident f_$0 : 'a -> 'b
                                               └──Ident x_$0 : 'a
@@ -54,52 +54,52 @@ let%expect_test "test List.map" =
                                         └──Seq
                                            └──Set_Tuple
                                               └──Ident i : int
-                                              └──Ident dst : ('b * 'b list$)
+                                              └──Ident dst : ('b * 'b list)
                                               └──App
-                                                 └──Constructor Cons$ : ('b * 'b list$) -> 'b list$
-                                                 └──Ident dst' : ('b * 'b list$)
+                                                 └──Constructor Cons$ : ('b * 'b list) -> 'b list
+                                                 └──Ident dst' : ('b * 'b list)
                                            └──Direct_app : map_$0_dps
-                                              └──Ident dst' : ('b * 'b list$)
+                                              └──Ident dst' : ('b * 'b list)
                                               └──Int 1
                                               └──Ident f_$0 : 'a -> 'b
-                                              └──Ident xs_$0 : 'a list$
+                                              └──Ident xs_$0 : 'a list
     └──ValRec map_$0
-       └──Fun f_$0 : ('a -> 'b) -> 'a list$ -> 'b list$
-          └──Fun l_$0 : 'a list$ -> 'b list$
+       └──Fun f_$0 : ('a -> 'b) -> 'a list -> 'b list
+          └──Fun l_$0 : 'a list -> 'b list
              └──Let desugar_t0_$0
-                └──Ident l_$0 : 'a list$
+                └──Ident l_$0 : 'a list
                 └──Switch
-                   └──Ident desugar_t0_$0 : 'a list$
+                   └──Ident desugar_t0_$0 : 'a list
                    └── <case>
                       └──Nil$ : tag=0
                       └──Shared
-                         └──Constructor Nil$ : 'b list$
+                         └──Constructor Nil$ : 'b list
                    └── <case>
                       └──Cons$ : tag=1
                       └──Shared
                          └──Let x_$0
                             └──Get 0
                                └──GetArg
-                                  └──Ident desugar_t0_$0 : 'a list$
+                                  └──Ident desugar_t0_$0 : 'a list
                             └──Let xs_$0
                                └──Get 1
                                   └──GetArg
-                                     └──Ident desugar_t0_$0 : 'a list$
+                                     └──Ident desugar_t0_$0 : 'a list
                                └──Let dst
-                                  └──Tuple : ('b * 'b list$)
+                                  └──Tuple : ('b * 'b list)
                                      └──App
                                         └──Ident f_$0 : 'a -> 'b
                                         └──Ident x_$0 : 'a
                                      └──Hole
                                   └──Seq
                                      └──Direct_app : map_$0_dps
-                                        └──Ident dst : ('b * 'b list$)
+                                        └──Ident dst : ('b * 'b list)
                                         └──Int 1
                                         └──Ident f_$0 : 'a -> 'b
-                                        └──Ident xs_$0 : 'a list$
+                                        └──Ident xs_$0 : 'a list
                                      └──App
-                                        └──Constructor Cons$ : ('b * 'b list$) -> 'b list$
-                                        └──Ident dst : ('b * 'b list$)
+                                        └──Constructor Cons$ : ('b * 'b list) -> 'b list
+                                        └──Ident dst : ('b * 'b list)
 
   |}]
 

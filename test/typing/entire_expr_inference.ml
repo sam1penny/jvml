@@ -78,33 +78,35 @@ let%expect_test "test valid type definition" =
   let x =
     Type
       ( [ "'a" ],
-        "list",
+        "my_list",
         [
           DeclConstr ("Nil", None);
           DeclConstr
-            ("Some", Some (TyTuple [ TyInt; TyCustom ([ TyVar "'a" ], "list") ]));
+            ( "Some",
+              Some (TyTuple [ TyInt; TyCustom ([ TyVar "'a" ], "my_list") ]) );
         ] )
   in
   Utils.add_dummy_loc_decl x |> Typing.Driver.type_decl |> pp_entire_decl_result;
   [%expect
     {|
     Ok(
-    └──Type list
+    └──Type my_list
        └──params = ['a]
        └──constructors
           └──Nil
-          └──Some of (int * 'a list)
+          └──Some of (int * 'a my_list)
     )|}]
 
 let%expect_test "test invalid type definition - unknown parameter" =
   let x =
     Type
       ( [ "'a" ],
-        "list",
+        "my_list",
         [
           DeclConstr ("Nil", None);
           DeclConstr
-            ("Some", Some (TyTuple [ TyInt; TyCustom ([ TyVar "'b" ], "list") ]));
+            ( "Some",
+              Some (TyTuple [ TyInt; TyCustom ([ TyVar "'b" ], "my_list") ]) );
         ] )
   in
   Utils.add_dummy_loc_decl x |> Typing.Driver.type_decl |> pp_entire_decl_result;
@@ -115,12 +117,13 @@ let%expect_test "test entire tree with pattern matching constructor" =
     [
       Type
         ( [ "'a" ],
-          "list",
+          "my_list",
           [
             DeclConstr ("N", None);
             DeclConstr
               ( "C",
-                Some (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "list") ])
+                Some
+                  (TyTuple [ TyVar "'a"; TyCustom ([ TyVar "'a" ], "my_list") ])
               );
           ] );
       ValRec
@@ -153,33 +156,33 @@ let%expect_test "test entire tree with pattern matching constructor" =
   [%expect
     {|
     Ok(
-    └──Type list
+    └──Type my_list
        └──params = ['a]
        └──constructors
           └──N
-          └──C of ('a * 'a list)
+          └──C of ('a * 'a my_list)
     └──ValRec map
-       └──Fun f : ('a -> 'b) -> 'a list -> 'b list
-          └──Fun x : 'a list -> 'b list
+       └──Fun f : ('a -> 'b) -> 'a my_list -> 'b my_list
+          └──Fun x : 'a my_list -> 'b my_list
              └──Match
-                └──Ident x : 'a list
+                └──Ident x : 'a my_list
                 └── <case>
-                   └──Pat_Constr N : 'a list
-                   └──Constructor N : 'b list
+                   └──Pat_Constr N : 'a my_list
+                   └──Constructor N : 'b my_list
                 └── <case>
-                   └──Pat_Constr C : 'a list
+                   └──Pat_Constr C : 'a my_list
                       └──Pat_Tuple
                          └──Pat_Ident hd : 'a
-                         └──Pat_Ident tl : 'a list
+                         └──Pat_Ident tl : 'a my_list
                    └──App
-                      └──Constructor C : ('b * 'b list) -> 'b list
-                      └──Tuple : ('b * 'b list)
+                      └──Constructor C : ('b * 'b my_list) -> 'b my_list
+                      └──Tuple : ('b * 'b my_list)
                          └──App
                             └──Ident f : 'a -> 'b
                             └──Ident hd : 'a
                          └──App
                             └──App
-                               └──Ident map : ('a -> 'b) -> 'a list -> 'b list
+                               └──Ident map : ('a -> 'b) -> 'a my_list -> 'b my_list
                                └──Ident f : 'a -> 'b
-                            └──Ident tl : 'a list
+                            └──Ident tl : 'a my_list
     ) |}]

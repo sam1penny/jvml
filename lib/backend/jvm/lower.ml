@@ -631,7 +631,7 @@ L2:     areturn
 ; my custom list class
 
 .version 65 0
-.class public super abstract sam/generated/List$
+.class public super abstract sam/generated/List
 .super java/lang/Object
 .field tag I
 
@@ -649,12 +649,12 @@ L4:     return
 
 .version 65 0
 .class public final super sam/generated/Nil$
-.super sam/generated/List$
+.super sam/generated/List
 
 .method public <init> : ()V
     .code stack 2 locals 1
 L0:     aload_0
-L1:     invokespecial Method sam/generated/List$ <init> ()V
+L1:     invokespecial Method sam/generated/List <init> ()V
         aload_0
         iconst_0
         putfield Field sam/generated/Nil$ tag I
@@ -675,13 +675,13 @@ L2:     areturn
 
 .version 65 0
 .class public final super sam/generated/Cons$
-.super sam/generated/List$
+.super sam/generated/List
 .field public val Lsam/generated/Tuple;
 
 .method public <init> : (Lsam/generated/Tuple;)V
     .code stack 2 locals 2
 L0:     aload_0
-L1:     invokespecial Method sam/generated/List$ <init> ()V
+L1:     invokespecial Method sam/generated/List <init> ()V
 L4:     aload_0
 L5:     aload_1
 L6:     putfield Field sam/generated/Cons$ val Lsam/generated/Tuple;
@@ -756,7 +756,7 @@ L87:    areturn
 .field public static print Ljava/util/function/Function; .fieldattributes
     .signature Ljava/util/function/Function<Ljava/lang/Object;Lsam/generated/Unit;>;
 .end fieldattributes
-.field public static Nil$ Lsam/generated/List$;
+.field public static Nil$ Lsam/generated/List;
 .field public static Cons$ Ljava/util/function/Function;
 
 .method public <init> : ()V
@@ -806,7 +806,7 @@ L5:     putstatic Field sam/generated/Std print Ljava/util/function/Function;
         new sam/generated/Nil$
         dup
         invokespecial Method sam/generated/Nil$ <init> ()V
-        putstatic Field sam/generated/Std Nil$ Lsam/generated/List$;
+        putstatic Field sam/generated/Std Nil$ Lsam/generated/List;
 
         invokedynamic [_100]
         putstatic Field sam/generated/Std Cons$ Ljava/util/function/Function;

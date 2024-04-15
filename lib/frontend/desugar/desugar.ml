@@ -76,7 +76,7 @@ let desugared_ast_of_decl constructors_by_type = function
 
 let external_lib =
   [
-    ( "list$",
+    ( "list",
       [ ("Nil$", AdtCon ("Nil$", 0l)); ("Cons$", AdtCon ("Cons$", 1l)) ]
       |> StringMap.of_list );
   ]

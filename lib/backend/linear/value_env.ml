@@ -14,7 +14,7 @@ type env = {
 let empty = StringMap.empty
 
 let external_lib =
-  let alpha_list = TyCustom "list$" in
+  let alpha_list = TyCustom "list" in
   {
     fields =
       [

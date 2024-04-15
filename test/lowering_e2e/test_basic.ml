@@ -108,7 +108,7 @@ let%expect_test "test recursive type product" =
 let%expect_test "test equality of adts" =
   let program =
     {|
-  type 'a list = N | C of int * 'a list
+  type 'a my_list = N | C of int * 'a my_list
   val compnil = print(N = N)
   val compdiff = print(N = C(0, N))
   val comp_eqcons = print(C(0, N) = C(0, N))
@@ -373,7 +373,7 @@ let%expect_test "test tail call with match" =
 let%expect_test "test tail call with ADT" =
   let program =
     {|
-  type 'a list = N | C of 'a * 'a list
+  type 'a my_list = N | C of 'a * 'a my_list
   val rec length_tr = fun l -> fun acc ->
     match l with
       | N -> acc

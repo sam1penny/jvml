@@ -517,7 +517,7 @@ let simplify_texpr_state () =
 
 let external_env =
   let open Typed_ast in
-  let alpha_list = TyCustom ([ TyVar "'a" ], "list$") in
+  let alpha_list = TyCustom ([ TyVar "'a" ], "list") in
   StringMap.of_list
     [
       ("print", (TyFun (TyVar "'a", TyUnit), StringSet.singleton "'a"));

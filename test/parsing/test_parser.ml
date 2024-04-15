@@ -85,7 +85,7 @@ let%expect_test "test function application associativity" =
 
 let%expect_test "test nested patterns" =
   let x =
-    "type 'a list = N | C of 'a * 'a list\n\
+    "type 'a my_list = N | C of 'a * 'a my_list\n\
     \  val length_minus_one = fun x -> match x with\n\
     \  | N | C (_, N) -> 0\n\
     \  | C(_, y) -> 1 + length_minus_one y\n\
@@ -97,11 +97,11 @@ let%expect_test "test nested patterns" =
          print_newline ());
   [%expect
     {|
-  └──Type list
+  └──Type my_list
      └──params = ['a]
      └──constructors
         └──N
-        └──C of ('a * 'a list)
+        └──C of ('a * 'a my_list)
 
   └──Val length_minus_one
      └──Fun x

@@ -100,7 +100,7 @@ let%expect_test "test tail call with match" =
 let%expect_test "test tail call with ADT" =
   let program =
     {|
-  type 'a list = N | C of 'a * 'a list
+  type 'a my_list = N | C of 'a * 'a my_list
   val rec length_tr = fun l -> fun acc ->
     match l with
       | N -> acc
@@ -110,19 +110,19 @@ let%expect_test "test tail call with ADT" =
   let _ = parse_type_desugar_tco_print program in
   [%expect
     {|
-    └──Type list
+    └──Type my_list
        └──params = ['a]
        └──constructors
           └──N : tag=0
-          └──C of ('a * 'a list) : tag=1
+          └──C of ('a * 'a my_list) : tag=1
     └──Val length_tr_$0
-       └──Fun l_$0 : 'a list -> int -> int
+       └──Fun l_$0 : 'a my_list -> int -> int
           └──Fun acc_$0 : int -> int
              └──While true
                 └──Let desugar_t1_$0
-                   └──Ident l_$0 : 'a list
+                   └──Ident l_$0 : 'a my_list
                    └──Switch
-                      └──Ident desugar_t1_$0 : 'a list
+                      └──Ident desugar_t1_$0 : 'a my_list
                       └── <case>
                          └──N : tag=0
                          └──Break
@@ -134,10 +134,10 @@ let%expect_test "test tail call with ADT" =
                             └──Let tl_$0
                                └──Get 1
                                   └──GetArg
-                                     └──Ident desugar_t1_$0 : 'a list
+                                     └──Ident desugar_t1_$0 : 'a my_list
                                └──Assign_Seq
-                                  └── assign l_$0 : 'a list =
-                                     └──Ident tl_$0 : 'a list
+                                  └── assign l_$0 : 'a my_list =
+                                     └──Ident tl_$0 : 'a my_list
                                   └── assign acc_$0 : int =
                                      └──Bop + : int
                                         └──Ident acc_$0 : int
