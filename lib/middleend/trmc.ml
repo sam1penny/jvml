@@ -88,6 +88,8 @@ let rec replace_call_with_dps fn_name dst_ty e =
           Typed_ast.TyUnit,
           name ^ "_dps",
           [ Ident (dst_ty, "dst"); Ident (Typed_ast.TyInt, "i") ] @ arg_es )
+  (* case to avoid calling the dps version twice when multiple opportunities for tmc *)
+  | Let (_, x, _, _) when x = "dst" || x = "dst'" -> e
   | e ->
       Desugar.Utils.map_over_sub_expr (replace_call_with_dps fn_name dst_ty) e
 
