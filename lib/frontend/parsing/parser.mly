@@ -105,8 +105,14 @@ expr:
  | IF; e1 = expr; THEN; e2 = expr; ELSE; e3 = expr {Parsed_ast.If($sloc, e1, e2, e3)}
  | FUN; i = LOWERCASE_IDENT; ARROW; e = expr; {Parsed_ast.Fun($sloc, i, e)}
  | MATCH; e = expr; WITH ; option(BAR); cl = separated_nonempty_list(BAR, case) {Parsed_ast.Match($sloc, e, cl)}
- | LET; i = LOWERCASE_IDENT; EQ; e1 = expr; IN; e2 = expr; {Parsed_ast.Let ($sloc, i, e1, e2)}
- | LET; REC; i = LOWERCASE_IDENT; EQ; e1 = expr; IN; e2 = expr; {Parsed_ast.LetRec ($sloc, i, e1, e2)}
+ | LET; i = LOWERCASE_IDENT; args = list(LOWERCASE_IDENT); EQ; e1 = expr; IN; e2 = expr; {
+  let e1' = List.fold_right (fun arg e -> Parsed_ast.Fun($sloc, arg, e)) args e1 in
+  Parsed_ast.Let ($sloc, i, e1', e2)
+  }
+ | LET; REC; i = LOWERCASE_IDENT; args = list(LOWERCASE_IDENT); EQ; e1 = expr; IN; e2 = expr; {
+  let e1' = List.fold_right (fun arg e -> Parsed_ast.Fun($sloc, arg, e)) args e1 in
+  Parsed_ast.LetRec ($sloc, i, e1', e2)
+  }
  | DO; LCURLY; es = tuple_sep(SEMICOLON, expr); RCURLY { Parsed_ast.Seq($sloc, es)}
 
 pattern2:
@@ -146,8 +152,14 @@ case:
 
 decl:
   | TYPE; tparams = loption(type_params); tname = LOWERCASE_IDENT; EQ; option(BAR); cl = separated_nonempty_list(BAR, type_constr) {Parsed_ast.Type($sloc, tparams, tname, cl)}
-  | VAL; vname = LOWERCASE_IDENT; EQ; e = expr {Parsed_ast.Val ($sloc, vname, e)}
-  | VAL; REC; vname = LOWERCASE_IDENT; EQ; e = expr {Parsed_ast.ValRec ($sloc, vname, e)}
+  | VAL; vname = LOWERCASE_IDENT; args = list(LOWERCASE_IDENT); EQ; e = expr {
+    let e' = List.fold_right (fun arg e -> Parsed_ast.Fun($sloc, arg, e)) args e in
+    Parsed_ast.Val ($sloc, vname, e')
+    }
+  | VAL; REC; vname = LOWERCASE_IDENT; args = list(LOWERCASE_IDENT); EQ; e = expr {
+    let e' = List.fold_right (fun arg e -> Parsed_ast.Fun($sloc, arg, e)) args e in
+    Parsed_ast.ValRec ($sloc, vname, e')
+    }
 
 type_constr:
   | tconstr = UPPERCASE_IDENT; {Parsed_ast.DeclConstr ($sloc, tconstr, None) }
