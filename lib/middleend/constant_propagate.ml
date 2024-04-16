@@ -78,7 +78,7 @@ let rec const_prop_expr const_tbl e =
       | _ -> Switch (ty, e', cases', maybe_fallback_opt'))
   | _ -> Desugar.Utils.map_over_sub_expr rec_const_prop e
 
-let const_prop_decl const_tbl decl =
+let rec const_prop_decl const_tbl decl =
   let prop_decl =
     Desugar.Utils.map_over_decl_exprs (const_prop_expr const_tbl) decl
   in
@@ -87,6 +87,7 @@ let const_prop_decl const_tbl decl =
   | Val (_, x, ((Int _ | Bool _ | Unit | Constr _ | Ident _) as e)) ->
       let _ = Hashtbl.add const_tbl x e in
       prop_decl
+  | And decls -> And (List.map (const_prop_decl const_tbl) decls)
   | _ -> prop_decl
 
 let const_prop_program program =

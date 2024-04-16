@@ -204,8 +204,7 @@ let rec replace_expr_ty new_ty e =
   (* todo other cases *)
   | _ -> e
 
-(* todo extend to 'and' *)
-let transform_tmc_decl decl =
+let rec transform_tmc_decl decl =
   let open Typing in
   match decl with
   | ValRec (ty, fname, e) -> (
@@ -249,6 +248,7 @@ let transform_tmc_decl decl =
             ValRec (dps_ty, fname ^ "_dps", dps_fun);
             ValRec (ty, fname, no_dps_fun);
           ])
+  | And decls -> [ And (List.map transform_tmc_decl decls |> List.flatten) ]
   | _ -> [ decl ]
 
 let transform_tmc_program program =
