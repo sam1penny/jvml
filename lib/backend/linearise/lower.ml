@@ -510,6 +510,21 @@ and compile_bop label_gen env top_level_bindings after_while_loop e0 e1 =
       ( defs0 @ defs1,
         c0 @ [ UNBOX_INT ] @ c1 @ [ UNBOX_INT ] @ [ BOP standard_bop; BOX_BOOL ],
         s0 @ s1 )
+  | (FLOAT_LT | FLOAT_GT | FLOAT_LEQ | FLOAT_GEQ) as float_to_bool_op ->
+      let defs0, c0, s0 = compile_expr_rec e0 in
+      let defs1, c1, s1 = compile_expr_rec e1 in
+      let standard_bop =
+        match float_to_bool_op with
+        | FLOAT_LT -> Instruction.FLOAT_LT
+        | FLOAT_GT -> Instruction.FLOAT_GT
+        | FLOAT_LEQ -> Instruction.FLOAT_LEQ
+        | FLOAT_GEQ -> Instruction.FLOAT_GEQ
+        | _ -> assert false
+      in
+      ( defs0 @ defs1,
+        c0 @ [ UNBOX_FLOAT ] @ c1 @ [ UNBOX_FLOAT ]
+        @ [ BOP standard_bop; BOX_BOOL ],
+        s0 @ s1 )
   | AND ->
       let defs0, c0, s0 = compile_expr_rec e0 in
       let defs1, c1, s1 = compile_expr_rec e1 in

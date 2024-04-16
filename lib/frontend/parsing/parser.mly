@@ -11,6 +11,7 @@
 
 %token LPAREN, RPAREN
 %token TRUE, FALSE, AND, OR, IF, THEN, ELSE, EQ, LT, GT, LEQ, GEQ
+%token FLOAT_LT, FLOAT_GT, FLOAT_LEQ, FLOAT_GEQ
 %token FUN, ARROW, MATCH, BAR, WITH, UNDERSCORE
 %token UNIT, COMMA, APOSTROPHE, LET, IN, REC
 %token DO, SEMICOLON, LCURLY, RCURLY, LSQUARE, RSQUARE
@@ -24,7 +25,7 @@
 %token ADD, SUB, MUL, DIV, STRING_CONCAT
 %token FLOAT_ADD, FLOAT_SUB, FLOAT_MUL, FLOAT_DIV
 
-%left EQ, LT, GT, LEQ, GEQ
+%left EQ, LT, GT, LEQ, GEQ, FLOAT_LT, FLOAT_GT, FLOAT_LEQ, FLOAT_GEQ
 %right AND
 %right OR
 %left ADD, SUB, FLOAT_ADD, FLOAT_SUB, STRING_CONCAT
@@ -63,6 +64,10 @@ prog:
   | GT { Common.GT }
   | LEQ { Common.LEQ }
   | GEQ { Common.GEQ }
+  | FLOAT_LT { Common.FLOAT_LT }
+  | FLOAT_GT { Common.FLOAT_GT }
+  | FLOAT_LEQ { Common.FLOAT_LEQ }
+  | FLOAT_GEQ { Common.FLOAT_GEQ }
   | AND { Common.AND }
   | OR { Common.OR }
   | STRING_CONCAT { Common.STRING_CONCAT }

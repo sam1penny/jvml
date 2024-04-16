@@ -41,6 +41,10 @@ rule next_token = parse
     | '>' { GT }
     | "<=" { LEQ }
     | ">=" { GEQ }
+    | "<." { FLOAT_LT }
+    | ">." { FLOAT_GT }
+    | "<=." { FLOAT_LEQ }
+    | ">=." { FLOAT_GEQ }
     | "&&" { AND }
     | "||" { OR }
     | "()" { UNIT }

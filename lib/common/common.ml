@@ -8,6 +8,10 @@ type bop =
   | GT
   | LEQ
   | GEQ
+  | FLOAT_LT
+  | FLOAT_GT
+  | FLOAT_LEQ
+  | FLOAT_GEQ
   | AND
   | OR
   | FLOAT_ADD
@@ -27,6 +31,10 @@ let show_bop = function
   | GT -> ">"
   | LEQ -> "<="
   | GEQ -> ">="
+  | FLOAT_LT -> "<."
+  | FLOAT_GT -> ">."
+  | FLOAT_LEQ -> "<=."
+  | FLOAT_GEQ -> ">=."
   | EQ -> "="
   | AND -> "&&"
   | OR -> "||"

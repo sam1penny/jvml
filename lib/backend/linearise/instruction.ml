@@ -9,6 +9,10 @@ type standard_bop =
   | GT
   | LEQ
   | GEQ
+  | FLOAT_LT
+  | FLOAT_GT
+  | FLOAT_LEQ
+  | FLOAT_GEQ
   | FLOAT_ADD
   | FLOAT_SUB
   | FLOAT_MUL

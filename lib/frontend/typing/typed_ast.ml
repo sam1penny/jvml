@@ -57,6 +57,7 @@ let bop_arg_type nt ty =
   | ADD | SUB | MUL | DIV | LT | GT | LEQ | GEQ -> TyInt
   | AND | OR -> TyBool
   | FLOAT_ADD | FLOAT_SUB | FLOAT_MUL | FLOAT_DIV -> TyFloat
+  | FLOAT_LT | FLOAT_GT | FLOAT_LEQ | FLOAT_GEQ -> TyFloat
   | STRING_CONCAT -> TyString
   | EQ -> nt ()
 
@@ -64,7 +65,9 @@ let bop_return_type ty =
   let open Common in
   match ty with
   | ADD | SUB | MUL | DIV -> TyInt
-  | AND | OR | LT | GT | LEQ | GEQ | EQ -> TyBool
+  | AND | OR | LT | GT | LEQ | GEQ | EQ | FLOAT_LT | FLOAT_GT | FLOAT_LEQ
+  | FLOAT_GEQ ->
+      TyBool
   | FLOAT_ADD | FLOAT_SUB | FLOAT_MUL | FLOAT_DIV -> TyFloat
   | STRING_CONCAT -> TyString
 

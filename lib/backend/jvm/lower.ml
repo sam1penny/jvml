@@ -99,6 +99,26 @@ let lower_bop ctrl_gen = function
         "iconst_0";
         after_label ^ ":";
       ]
+  | (FLOAT_LT | FLOAT_GT | FLOAT_LEQ | FLOAT_GEQ) as bop ->
+      let false_label = ctrl_gen () in
+      let after_label = ctrl_gen () in
+      let flt_compare, flt_branch =
+        match bop with
+        | FLOAT_LT -> ("fcmpg", "ifge")
+        | FLOAT_LEQ -> ("fcmpg", "ifgt")
+        | FLOAT_GT -> ("fcmpl", "ifle")
+        | FLOAT_GEQ -> ("fcmpl", "iflt")
+        | _ -> assert false
+      in
+      [
+        flt_compare;
+        flt_branch ^ " " ^ false_label;
+        "iconst_1";
+        "goto " ^ after_label;
+        false_label ^ ":";
+        "iconst_0";
+        after_label ^ ":";
+      ]
   | STRING_CONCAT ->
       [
         "invokevirtual Method java/lang/String concat \
