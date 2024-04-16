@@ -1,11 +1,11 @@
+Jvml_parser.Wrapped_parser.pp_exceptions ()
+
 let parse_file filename =
-  let in_channel = In_channel.open_text filename in
-  let lexbuf = Lexing.from_channel in_channel in
-  Lexing.set_filename lexbuf filename;
-  let parse_tree = Jvml_parser.prog Lexer.token lexbuf in
-  In_channel.close in_channel;
-  parse_tree
+  Jvml_parser.Wrapped_parser.parse_file filename
+  |> List.map (Jvml_parser.map_over_decl_exprs Jvml_parser.check_letrec)
+  |> List.map Jvml_parser.check_valrec
 
 let parse_string s =
-  let lexbuf = Lexing.from_string s in
-  Jvml_parser.prog Lexer.token lexbuf
+  Jvml_parser.Wrapped_parser.parse_string s
+  |> List.map (Jvml_parser.map_over_decl_exprs Jvml_parser.check_letrec)
+  |> List.map Jvml_parser.check_valrec

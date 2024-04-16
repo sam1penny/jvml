@@ -2,6 +2,6 @@
  (name jvm)
  (preprocess
   (pps ppx_deriving.show))
- (libraries common linear)
+ (libraries common linearise)
  (instrumentation
   (backend bisect_ppx)))

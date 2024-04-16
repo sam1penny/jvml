@@ -5,6 +5,6 @@
 
 (library
  (name parsing)
- (libraries common)
+ (libraries common nice_parser)
  (instrumentation
   (backend bisect_ppx)))

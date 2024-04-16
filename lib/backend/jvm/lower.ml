@@ -1,4 +1,4 @@
-open Linear.Instruction
+open Linearise.Instruction
 open Printf
 
 let stack_size_change = function
@@ -65,11 +65,11 @@ let lower_type_list tys =
   List.map lower_type_as_descriptor tys |> String.concat ""
 
 let make_jvm_ctrl_gen () =
-  let cnt = Linear.Lower.make_counter 0 in
+  let cnt = Linearise.Lower.make_counter 0 in
   fun () -> "Ljvm" ^ string_of_int @@ cnt ()
 
 let lower_bop ctrl_gen = function
-  | Linear.Instruction.ADD -> [ "iadd" ]
+  | Linearise.Instruction.ADD -> [ "iadd" ]
   | SUB -> [ "isub" ]
   | MUL -> [ "imul" ]
   | DIV -> [ "idiv" ]

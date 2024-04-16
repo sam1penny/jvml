@@ -2,6 +2,6 @@
  (name jvml)
  (preprocess
   (pps ppx_deriving.show))
- (libraries common parsing typing desugar linear jvm)
+ (libraries common parsing typing desugar linearise jvm)
  (instrumentation
   (backend bisect_ppx)))

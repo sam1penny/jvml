@@ -1,5 +1,5 @@
 (library
- (name linear)
+ (name linearise)
  (preprocess
   (pps ppx_deriving.show))
  (libraries common typing desugar parsing middle_end)

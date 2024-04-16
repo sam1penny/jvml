@@ -5,6 +5,6 @@
    (file build_run_e2e.sh)))
  (preprocess
   (pps ppx_expect))
- (libraries jvml common jvm linear test_utils))
+ (libraries jvml common jvm linearise test_utils))
 
 ; todo - add dependency of scripts/ folder to avoid bodge copy

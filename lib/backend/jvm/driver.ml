@@ -1,4 +1,4 @@
-open Linear.Instruction
+open Linearise.Instruction
 
 let lower_ir program =
   String.concat "\n"
