@@ -22,7 +22,8 @@ let run_frontend_exn_from_string program_text =
 
 let linear_ir_from_string program_text =
   run_frontend_exn_from_string program_text
-  |> Middle_end.Driver.run_middleend |> Linearise.Driver.lower_program_to_linear_ir
+  |> Middle_end.Driver.run_middleend
+  |> Linearise.Driver.lower_program_to_linear_ir
   |> Linearise.Instruction.show_program
 
 let run_backend typed_tree =

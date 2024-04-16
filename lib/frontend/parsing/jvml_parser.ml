@@ -36,10 +36,13 @@ let check_valrec = function
            (loc, "You must bind a lambda on the rhs of a 'val rec'")
   | decl -> decl
 
-module Wrapped_parser = Nice_parser.Make(struct
+module Wrapped_parser = Nice_parser.Make (struct
   type result = Parsed_ast.decl list
   type token = Parser.token
+
   exception ParseError = Parser.Error
+
   let parse = Parser.prog
+
   include Lexer
 end)
