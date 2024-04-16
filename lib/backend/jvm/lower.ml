@@ -125,10 +125,21 @@ let lower_bop ctrl_gen = function
          (Ljava/lang/String;)Ljava/lang/String;";
       ]
 
-let lower_uop = function
+let lower_uop ctrl_gen = function
   | NEG -> [ "ineg" ]
   | FLOAT_NEG -> [ "fneg" ]
   | REAL -> [ "i2f" ]
+  | NOT ->
+      let false_label = ctrl_gen () in
+      let after_label = ctrl_gen () in
+      [
+        "ifne " ^ false_label;
+        "iconst_1";
+        "goto " ^ after_label;
+        false_label ^ ":";
+        "iconst_0";
+        after_label ^ ":";
+      ]
 
 let load_int = function
   | -1l -> "iconst_m1"
@@ -192,7 +203,7 @@ let lower_instruction ctrl_gen clazz = function
       [ "getstatic Field sam/generated/Unit INSTANCE Lsam/generated/Unit;" ]
   | PUSH_STRING s -> [ sprintf "ldc \"%s\"" (String.escaped s) ]
   | BOP bop -> lower_bop ctrl_gen bop
-  | UOP uop -> lower_uop uop
+  | UOP uop -> lower_uop ctrl_gen uop
   | STORE_REF r -> [ store_ref r ]
   | LOAD_REF r -> [ load_ref r ]
   | IFZERO l -> [ sprintf "ifeq %s" l ]

@@ -36,6 +36,7 @@ type type_expr =
   | TyFloat of loc
   | TyBool of loc
   | TyUnit of loc
+  | TyString of loc
   | TyCustom of loc * type_expr list * string
   | TyVar of loc * string
   | TyTuple of loc * type_expr list
@@ -115,6 +116,7 @@ let rec pp_texpr = function
   | TyFloat _ -> "float"
   | TyBool _ -> "bool"
   | TyUnit _ -> "unit"
+  | TyString _ -> "string"
   | TyVar (_, v) -> v
   | TyCustom (_, [], v) -> v
   | TyCustom (_, [ t ], v) -> Printf.sprintf "%s %s" (pp_texpr t) v

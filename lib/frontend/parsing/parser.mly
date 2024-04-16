@@ -16,10 +16,10 @@
 %token UNIT, COMMA, APOSTROPHE, LET, IN, REC
 %token DO, SEMICOLON, LCURLY, RCURLY, LSQUARE, RSQUARE
 %token CONS, EMPTY_LIST
-%token REAL
+%token REAL, NOT
 %token EOF
 
-%token TYPE, TINT, TBOOL, TUNIT, OF
+%token TYPE, TINT, TBOOL, TUNIT, TSTRING, TFLOAT, OF
 %token VAL
 
 %token ADD, SUB, MUL, DIV, STRING_CONCAT
@@ -72,6 +72,10 @@ prog:
   | OR { Common.OR }
   | STRING_CONCAT { Common.STRING_CONCAT }
 
+%inline functionlike_uop:
+  | NOT { Common.NOT }
+  | REAL { Common.REAL }
+
 %inline standard_uop:
   | SUB { Common.NEG }
   | FLOAT_SUB { Common.FLOAT_NEG }
@@ -106,7 +110,7 @@ expr4:
 expr3:
   | e = expr4 { e }
   | e = expr3; e2 = expr4 { Parsed_ast.App ($sloc, e, e2)}
-  | REAL; e = expr4 { Parsed_ast.Uop ($sloc, Common.REAL, e)}
+  | op = functionlike_uop; e = expr4 { Parsed_ast.Uop ($sloc, op, e)}
 
 expr2:
  | e = expr3 {e}
@@ -196,6 +200,8 @@ type_expr2:
   | TINT { Parsed_ast.TyInt ($sloc) }
   | TBOOL { Parsed_ast.TyBool ($sloc) }
   | TUNIT { Parsed_ast.TyUnit ($sloc) }
+  | TFLOAT { Parsed_ast.TyFloat ($sloc) }
+  | TSTRING { Parsed_ast.TyString ($sloc) }
   | tparam = type_param { Parsed_ast.TyVar ($sloc, tparam)}
   | tname = LOWERCASE_IDENT { Parsed_ast.TyCustom ($sloc, [], tname) }
   | texpr = type_expr2; tname = LOWERCASE_IDENT { Parsed_ast.TyCustom ($sloc, [texpr], tname) }

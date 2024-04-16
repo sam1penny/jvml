@@ -71,6 +71,8 @@ rule next_token = parse
     | "int" { TINT }
     | "bool" { TBOOL }
     | "unit" { TUNIT }
+    | "string" { TSTRING }
+    | "float" { TFLOAT }
     | "type" { TYPE }
     | "of" { OF }
     | "val" { VAL }
@@ -79,6 +81,7 @@ rule next_token = parse
     | "in" { IN }
     | "do" { DO }
     | "real" { REAL }
+    | "not" { NOT }
     | lowercase_indent { LOWERCASE_IDENT (Lexing.lexeme lexbuf)}
     | uppercase_ident { UPPERCASE_IDENT (Lexing.lexeme lexbuf)}
     | eof { EOF }

@@ -555,6 +555,7 @@ let rec validate_texpr type_env params = function
   | Parsed_ast.TyFloat _ -> Ok Typed_ast.TyFloat
   | Parsed_ast.TyBool _ -> Ok Typed_ast.TyBool
   | Parsed_ast.TyUnit _ -> Ok Typed_ast.TyUnit
+  | Parsed_ast.TyString _ -> Ok Typed_ast.TyString
   | Parsed_ast.TyVar (loc, p) ->
       if List.mem p params then Ok (Typed_ast.TyVar p)
       else Error (loc, sprintf "Unbound type variable '%s" p)

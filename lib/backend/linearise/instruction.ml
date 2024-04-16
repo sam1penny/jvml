@@ -20,7 +20,7 @@ type standard_bop =
   | STRING_CONCAT
 [@@deriving show]
 
-type standard_uop = NEG | FLOAT_NEG | REAL [@@deriving show]
+type standard_uop = NEG | FLOAT_NEG | REAL | NOT [@@deriving show]
 
 type type_expr =
   | TyInt

@@ -594,7 +594,9 @@ let%expect_test "test uops" =
   val test = do {
     print(real 3 +. 4.0);
     print(- 4 + 1);
-    print(-. 4.0 +. 1.0)
+    print(-. 4.0 +. 1.0);
+    print(not true);
+    print(not false)
   }
   |}
   in
@@ -603,6 +605,8 @@ let%expect_test "test uops" =
     7.0
     -3
     -3.0
+    false
+    true
   |}]
 
 let%expect_test "test float comparisons" =

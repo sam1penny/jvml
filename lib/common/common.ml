@@ -20,7 +20,7 @@ type bop =
   | FLOAT_DIV
   | STRING_CONCAT
 
-type uop = NEG | FLOAT_NEG | REAL
+type uop = NEG | FLOAT_NEG | REAL | NOT
 
 let show_bop = function
   | ADD -> "+"
@@ -44,7 +44,12 @@ let show_bop = function
   | FLOAT_DIV -> "/."
   | STRING_CONCAT -> "^"
 
-let show_uop = function NEG -> "-" | FLOAT_NEG -> "-." | REAL -> "real"
+let show_uop = function
+  | NEG -> "-"
+  | FLOAT_NEG -> "-."
+  | REAL -> "real"
+  | NOT -> "not"
+
 let pp_bop formatter bop = Format.fprintf formatter "@[%s@]" (show_bop bop)
 let ( >>=? ) x f = Result.bind x f
 let ( >>= ) x f = Option.bind x f

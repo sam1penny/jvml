@@ -73,11 +73,19 @@ let bop_return_type ty =
 
 let uop_arg_type ty =
   let open Common in
-  match ty with NEG -> TyInt | REAL -> TyInt | FLOAT_NEG -> TyFloat
+  match ty with
+  | NEG -> TyInt
+  | REAL -> TyInt
+  | FLOAT_NEG -> TyFloat
+  | NOT -> TyBool
 
 let uop_return_type ty =
   let open Common in
-  match ty with NEG -> TyInt | REAL -> TyFloat | FLOAT_NEG -> TyFloat
+  match ty with
+  | NEG -> TyInt
+  | REAL -> TyFloat
+  | FLOAT_NEG -> TyFloat
+  | NOT -> TyBool
 
 (* printing *)
 let rec pp_texpr = function

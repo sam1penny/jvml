@@ -239,6 +239,10 @@ let rec compile_expr label_gen env top_level_bindings after_while_loop e =
       | Common.REAL ->
           ( defs,
             c @ [ UNBOX_INT; Instruction.UOP Instruction.REAL; BOX_FLOAT ],
+            smethods )
+      | Common.NOT ->
+          ( defs,
+            c @ [ UNBOX_BOOL; Instruction.UOP Instruction.NOT; BOX_BOOL ],
             smethods ))
   | If (_, e0, e1, e2) ->
       let else_label = label_gen.ctrl_label () in
