@@ -178,9 +178,6 @@ so it can now be removed from free variable mappings.
 let remove_from_fv_tbls key fv_tbls =
   Hashtbl.iter (fun _ fv_tbl -> Hashtbl.remove fv_tbl key) fv_tbls
 
-(* dodgy bodge to set flag if mutual recursion is actually required *)
-let mutual_recursion_required = ref false
-
 let rec lift_lambdas_expr decl_name free_var_tbl e =
   let rec_lift_lambdas_expr = lift_lambdas_expr decl_name free_var_tbl in
   let rec_lift_list es =
@@ -251,11 +248,6 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
       remove_from_fv_tbls x free_var_tbl;
       let defs1, e1 = rec_lift_lambdas_expr e1 in
 
-      let freevars_in_e0, _ = free_vars_with_types_expr StringSet.empty e0 in
-
-      if StringMap.mem decl_name freevars_in_e0 then
-        mutual_recursion_required := true
-      else ();
       ([ lifted_valrec ] @ defs0 @ defs1, e1)
   | Tuple (ty, es) ->
       let lifted_defs, lifted_es = rec_lift_list es in
@@ -304,17 +296,46 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
       let defs2, e2' = rec_lift_lambdas_expr e2 in
       (defs0 @ defs1 @ defs2, Set_Tuple (e0', e1', e2'))
 
+let expr_idents e =
+  let rec inner acc e =
+    match e with
+    | Ident (_, x) -> StringSet.add x acc
+    | _ -> Utils.fold_left_over_sub_expr inner acc e
+  in
+  let res = inner StringSet.empty e in
+  Utils.clear_shared_expr_seen e;
+  res
+
+(*
+check if mutual recursion is required to avoid creating unnecessary AND
+
+could be more precise, rather than all or nothing, but simple enough for most cases
+*)
+let mutual_recursion_required lifted_decls =
+  let intersection s1 s2 = StringSet.inter s1 s2 |> StringSet.cardinal > 0 in
+  List.fold_left
+    (fun (lifted_decls, exists) decl ->
+      if exists then (lifted_decls, true)
+      else
+        match decl with
+        | Val (_, x, e) | ValRec (_, x, e) ->
+            ( StringSet.add x lifted_decls,
+              intersection lifted_decls (expr_idents e) )
+        | _ -> (lifted_decls, false))
+    (StringSet.empty, false) (List.rev lifted_decls)
+  |> fun (_, required) -> required
+
 let lift_lambdas_decl free_var_map decl =
   match decl with
   | Val (ty, x, e) ->
       let lifted_decls, e = lift_lambdas_expr x free_var_map e in
       lifted_decls @ [ Val (ty, x, e) ]
   | ValRec (ty, x, e) ->
-      mutual_recursion_required := false;
       let lifted_decls, e = lift_lambdas_expr x free_var_map e in
-      if !mutual_recursion_required then
-        [ And (lifted_decls @ [ ValRec (ty, x, e) ]) ]
-      else lifted_decls @ [ ValRec (ty, x, e) ]
+      Utils.clear_shared_expr_seen e;
+      let lifted_decls = lifted_decls @ [ ValRec (ty, x, e) ] in
+      if mutual_recursion_required lifted_decls then [ And lifted_decls ]
+      else lifted_decls
   | Type _ -> [ decl ]
   | And _ ->
       raise @@ Failure "mutual recursion should not occur before lambda lifting"
