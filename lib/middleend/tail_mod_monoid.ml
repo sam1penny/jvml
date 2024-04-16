@@ -18,7 +18,7 @@ let rec has_tmm_expr fn_name e =
   match e with
   | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
   | Match_Failure | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _
-  | Direct_app _ | Hole | Set_Tuple _ ->
+  | Direct_app _ | Hole | Set_Tuple _ | Uop _ ->
       None
   | Bop (_, _, ((ADD | MUL) as bop), Direct_app (_, _, _, name, _))
     when name = fn_name ->

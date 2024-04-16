@@ -11,6 +11,7 @@ type expr =
   | Bool of loc * bool
   | Unit of loc
   | Bop of loc * expr * bop * expr
+  | Uop of loc * uop * expr
   | If of loc * expr * expr * expr
   | Fun of loc * string * expr
   | App of loc * expr * expr
@@ -55,6 +56,7 @@ let get_expr_loc = function
   | Bool (loc, _) -> loc
   | Unit loc -> loc
   | Bop (loc, _, _, _) -> loc
+  | Uop (loc, _, _) -> loc
   | If (loc, _, _, _) -> loc
   | Fun (loc, _, _) -> loc
   | App (loc, _, _) -> loc
@@ -86,6 +88,7 @@ let string_of_expr_node =
   | Unit _ -> "()"
   | Constr (_, n) -> sprintf "Constructor %s" n
   | Bop (_, _, op, _) -> sprintf "Bop: %s" (show_bop op)
+  | Uop (_, op, _) -> sprintf "Uop: %s" (show_uop op)
   | If _ -> "If"
   | Fun (_, x, _) -> sprintf "Fun %s" x
   | App _ -> "App"
@@ -158,6 +161,9 @@ let rec pp_expr ?(indent = "") expr =
       pp_node expr;
       pp_rec_expr e0;
       pp_rec_expr e1
+  | Uop (_, _, e) ->
+      pp_node expr;
+      pp_rec_expr e
   | If (_, e0, e1, e2) ->
       pp_node expr;
       pp_rec_expr e0;

@@ -23,6 +23,7 @@ type expr =
   | Bool of bool
   | Unit
   | Bop of Typed_ast.type_expr * expr * Common.bop * expr
+  | Uop of Typed_ast.type_expr * Common.uop * expr
   | If of Typed_ast.type_expr * expr * expr * expr
   | Fun of Typed_ast.type_expr * Typed_ast.type_expr * string * expr
   | App of Typed_ast.type_expr * expr * expr
@@ -76,6 +77,7 @@ let rec get_expr_type = function
   | Bool _ -> Typed_ast.TyBool
   | Unit -> Typed_ast.TyUnit
   | Bop (t, _, _, _) -> t
+  | Uop (t, _, _) -> t
   | If (t, _, _, _) -> t
   | Fun (t0, t1, _, _) -> Typed_ast.TyFun (t0, t1)
   | App (t, _, _) -> t
@@ -113,6 +115,8 @@ let string_of_expr_node =
   | Unit -> "()"
   | Bop (return_ty, _, op, _) ->
       sprintf "Bop %s : %s" (show_bop op) (Typed_ast.pp_texpr return_ty)
+  | Uop (return_ty, op, _) ->
+      sprintf "Uop %s : %s" (show_uop op) (Typed_ast.pp_texpr return_ty)
   | If _ -> "If"
   | Fun (arg_type, return_type, x, _) ->
       sprintf "Fun %s : %s" x
@@ -154,6 +158,9 @@ let rec pp_expr ?(indent = "") expr =
       pp_node expr;
       pp_rec_expr e0;
       pp_rec_expr e1
+  | Uop (_, _, e) ->
+      pp_node expr;
+      pp_rec_expr e
   | If (_, e0, e1, e2) ->
       pp_node expr;
       pp_rec_expr e0;

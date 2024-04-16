@@ -49,6 +49,7 @@ let free_vars_with_types_expr bound e =
           StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
         in
         (free, fvs_by_ident)
+    | Uop (_, _, e) -> rec_aux e
     | If (_, e0, e1, e2) | Set_Tuple (e0, e1, e2) ->
         let free0, fvs_by_ident0 = rec_aux e0 in
         let free1, fvs_by_ident1 = rec_aux e1 in
@@ -204,6 +205,9 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
       let defs0, e0 = rec_lift_lambdas_expr e0 in
       let defs1, e1 = rec_lift_lambdas_expr e1 in
       (defs0 @ defs1, Bop (ty, e0, bop, e1))
+  | Uop (ty, uop, e) ->
+      let defs, e' = rec_lift_lambdas_expr e in
+      (defs, Uop (ty, uop, e'))
   | If (ty, e0, e1, e2) ->
       let defs0, e0 = rec_lift_lambdas_expr e0 in
       let defs1, e1 = rec_lift_lambdas_expr e1 in

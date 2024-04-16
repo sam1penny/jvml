@@ -22,6 +22,7 @@ type expr =
   | Bool of loc * bool
   | Unit of loc
   | Bop of loc * type_expr * expr * Common.bop * expr
+  | Uop of loc * type_expr * Common.uop * expr
   | If of loc * type_expr * expr * expr * expr
   | Fun of loc * type_expr * type_expr * string * expr
   | App of loc * type_expr * expr * expr
@@ -67,6 +68,14 @@ let bop_return_type ty =
   | FLOAT_ADD | FLOAT_SUB | FLOAT_MUL | FLOAT_DIV -> TyFloat
   | STRING_CONCAT -> TyString
 
+let uop_arg_type ty =
+  let open Common in
+  match ty with NEG -> TyInt | REAL -> TyInt | FLOAT_NEG -> TyFloat
+
+let uop_return_type ty =
+  let open Common in
+  match ty with NEG -> TyInt | REAL -> TyFloat | FLOAT_NEG -> TyFloat
+
 (* printing *)
 let rec pp_texpr = function
   | TyInt -> "int"
@@ -104,6 +113,7 @@ let string_of_expr_node =
   | Unit _ -> "()"
   | Bop (_, return_ty, _, op, _) ->
       sprintf "Bop %s : %s" (show_bop op) (pp_texpr return_ty)
+  | Uop (_, ty, op, _) -> sprintf "Uop %s : %s" (show_uop op) (pp_texpr ty)
   | If _ -> "If"
   | Fun (_, arg_type, return_type, x, _) ->
       sprintf "Fun %s : %s" x (pp_texpr (TyFun (arg_type, return_type)))
@@ -156,6 +166,9 @@ let rec pp_expr ?(indent = "") expr =
       pp_node expr;
       pp_rec_expr e0;
       pp_rec_expr e1
+  | Uop (_, _, _, e) ->
+      pp_node expr;
+      pp_rec_expr e
   | If (_, _, e0, e1, e2) ->
       pp_node expr;
       pp_rec_expr e0;

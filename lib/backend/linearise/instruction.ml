@@ -16,6 +16,8 @@ type standard_bop =
   | STRING_CONCAT
 [@@deriving show]
 
+type standard_uop = NEG | FLOAT_NEG | REAL [@@deriving show]
+
 type type_expr =
   | TyInt
   | TyFloat
@@ -50,6 +52,7 @@ type instruction =
   | GOTO of string
   | LABEL of string
   | BOP of standard_bop
+  | UOP of standard_uop
   | LOAD_FIELD of string * type_expr
   | STORE_FIELD of string * type_expr
   | ALLOC_OBJ of string

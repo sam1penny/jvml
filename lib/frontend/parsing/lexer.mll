@@ -74,6 +74,7 @@ rule next_token = parse
     | "rec" { REC }
     | "in" { IN }
     | "do" { DO }
+    | "real" { REAL }
     | lowercase_indent { LOWERCASE_IDENT (Lexing.lexeme lexbuf)}
     | uppercase_ident { UPPERCASE_IDENT (Lexing.lexeme lexbuf)}
     | eof { EOF }

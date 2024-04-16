@@ -12,6 +12,7 @@ let get_expr_type =
   | Bool _ -> TyBool
   | Unit _ -> TyUnit
   | Bop (_, t, _, _, _) -> t
+  | Uop (_, t, _, _) -> t
   | If (_, t, _, _, _) -> t
   | Fun (_, t0, t1, _, _) -> TyFun (t0, t1)
   | App (_, t, _, _) -> t
@@ -117,6 +118,10 @@ let rec map_over_expr_texprs f expr =
       let e0' = map_over_expr_texprs f e0 in
       let e1' = map_over_expr_texprs f e1 in
       Bop (loc, ty', e0', op, e1')
+  | Uop (loc, ty, op, e) ->
+      let ty' = f ty in
+      let e' = map_over_expr_texprs f e in
+      Uop (loc, ty', op, e')
   | If (loc, ty, e0, e1, e2) ->
       let ty' = f ty in
       let e0' = map_over_expr_texprs f e0 in
@@ -396,6 +401,13 @@ let rec type_expr unifications nt env expr =
           Ok
             (Typed_ast.Bop
                (loc, Typed_ast.bop_return_type op, e0node, op, e1node)))
+  | Parsed_ast.Uop (loc, uop, e) ->
+      type_expr unifications nt env e >>=? fun enode ->
+      unify unifications (get_expr_type enode)
+        (Typed_ast.uop_arg_type uop)
+        (Parsed_ast.get_expr_loc e)
+      >>=? fun _ ->
+      Ok (Typed_ast.Uop (loc, Typed_ast.uop_return_type uop, uop, enode))
   | Parsed_ast.If (loc, e0, e1, e2) ->
       type_expr unifications nt env e0 >>=? fun e0node ->
       unify unifications (get_expr_type e0node) TyBool

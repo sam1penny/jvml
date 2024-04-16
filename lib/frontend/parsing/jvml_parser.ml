@@ -6,6 +6,7 @@ let rec check_letrec = function
   | (Int _ | Float _ | String _ | Ident _ | Constr _ | Bool _ | Unit _) as e ->
       e
   | Bop (loc, e0, op, e1) -> Bop (loc, check_letrec e0, op, check_letrec e1)
+  | Uop (loc, op, e) -> Uop (loc, op, check_letrec e)
   | If (loc, e0, e1, e2) ->
       If (loc, check_letrec e0, check_letrec e1, check_letrec e2)
   | Fun (loc, x, e) -> Fun (loc, x, check_letrec e)

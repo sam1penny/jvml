@@ -36,6 +36,7 @@ let rec size_expr_helper e =
   | Match_Failure | Hole ->
       1
   | Bop (_, e0, _, e1) -> 1 + size_expr_helper e0 + size_expr_helper e1
+  | Uop (_, _, e) -> 1 + size_expr_helper e
   | If (_, e0, e1, e2) | Set_Tuple (e0, e1, e2) ->
       1 + size_expr_helper e0 + size_expr_helper e1 + size_expr_helper e2
   | Fun (_, _, _, e) -> 1 + size_expr_helper e
@@ -278,6 +279,9 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
       let e0' = rec_inline_expr_without_ctx OtherCtx e0 in
       let e1' = rec_inline_expr_without_ctx OtherCtx e1 in
       Bop (ty, e0', bop, e1')
+  | Uop (ty, uop, e) ->
+      let e' = rec_inline_expr_without_ctx OtherCtx e in
+      Uop (ty, uop, e')
   | If (ty, e0, e1, e2) ->
       let e0' = rec_inline_expr_without_ctx (CaseCtx context) e0 in
       let e1' = rec_inline_expr_without_ctx context e1 in

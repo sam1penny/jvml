@@ -27,6 +27,9 @@ let map_over_sub_expr f e =
       let e0' = f e0 in
       let e1' = f e1 in
       Bop (ty, e0', bop, e1')
+  | Uop (ty, uop, e) ->
+      let e' = f e in
+      Uop (ty, uop, e')
   | If (ty, e0, e1, e2) ->
       let e0' = f e0 in
       let e1' = f e1 in
@@ -100,6 +103,7 @@ let fold_left_over_sub_expr f acc e =
   | Match_Failure | Hole ->
       acc
   | Bop (_, e0, _, e1) -> f (f acc e0) e1
+  | Uop (_, _, e) -> f acc e
   | If (_, e0, e1, e2) -> f (f (f acc e0) e1) e2
   | Fun (_, _, _, e) -> f acc e
   | App (_, e0, e1) -> f (f acc e0) e1
@@ -143,6 +147,10 @@ let rec map_over_expr_texprs f expr =
       let e0' = map_over_expr_texprs f e0 in
       let e1' = map_over_expr_texprs f e1 in
       Bop (ty', e0', op, e1')
+  | Uop (ty, uop, e) ->
+      let ty' = f ty in
+      let e' = map_over_expr_texprs f e in
+      Uop (ty', uop, e')
   | If (ty, e0, e1, e2) ->
       let ty' = f ty in
       let e0' = map_over_expr_texprs f e0 in
@@ -221,7 +229,7 @@ let shallow_map_tail_positions f e =
   match e with
   | Int _ | Float _ | String _ | Ident _ | Bool _ | Unit | Constr _
   | Match_Failure | Fun _ | App _ | Tuple _ | TupleGet _ | ConstructorGet _
-  | Bop _ | Direct_app _ | Hole | Set_Tuple _ ->
+  | Bop _ | Uop _ | Direct_app _ | Hole | Set_Tuple _ ->
       e
   | If (ty, e0, e1, e2) -> If (ty, e0, f e1, f e2)
   | Let (ty, x, e0, e1) -> Let (ty, x, e0, f e1)

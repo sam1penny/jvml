@@ -47,6 +47,9 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
       let e0' = rec_rename_expr e0 in
       let e1' = rec_rename_expr e1 in
       Bop (ty, e0', bop, e1')
+  | Uop (ty, uop, e) ->
+      let e' = rec_rename_expr e in
+      Uop (ty, uop, e')
   | If (ty, e0, e1, e2) ->
       let e0' = rec_rename_expr e0 in
       let e1' = rec_rename_expr e1 in

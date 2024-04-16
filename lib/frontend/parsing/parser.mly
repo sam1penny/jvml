@@ -15,6 +15,7 @@
 %token UNIT, COMMA, APOSTROPHE, LET, IN, REC
 %token DO, SEMICOLON, LCURLY, RCURLY, LSQUARE, RSQUARE
 %token CONS, EMPTY_LIST
+%token REAL
 %token EOF
 
 %token TYPE, TINT, TBOOL, TUNIT, OF
@@ -48,7 +49,7 @@ prog:
  | p = terminated(list(decl), EOF) { p }
 
 
-%inline infix_op:
+%inline infix_bop:
   | ADD { Common.ADD }
   | SUB { Common.SUB }
   | MUL {Common.MUL }
@@ -65,6 +66,10 @@ prog:
   | AND { Common.AND }
   | OR { Common.OR }
   | STRING_CONCAT { Common.STRING_CONCAT }
+
+%inline standard_uop:
+  | SUB { Common.NEG }
+  | FLOAT_SUB { Common.FLOAT_NEG }
 
 (* expressions in decreasing order of precedence *)
 
@@ -96,10 +101,12 @@ expr4:
 expr3:
   | e = expr4 { e }
   | e = expr3; e2 = expr4 { Parsed_ast.App ($sloc, e, e2)}
+  | REAL; e = expr4 { Parsed_ast.Uop ($sloc, Common.REAL, e)}
 
 expr2:
  | e = expr3 {e}
- | e1 = expr2; op = infix_op; e2 = expr2 { Parsed_ast.Bop($sloc, e1, op, e2) }
+ | e1 = expr2; op = infix_bop; e2 = expr2 { Parsed_ast.Bop($sloc, e1, op, e2) }
+ | op = standard_uop; e = expr2 { Parsed_ast.Uop($sloc, op, e) }
  | e1 = expr2; CONS; e2 = expr2 { Parsed_ast.App($sloc, Parsed_ast.Constr($sloc, "Cons$"), Parsed_ast.Tuple($sloc, [e1; e2])) }
 
 expr:

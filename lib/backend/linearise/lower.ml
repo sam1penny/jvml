@@ -65,6 +65,7 @@ let free_vars_with_types_expr bound e =
         if StringSet.mem i bound then free else StringMap.add i ty free
     | Bop (_, e0, _, e1) ->
         StringMap.union takeleft (aux bound free e0) (aux bound free e1)
+    | Uop (_, _, e) -> aux bound free e
     | If (_, e0, e1, e2) ->
         StringMap.union takeleft (aux bound free e0) (aux bound free e1)
         |> StringMap.union takeleft (aux bound free e2)
@@ -137,6 +138,7 @@ let rec clear_shared_expr_labels e =
   | Bop (_, e0, _, e1) ->
       clear_shared_expr_labels e0;
       clear_shared_expr_labels e1
+  | Uop (_, _, e) -> clear_shared_expr_labels e
   | If (_, e0, e1, e2) ->
       clear_shared_expr_labels e0;
       clear_shared_expr_labels e1;
@@ -222,6 +224,22 @@ let rec compile_expr label_gen env top_level_bindings after_while_loop e =
   | Unit -> ([], [ PUSH_UNIT ], [])
   | Bop (_, e0, bop, e1) ->
       compile_bop label_gen env top_level_bindings after_while_loop e0 e1 bop
+  | Uop (_, uop, e) -> (
+      let defs, c, smethods = compile_expr_rec e in
+      match uop with
+      | Common.NEG ->
+          ( defs,
+            c @ [ UNBOX_INT; Instruction.UOP Instruction.NEG; BOX_INT ],
+            smethods )
+      | Common.FLOAT_NEG ->
+          ( defs,
+            c
+            @ [ UNBOX_FLOAT; Instruction.UOP Instruction.FLOAT_NEG; BOX_FLOAT ],
+            smethods )
+      | Common.REAL ->
+          ( defs,
+            c @ [ UNBOX_INT; Instruction.UOP Instruction.REAL; BOX_FLOAT ],
+            smethods ))
   | If (_, e0, e1, e2) ->
       let else_label = label_gen.ctrl_label () in
       let defs0, c0, s0 = compile_expr_rec e0 in

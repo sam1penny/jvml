@@ -9,7 +9,8 @@ let rec has_tmc_candidate fn_name e =
   | Int _ | Ident _ | Float _ | String _ | Bool _ | Unit | Constr _
   | Match_Failure ->
       false
-  | Bop _ | Fun _ | TupleGet _ | ConstructorGet _ | Direct_app _ | Tuple _ ->
+  | Bop _ | Uop _ | Fun _ | TupleGet _ | ConstructorGet _ | Direct_app _
+  | Tuple _ ->
       false
   | If (_, _, e1, e2) -> rec_has_tmc e1 || rec_has_tmc e2
   | App (_, Constr (_, _), Tuple (_, es)) ->

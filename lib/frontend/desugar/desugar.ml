@@ -21,6 +21,7 @@ let rec desugared_ast_of_expr constructors_by_type expr =
   | Typed_ast.Unit _ -> Unit
   | Typed_ast.Bop (_, ty, e0, op, e1) ->
       Bop (ty, rec_desugar e0, op, rec_desugar e1)
+  | Typed_ast.Uop (_, ty, op, e) -> Uop (ty, op, rec_desugar e)
   | Typed_ast.If (_, ty, e0, e1, e2) ->
       If (ty, rec_desugar e0, rec_desugar e1, rec_desugar e2)
   | Typed_ast.Fun (_, t0, t1, x, e) -> Fun (t0, t1, x, rec_desugar e)

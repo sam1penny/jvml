@@ -9,6 +9,7 @@ let stack_size_change = function
   | IFZERO _ | IFNONZERO _ -> -1
   | GOTO _ | LABEL _ -> 0
   | BOP _ -> 1
+  | UOP _ -> 0
   | LOAD_FIELD _ | LOAD_FIELD_ANY_CLASS _ -> 0
   | STORE_FIELD _ | STORE_FIELD_ANY_CLASS _ -> -2
   | ALLOC_OBJ _ -> 2
@@ -104,6 +105,11 @@ let lower_bop ctrl_gen = function
          (Ljava/lang/String;)Ljava/lang/String;";
       ]
 
+let lower_uop = function
+  | NEG -> [ "ineg" ]
+  | FLOAT_NEG -> [ "fneg" ]
+  | REAL -> [ "i2f" ]
+
 let load_int = function
   | -1l -> "iconst_m1"
   | (0l | 1l | 2l | 3l | 4l | 5l) as n -> sprintf "iconst_%ld" n
@@ -166,6 +172,7 @@ let lower_instruction ctrl_gen clazz = function
       [ "getstatic Field sam/generated/Unit INSTANCE Lsam/generated/Unit;" ]
   | PUSH_STRING s -> [ sprintf "ldc \"%s\"" (String.escaped s) ]
   | BOP bop -> lower_bop ctrl_gen bop
+  | UOP uop -> lower_uop uop
   | STORE_REF r -> [ store_ref r ]
   | LOAD_REF r -> [ load_ref r ]
   | IFZERO l -> [ sprintf "ifeq %s" l ]
