@@ -144,3 +144,59 @@ let%expect_test "test lambda lift mutual recursion" =
                       └──Ident x_$0 : int
                       └──Int 1
   |}]
+
+let%expect_test "test lambda lifting more complex mutual recursion case" =
+  let program =
+    {|
+   val rec loop1 i =
+      let rec loop2 j =
+         let rec loop3 k =
+            if k = 100 then ()
+            else
+            do {
+            loop2(k);
+            loop3(k+1)
+         }
+         in
+         if j = 100 then () else loop3 (j+1)
+      in
+      loop2 i
+   |}
+  in
+  let _ = parse_type_desugar_print program in
+  [%expect
+    {|
+     └──And
+        └──ValRec loop2_$0
+           └──Fun j_$0 : int -> unit
+              └──If
+                 └──Bop = : bool
+                    └──Ident j_$0 : int
+                    └──Int 100
+                 └──()
+                 └──App
+                    └──Ident loop3_$0 : int -> unit
+                    └──Bop + : int
+                       └──Ident j_$0 : int
+                       └──Int 1
+        └──ValRec loop3_$0
+           └──Fun k_$0 : int -> unit
+              └──If
+                 └──Bop = : bool
+                    └──Ident k_$0 : int
+                    └──Int 100
+                 └──()
+                 └──Seq
+                    └──App
+                       └──Ident loop2_$0 : int -> unit
+                       └──Ident k_$0 : int
+                    └──App
+                       └──Ident loop3_$0 : int -> unit
+                       └──Bop + : int
+                          └──Ident k_$0 : int
+                          └──Int 1
+        └──ValRec loop1_$0
+           └──Fun i_$0 : int -> unit
+              └──App
+                 └──Ident loop2_$0 : int -> unit
+                 └──Ident i_$0 : int |}]

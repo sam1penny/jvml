@@ -227,10 +227,10 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
       let freevars =
         Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
       in
+      remove_from_fv_tbls x free_var_tbl;
       let lifted_args = freevars @ funargs in
       let defs0, body0 = rec_lift_lambdas_expr body in
       let lifted_val = lift_to_val x lifted_args body0 in
-      remove_from_fv_tbls x free_var_tbl;
       let defs1, e1 = rec_lift_lambdas_expr e1 in
       ([ lifted_val ] @ defs0 @ defs1, e1)
   | Let (ty, x, e0, e1) ->
@@ -242,10 +242,10 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
       let freevars =
         Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
       in
+      remove_from_fv_tbls x free_var_tbl;
       let lifted_args = freevars @ funargs in
       let defs0, body0 = rec_lift_lambdas_expr body in
       let lifted_valrec = lift_to_valrec x lifted_args body0 in
-      remove_from_fv_tbls x free_var_tbl;
       let defs1, e1 = rec_lift_lambdas_expr e1 in
 
       ([ lifted_valrec ] @ defs0 @ defs1, e1)
