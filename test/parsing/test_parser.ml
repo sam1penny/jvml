@@ -152,3 +152,20 @@ let%expect_test "test letrec without immediate binding" =
   with _ ->
     print_endline "Error";
     [%expect {|Error|}]
+
+let%expect_test "test correct precedence of comparison operations" =
+  let x = "val x = 3 + 4 > 5 * 4" in
+  Parsing.Driver.parse_string x
+  |> List.iter (fun x ->
+         Parsing.Parsed_ast.pp_decl x;
+         print_newline ());
+  [%expect
+    {|
+     └──Val x
+        └──Bop: >
+           └──Bop: +
+              └──Int 3
+              └──Int 4
+           └──Bop: *
+              └──Int 5
+              └──Int 4 |}]
