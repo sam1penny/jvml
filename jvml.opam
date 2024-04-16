@@ -14,6 +14,7 @@ depends: [
   "pp_loc" {>= "2.1.0"}
   "ppx_deriving" {>= "5.2.1"}
   "odoc" {with-doc}
+  "nice_parser"
 ]
 build: [
   ["dune" "subst"] {dev}
