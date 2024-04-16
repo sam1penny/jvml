@@ -587,3 +587,38 @@ let%expect_test "test <= and >=" =
     true
     true
   |}]
+
+let%expect_test "test uops" =
+  let program =
+    {|
+  val test = do {
+    print(real 3 +. 4.0);
+    print(- 4 + 1);
+    print(-. 4.0 +. 1.0)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    7.0
+    -3
+    -3.0
+  |}]
+
+let%expect_test "test float comparisons" =
+  let program =
+    {|
+  val test = do {
+    print(3.0 >. 4.0);
+    print(4.0 >=. 4.0);
+    print(3.0 <. 4.0);
+    print(3.0 <=. 4.0)
+  }
+  |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    false
+    true
+    true
+    true |}]
