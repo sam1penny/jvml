@@ -45,7 +45,7 @@ let num_local_vars nargs prog =
 
 let rec lower_type = function
   | TyInt -> "java/lang/Integer"
-  | TyFloat -> "java/lang/Float"
+  | TyFloat -> "java/lang/Double"
   | TyString -> "java/lang/String"
   | TyBool -> "java/lang/Boolean"
   | TyFun _ -> "java/util/function/Function"
@@ -74,10 +74,10 @@ let lower_bop ctrl_gen = function
   | SUB -> [ "isub" ]
   | MUL -> [ "imul" ]
   | DIV -> [ "idiv" ]
-  | FLOAT_ADD -> [ "fadd" ]
-  | FLOAT_SUB -> [ "fsub" ]
-  | FLOAT_MUL -> [ "fmul" ]
-  | FLOAT_DIV -> [ "fdiv" ]
+  | FLOAT_ADD -> [ "dadd" ]
+  | FLOAT_SUB -> [ "dsub" ]
+  | FLOAT_MUL -> [ "dmul" ]
+  | FLOAT_DIV -> [ "ddiv" ]
   | EQ ->
       [ "invokevirtual Method java/lang/Object equals (Ljava/lang/Object;)Z" ]
   | (LT | GT | LEQ | GEQ) as bop ->
@@ -104,10 +104,10 @@ let lower_bop ctrl_gen = function
       let after_label = ctrl_gen () in
       let flt_compare, flt_branch =
         match bop with
-        | FLOAT_LT -> ("fcmpg", "ifge")
-        | FLOAT_LEQ -> ("fcmpg", "ifgt")
-        | FLOAT_GT -> ("fcmpl", "ifle")
-        | FLOAT_GEQ -> ("fcmpl", "iflt")
+        | FLOAT_LT -> ("dcmpg", "ifge")
+        | FLOAT_LEQ -> ("dcmpg", "ifgt")
+        | FLOAT_GT -> ("dcmpl", "ifle")
+        | FLOAT_GEQ -> ("dcmpl", "iflt")
         | _ -> assert false
       in
       [
@@ -127,8 +127,8 @@ let lower_bop ctrl_gen = function
 
 let lower_uop ctrl_gen = function
   | NEG -> [ "ineg" ]
-  | FLOAT_NEG -> [ "fneg" ]
-  | REAL -> [ "i2f" ]
+  | FLOAT_NEG -> [ "dneg" ]
+  | REAL -> [ "i2d" ]
   | NOT ->
       let false_label = ctrl_gen () in
       let after_label = ctrl_gen () in
@@ -147,10 +147,9 @@ let load_int = function
   | n -> sprintf "ldc %ld" n
 
 let load_float = function
-  | 0.0 -> "fconst_0"
-  | 1.0 -> "fconst_1"
-  | 2.0 -> "fconst_2"
-  | f -> sprintf "ldc %ff" f
+  | 0.0 -> "dconst_0"
+  | 1.0 -> "dconst_1"
+  | f -> sprintf "ldc %f" f
 
 let store_ref = function
   | (0 | 1 | 2 | 3) as n -> sprintf "astore_%i" n
@@ -193,8 +192,8 @@ let lower_instruction ctrl_gen clazz = function
   | UNBOX_INT -> [ "invokevirtual Method java/lang/Integer intValue ()I" ]
   | PUSH_FLOAT f -> [ load_float f ]
   | BOX_FLOAT ->
-      [ "invokestatic Method java/lang/Float valueOf (F)Ljava/lang/Float;" ]
-  | UNBOX_FLOAT -> [ "invokevirtual Method java/lang/Float floatValue ()F" ]
+      [ "invokestatic Method java/lang/Double valueOf (D)Ljava/lang/Double;" ]
+  | UNBOX_FLOAT -> [ "invokevirtual Method java/lang/Double doubleValue ()D" ]
   | PUSH_BOOL b -> [ (if b then "iconst_1" else "iconst_0") ]
   | BOX_BOOL ->
       [ "invokestatic Method java/lang/Boolean valueOf (Z)Ljava/lang/Boolean;" ]

@@ -5,7 +5,7 @@ open Desugar
 
 type label_generators = {
   ctrl_label : unit -> string;
-  ref_label : unit -> int;
+  ref_label : Instruction.type_expr -> int;
   lambda_label : unit -> string;
 }
 
@@ -24,18 +24,26 @@ let make_lambda_gen () =
   let cnt = make_counter 0 in
   fun () -> "Lambda$" ^ string_of_int @@ cnt ()
 
+let make_ref_gen initial_val =
+  let t = ref initial_val in
+  fun ty ->
+    let inc = match ty with Instruction.TyFloat -> 2 | _ -> 1 in
+    let n = !t in
+    let _ = t := n + inc in
+    n
+
 let make_generators () =
   {
     ctrl_label = make_ctrl_gen ();
-    ref_label = make_counter 1;
+    ref_label = make_ref_gen 1;
     lambda_label = make_lambda_gen ();
   }
 
 let reset_per_func_generators g =
-  { g with ctrl_label = make_ctrl_gen (); ref_label = make_counter 1 }
+  { g with ctrl_label = make_ctrl_gen (); ref_label = make_ref_gen 1 }
 
 let reset_for_static_func_generators g =
-  { g with ctrl_label = make_ctrl_gen (); ref_label = make_counter 0 }
+  { g with ctrl_label = make_ctrl_gen (); ref_label = make_ref_gen 0 }
 
 let rec intersperse sep = function
   | ([] | [ _ ]) as l -> l
@@ -288,7 +296,7 @@ let rec compile_expr label_gen env top_level_bindings after_while_loop e =
         List.flatten smethods )
   | Let (_, x, e0, e1) ->
       let defs0, c0, s0 = compile_expr_rec e0 in
-      let x_label = label_gen.ref_label () in
+      let x_label = label_gen.ref_label (get_expr_type e0 |> convert_type) in
       let env_with_x = Value_env.add_local_var x x_label env in
       let defs1, c1, s1 =
         compile_expr label_gen env_with_x top_level_bindings after_while_loop e1
@@ -591,7 +599,7 @@ and compile_anon_lambda_expr label_gen env top_level_bindings after_while_loop
 
   let body_env =
     Value_env.strip_nonstatic env
-    |> Value_env.add_local_var x (body_label_gen.ref_label ())
+    |> Value_env.add_local_var x (body_label_gen.ref_label arg_type)
   in
   let body_env =
     List.fold_left
@@ -642,10 +650,10 @@ and compile_dyn_lambda_expr label_gen env top_level_bindings after_while_loop
   let body_env =
     Value_env.strip_nonstatic env |> fun env ->
     List.fold_left
-      (fun env (fv, _) ->
-        Value_env.add_local_var fv (body_label_gen.ref_label ()) env)
+      (fun env (fv, ty) ->
+        Value_env.add_local_var fv (body_label_gen.ref_label ty) env)
       env fvars_with_types
-    |> Value_env.add_local_var x (body_label_gen.ref_label ())
+    |> Value_env.add_local_var x (body_label_gen.ref_label arg_type)
   in
 
   let defs, ecode, smethods =
@@ -775,8 +783,10 @@ let rec compile_decl label_gen env toplevel = function
       let static_env =
         Value_env.strip_nonstatic env |> fun env ->
         List.fold_left
-          (fun env (name, _) ->
-            Value_env.add_local_var name (static_label_gen.ref_label ()) env)
+          (fun env (name, ty) ->
+            Value_env.add_local_var name
+              (static_label_gen.ref_label (convert_type ty))
+              env)
           env funargs
       in
 
@@ -841,8 +851,10 @@ let rec compile_decl label_gen env toplevel = function
       let static_env =
         Value_env.strip_nonstatic env |> fun env ->
         List.fold_left
-          (fun env (name, _) ->
-            Value_env.add_local_var name (static_label_gen.ref_label ()) env)
+          (fun env (name, ty) ->
+            Value_env.add_local_var name
+              (static_label_gen.ref_label (convert_type ty))
+              env)
           env funargs
         |> Value_env.add_static_method x static_method_details
         |> Value_env.add_static_field x closure_details

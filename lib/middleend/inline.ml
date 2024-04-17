@@ -96,7 +96,12 @@ let copy_shared_exprs e = copy_shared_exprs_helper (Hashtbl.create 10) e
 let rec build_type_mapping tbl general_ty special_ty =
   let open Typing.Typed_ast in
   match (general_ty, special_ty) with
-  | TyInt, TyInt | TyBool, TyBool | TyUnit, TyUnit | TyString, TyString -> ()
+  | TyInt, TyInt
+  | TyBool, TyBool
+  | TyUnit, TyUnit
+  | TyString, TyString
+  | TyFloat, TyFloat ->
+      ()
   | TyVar v, special -> Hashtbl.add tbl v special
   | TyFun (general_t0, general_t1), TyFun (special_t0, special_t1) ->
       build_type_mapping tbl general_t0 special_t0;

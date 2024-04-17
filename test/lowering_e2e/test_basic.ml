@@ -467,7 +467,7 @@ let%expect_test "test floats" =
   [%expect {|
     6.0
     20.0
-    1.3333334
+    1.3333333333333333
     1.0 |}]
 
 let%expect_test "test strings" =
@@ -626,3 +626,21 @@ let%expect_test "test float comparisons" =
     true
     true
     true |}]
+
+let%expect_test "test correctly compute local variable numbers for doubles" =
+  let program =
+    {|
+    val test =
+      let x = 1.0 in
+      let y = 10 in
+      let z = 2.0 in
+      do {
+        print(y);
+        print(x +. z)
+      }
+    |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+    10
+    3.0 |}]
