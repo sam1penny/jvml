@@ -27,7 +27,7 @@ let make_lambda_gen () =
 let make_ref_gen initial_val =
   let t = ref initial_val in
   fun ty ->
-    let inc = match ty with Instruction.TyFloat -> 2 | _ -> 1 in
+    let inc = match ty with Instruction.TyFloat -> 1 | _ -> 1 in
     let n = !t in
     let _ = t := n + inc in
     n

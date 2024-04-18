@@ -2,8 +2,12 @@ open Linearise.Instruction
 open Printf
 
 let stack_size_change = function
-  | PUSH_INT _ | PUSH_FLOAT _ | PUSH_BOOL _ | PUSH_UNIT | PUSH_STRING _ -> 1
-  | BOX_INT | BOX_FLOAT | BOX_BOOL | UNBOX_INT | UNBOX_BOOL | UNBOX_FLOAT -> 0
+  | PUSH_INT _ | PUSH_BOOL _ | PUSH_UNIT | PUSH_STRING _ -> 1
+  | BOX_INT | BOX_BOOL | UNBOX_INT | UNBOX_BOOL -> 0
+  (* special cases - double takes up two slots *)
+  | PUSH_FLOAT _ -> 2
+  | BOX_FLOAT -> -1
+  | UNBOX_FLOAT -> 1
   | STORE_REF _ -> -1
   | LOAD_REF _ -> 1
   | IFZERO _ | IFNONZERO _ -> -1
