@@ -333,6 +333,7 @@ let lift_lambdas_decl free_var_map decl =
   | ValRec (ty, x, e) ->
       let lifted_decls, e = lift_lambdas_expr x free_var_map e in
       Utils.clear_shared_expr_seen e;
+      List.iter Utils.clear_shared_decl_seen lifted_decls;
       let lifted_decls = lifted_decls @ [ ValRec (ty, x, e) ] in
       if mutual_recursion_required lifted_decls then [ And lifted_decls ]
       else lifted_decls
