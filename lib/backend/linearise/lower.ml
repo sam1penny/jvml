@@ -305,7 +305,9 @@ let rec compile_expr label_gen env top_level_bindings after_while_loop e =
   | LetRec (_, x, e0, e1) ->
       let env_with_x =
         Value_env.add_static_field x
-          ("Foo", x, convert_type (Desugared_ast.get_expr_type e0))
+          ( !Common.Config.generated_class_name,
+            x,
+            convert_type (Desugared_ast.get_expr_type e0) )
           env
       in
       let new_toplevel = StringSet.add x top_level_bindings in
@@ -319,7 +321,9 @@ let rec compile_expr label_gen env top_level_bindings after_while_loop e =
         c0
         @ [
             STORE_STATIC
-              ("Foo", x, convert_type (Desugared_ast.get_expr_type e0));
+              ( !Common.Config.generated_class_name,
+                x,
+                convert_type (Desugared_ast.get_expr_type e0) );
           ]
         @ c1,
         s0 @ s1 )
@@ -722,10 +726,13 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
         [
           ALLOC_OBJ cname;
           CONSTRUCT_OBJ (cname, []);
-          STORE_STATIC ("Foo", cname, typedef_texpr);
+          STORE_STATIC
+            (!Common.Config.generated_class_name, cname, typedef_texpr);
         ],
         [],
-        Value_env.add_static_field cname ("Foo", cname, typedef_texpr) env )
+        Value_env.add_static_field cname
+          (!Common.Config.generated_class_name, cname, typedef_texpr)
+          env )
   | Some ty ->
       let body =
         [ ALLOC_OBJ cname; LOAD_REF 1; CONSTRUCT_OBJ (cname, [ ty ]) ]
@@ -737,10 +744,16 @@ let lambda_for_constructor label_gen env cname typedef_texpr arg =
           (ty, typedef_texpr, body) []
       in
       ( defs,
-        code @ [ STORE_STATIC ("Foo", cname, TyFun (ty, typedef_texpr)) ],
+        code
+        @ [
+            STORE_STATIC
+              ( !Common.Config.generated_class_name,
+                cname,
+                TyFun (ty, typedef_texpr) );
+          ],
         smethods,
         Value_env.add_static_field cname
-          ("Foo", cname, TyFun (ty, typedef_texpr))
+          (!Common.Config.generated_class_name, cname, TyFun (ty, typedef_texpr))
           env )
 
 let get_static_method_details x e =
@@ -750,7 +763,8 @@ let get_static_method_details x e =
   let converted_ret_ty = Desugared_ast.get_expr_type body |> convert_type in
   (x, num_funargs, converted_funargs, converted_ret_ty)
 
-let get_closure_details ty x = ("Foo", x, convert_type ty)
+let get_closure_details ty x =
+  (!Common.Config.generated_class_name, x, convert_type ty)
 
 let update_env env = function
   | Desugared_ast.Val (ty, x, (Fun _ as e)) ->
@@ -822,7 +836,11 @@ let rec compile_decl label_gen env toplevel = function
         compile_expr label_gen env' new_toplevel None closure_e
       in
       ( static_defs @ closure_defs,
-        c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
+        c
+        @ [
+            STORE_STATIC
+              (!Common.Config.generated_class_name, x, convert_type ty);
+          ],
         [ static_method ] @ static_smethods @ closure_smethods,
         env',
         new_toplevel )
@@ -831,7 +849,11 @@ let rec compile_decl label_gen env toplevel = function
       let env' = Value_env.add_static_field x (get_closure_details ty x) env in
       let new_toplevel = StringSet.add x toplevel in
       ( defs,
-        c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
+        c
+        @ [
+            STORE_STATIC
+              (!Common.Config.generated_class_name, x, convert_type ty);
+          ],
         smethods,
         env',
         new_toplevel )
@@ -893,7 +915,11 @@ let rec compile_decl label_gen env toplevel = function
         compile_expr label_gen env' new_toplevel None closure_e
       in
       ( static_defs @ closure_defs,
-        c @ [ STORE_STATIC ("Foo", x, convert_type ty) ],
+        c
+        @ [
+            STORE_STATIC
+              (!Common.Config.generated_class_name, x, convert_type ty);
+          ],
         [ static_method ] @ static_smethods @ closure_body,
         env',
         new_toplevel )

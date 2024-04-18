@@ -25,6 +25,9 @@ let speclist =
     ( "-f",
       Arg.String (fun x -> program_input := Some (File x)),
       " Set file to compile" );
+    ( "-o",
+      Arg.Set_string Common.Config.generated_class_name,
+      " Set name of generated class" );
     ("-opt-all", Arg.Unit (add_opt "-opt-all"), " Enable all optimisations");
     ("-peep", Arg.Unit (add_opt "-peep"), " Enable peephole optimisations");
     ( "-const-fp",

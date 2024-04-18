@@ -1,10 +1,15 @@
 #!/bin/bash
 
+copy_args=( "$@" )
+
+
+generated_class="Foo"
+
 # assume tmp directory exists, with zip inside
-krak2 asm --out "tmp/Foo.zip" tmp/test.j > /dev/null
+krak2 asm --out "tmp/${generated_class}.zip" tmp/test.j > /dev/null
 cd tmp
-unzip -u Foo >/dev/null
-java -jar ../../../../../scripts/stackmap_gen.jar sam/generated/Foo.class
-java sam/generated/Foo
+unzip -u "${generated_class}" >/dev/null
+java -jar ../../../../../scripts/stackmap_gen.jar "sam/generated/${generated_class}.class"
+java "sam/generated/${generated_class}"
 cd ..
 rm -rf tmp/

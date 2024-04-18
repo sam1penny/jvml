@@ -170,8 +170,9 @@ let lower_dyn_closure lifted captured_tys arg_type return_type =
        java/lang/invoke/LambdaMetafactory metafactory \
        (Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite; \
        MethodType (Ljava/lang/Object;)Ljava/lang/Object; MethodHandle \
-       invokeStatic Method sam/generated/Foo %s (%s)L%s; MethodType (L%s;)L%s; \
+       invokeStatic Method sam/generated/%s %s (%s)L%s; MethodType (L%s;)L%s; \
        : apply (%s)Ljava/util/function/Function;"
+      !Common.Config.generated_class_name
       lifted
       (lower_type_list (captured_tys @ [ arg_type ]))
       (lower_type return_type) (lower_type arg_type) (lower_type return_type)
@@ -290,8 +291,9 @@ let lower_instruction ctrl_gen clazz = function
       ]
   | STATIC_APPLY (name, arg_tys, ret_ty, actual_return_ty) ->
       [
-        sprintf "invokestatic Method sam/generated/Foo %s (%s)L%s;" name
-          (lower_type_list arg_tys) (lower_type ret_ty);
+        sprintf "invokestatic Method sam/generated/%s %s (%s)L%s;"
+          !Common.Config.generated_class_name
+          name (lower_type_list arg_tys) (lower_type ret_ty);
         sprintf "checkcast %s" (lower_type actual_return_ty);
       ]
   | NULL -> [ "aconst_null" ]
@@ -542,7 +544,9 @@ let lower_static_method static_method =
     (lower_type static_method.return_type)
     (max_stack_depth static_method.body)
     (num_local_vars (List.length static_method.args) static_method.body)
-    (lower_body "     " "sam/generated/Foo" static_method.body)
+    (lower_body "     "
+       (Printf.sprintf "sam/generated/%s" !Common.Config.generated_class_name)
+       static_method.body)
 
 let lower_field_defs p =
   List.filter_map
@@ -557,7 +561,7 @@ let produce_instruction_bytecode (p, static_methods) =
   sprintf
     {|
 .version 52 0
-.class public sam/generated/Foo
+.class public sam/generated/%s
 .super java/lang/Object
 %s
 .method public static main : ([Ljava/lang/String;)V
@@ -573,8 +577,11 @@ let produce_instruction_bytecode (p, static_methods) =
 .end innerclasses
 .end class
 |}
+    !Common.Config.generated_class_name
     (lower_field_defs p) (max_stack_depth p) (num_local_vars 1 p)
-    (lower_body "        " "sam/generated/Foo" p)
+    (lower_body "        "
+       (Printf.sprintf "sam/generated/%s" !Common.Config.generated_class_name)
+       p)
     (List.map lower_static_method static_methods |> String.concat "\n")
 
 let external_lib =
