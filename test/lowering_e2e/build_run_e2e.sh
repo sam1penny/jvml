@@ -9,7 +9,7 @@ generated_class="Foo"
 krak2 asm --out "tmp/${generated_class}.zip" tmp/test.j > /dev/null
 cd tmp
 unzip -u "${generated_class}" >/dev/null
-java -jar ../../../../../scripts/stackmap_gen.jar "sam/generated/${generated_class}.class"
-java "sam/generated/${generated_class}"
+java -jar ../../../../../scripts/stackmap_gen.jar "jvml/generated/${generated_class}.class"
+java "jvml/generated/${generated_class}"
 cd ..
 rm -rf tmp/

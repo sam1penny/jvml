@@ -28,7 +28,7 @@ dune exec -- _build/default/bin/compile.exe "${copy_args[@]}" > tmp/tmp.j || exi
 krak2 asm --out "tmp/${generated_class}.zip" tmp/tmp.j > /dev/null
 cd tmp
 unzip -u "${generated_class}" >/dev/null
-java -jar ../scripts/stackmap_gen.jar "sam/generated/${generated_class}.class"
-jar cf "../${generated_class}.jar" sam/generated/*.class
+java -jar ../scripts/stackmap_gen.jar "jvml/generated/${generated_class}.class"
+jar cf "../${generated_class}.jar" jvml/generated/*.class
 cd ..
 rm -rf tmp/
