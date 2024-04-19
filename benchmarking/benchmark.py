@@ -5,6 +5,7 @@ import csv
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
+import json
 
 
 '''
@@ -44,6 +45,69 @@ def generate_sml_executables(benchmark_name : str, number_runs : int) -> None:
     shutil.rmtree("benchmarking/tmp")
 
 '''
+rewrite from hyperfile format (a list of objects that each contain a 'command')
+field with the name, to a single object with mapping from command ->
+
+e.g. [ {command : "mosml", time : 5.0}, {command : "mlton", time : 1.0}]
+-->
+{
+    "mosml" : {time : 5.0},
+    "mlton" : {time : 1.0}
+}
+
+useful for overwriting the results for a single compiler
+'''
+def rewrite_hyperfile_out_json(benchmark_name : str) -> None:
+    with open(f"benchmarking/results/{benchmark_name}_tmp.json", "r") as tmp_file:
+        tmp_data = json.loads(tmp_file.read())
+
+    modified_json = {}
+
+    for compiler_results in tmp_data["results"]:
+        command = compiler_results["command"]
+        del compiler_results["command"]
+        compiler = command.split(".")[1]
+        modified_json[compiler] = compiler_results
+
+
+    if not os.path.exists(f"benchmarking/results/{benchmark_name}.json"):
+        with open(f"benchmarking/results/{benchmark_name}.json", "w") as file:
+            file.write("{}")
+
+    with open(f"benchmarking/results/{benchmark_name}.json", "r") as existing_file:
+        existing_data = json.loads(existing_file.read())
+
+    for compiler in modified_json:
+        existing_data[compiler] = modified_json[compiler]
+
+    with open(f"benchmarking/results/{benchmark_name}.json", "w") as existing_file:
+        json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
+
+
+'''
+given that the executables exist in tmp, run each sml version
+
+for now, just use hyperfine
+'''
+def run_sml_benchmarking(benchmark_name : str, warmups=5, runs=10):
+    if not os.path.exists("benchmarking/results"):
+        os.mkdir("benchmarking/results")
+
+    subprocess.run(
+        ["hyperfine",
+         "--export-json", f"benchmarking/results/{benchmark_name}_tmp.json",
+         "--warmup", f"{warmups}", "--min-runs", f"{runs}",
+         f"benchmarking/out/{benchmark_name}.mlton",
+         f"benchmarking/out/{benchmark_name}.mosml",
+         f"benchmarking/out/{benchmark_name}.polyc"
+    ])
+
+    rewrite_hyperfile_out_json(benchmark_name)
+
+    os.remove(f"benchmarking/results/{benchmark_name}_tmp.json")
+
+
+'''
 Clear .java, .jar and .class files from previous benchmarking runs
 
 Required we currently generate code belonging to the same package,
@@ -59,7 +123,9 @@ def clear_java_directories() -> None:
     if os.path.exists("benchmarking/jmh/target"):
         shutil.rmtree("benchmarking/jmh/target")
 
-def generate_jvml_executables(benchmark_name : str, number_runs : int, opt=True) -> None:
+ALL_OPTIMISATIONS : list[str] = ["-peep", "-const-fp", "-tco", "-tmm", "-tmc"]
+
+def generate_jvml_executables(benchmark_name : str, number_runs : int, optimisation_flags : list[str], result_suffix : str) -> None:
 
     if os.path.exists("benchmarking/tmp"):
         shutil.rmtree("benchmarking/tmp")
@@ -75,10 +141,8 @@ def generate_jvml_executables(benchmark_name : str, number_runs : int, opt=True)
     with open(f"benchmarking/tmp/{benchmark_name}.jvml", "w") as file:
         file.write(jvml_program)
 
-    class_name = benchmark_name.capitalize() + ("Opt" if opt else "")
-    out_name = benchmark_name + ("_opt" if opt else "")
-
-    optimisation_flags = ["-peep", "-const-fp", "-tco", "-tmm", "-tmc"] if opt else []
+    class_name = benchmark_name.capitalize() + result_suffix
+    out_name = benchmark_name + result_suffix
 
     subprocess.run(["bash", "scripts/build_jar.sh",
                     "-f", f"benchmarking/tmp/{benchmark_name}.jvml",
@@ -116,8 +180,8 @@ public class Benchmark{class_name} {{
     public static void main(String[] args) throws RunnerException {{
         Options opt = new OptionsBuilder()
                 .include(Benchmark{class_name}.class.getSimpleName())
-                .resultFormat(ResultFormatType.CSV)
-                .result("benchmarking/results/{out_name}_jvml.csv")
+                .resultFormat(ResultFormatType.JSON)
+                .result("benchmarking/results/{out_name}_tmp.json")
                 .forks(1)
                 .build();
         new Runner(opt).run();
@@ -125,7 +189,7 @@ public class Benchmark{class_name} {{
 
     @Benchmark
     @BenchmarkMode(Mode.AverageTime)
-    @OutputTimeUnit(TimeUnit.MILLISECONDS)
+    @OutputTimeUnit(TimeUnit.SECONDS)
     @Fork(value = 1, warmups = 1)
     public void bench(Blackhole blackhole) {{
         {class_name}.main(null);
@@ -163,37 +227,47 @@ public class Benchmark{class_name} {{
     shutil.rmtree("benchmarking/tmp")
 
 
+def rewrite_jmh_out_json(benchmark_name : str, result_suffix : str) -> None:
+    out_name = benchmark_name + result_suffix
+    with open(f"benchmarking/results/{out_name}_tmp.json", "r") as tmp_file:
+        tmp_data = json.loads(tmp_file.read())
 
-'''
-given that the executables exist in tmp, run each sml version
 
-for now, just use hyperfine
-'''
-def run_sml_benchmarking(benchmark_name : str, warmups=5, runs=10):
-    if not os.path.exists("benchmarking/results"):
-        os.mkdir("benchmarking/results")
+    compiler = "jvml" + result_suffix
+    mean = tmp_data[0]["primaryMetric"]["score"] if len(tmp_data) > 0 else 0
 
-    subprocess.run(
-        ["hyperfine",
-         "--export-csv", f"benchmarking/results/{benchmark_name}.csv",
-         "--warmup", f"{warmups}", "--min-runs", f"{runs}",
-         f"benchmarking/out/{benchmark_name}.mlton",
-         f"benchmarking/out/{benchmark_name}.mosml",
-         f"benchmarking/out/{benchmark_name}.polyc"
-    ])
+    modified_json = {
+        compiler: {
+            "mean" : mean
+        }
+    }
+
+    if not os.path.exists(f"benchmarking/results/{benchmark_name}.json"):
+        with open(f"benchmarking/results/{benchmark_name}.json", "w") as file:
+            file.write("{}")
+
+    with open(f"benchmarking/results/{benchmark_name}.json", "r") as existing_file:
+        existing_data = json.loads(existing_file.read())
+
+    for compiler in modified_json:
+        existing_data[compiler] = modified_json[compiler]
+
+    with open(f"benchmarking/results/{benchmark_name}.json", "w") as existing_file:
+        json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
+
 
 
 '''
 given that the executables exist in jmh/src/main/..., run each benchmark
 '''
-def run_jvml_benchmarking(benchmark_name : str, opt = True):
+def run_jvml_benchmarking(benchmark_name : str, result_suffix : str):
 
-    class_name = benchmark_name.capitalize() + ("Opt" if opt else "")
-    out_name = benchmark_name + ("_opt" if opt else "")
+    class_name = benchmark_name.capitalize() + result_suffix
+    out_name = benchmark_name + result_suffix
 
 
-    if os.path.exists(f"benchmarking/results/{out_name}_jvml.csv"):
-        os.remove(f"benchmarking/results/{out_name}_jvml.csv")
+    if os.path.exists(f"benchmarking/results/{out_name}_tmp.json"):
+        os.remove(f"benchmarking/results/{out_name}_tmp.json")
 
     subprocess.run([
         "/Users/sam/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home/bin/java",
@@ -206,51 +280,16 @@ def run_jvml_benchmarking(benchmark_name : str, opt = True):
         f"jvml.benchmark.Benchmark{class_name}", "+TieredCompilation", "-Xmx8589934592",
     ])
 
-    # move jmh formatted csv to unified format
+    rewrite_jmh_out_json(benchmark_name, result_suffix)
 
-
-    with open(f"benchmarking/results/{out_name}_jvml.csv", "r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        data = list(reader)
-
-    with open(f"benchmarking/results/{out_name}_jvml.csv", "w") as file:
-        file.write("command,mean,stddev,median,user,system,min,max\n")
-        for row in data:
-            opt_type = "optimised" if opt else "unoptimised"
-            file.write(",".join([f"_.jvml ({opt_type})", row[4], "0", "0", "0", "0", "0", "0"]) + "\n")
-
-
+    os.remove(f"benchmarking/results/{out_name}_tmp.json")
 
 
 def parse_result_csv(benchmark_name : str) -> dict[str, float]:
-    with open(f"benchmarking/results/{benchmark_name}.csv", "r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        data = list(reader)
+    with open(f"benchmarking/results/{benchmark_name}.json", "r") as file:
+        benchmark_results = json.loads(file.read())
 
-    time_by_compiler = {d[0].split(".")[1] : float(d[1]) for d in data}
-
-    with open(f"benchmarking/results/{benchmark_name}_jvml.csv", "r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        data = list(reader)
-
-    if len(data) == 0:
-        time_by_compiler["jvml (unoptimised)"] = 0
-    else:
-        time_by_compiler[data[0][0].split(".")[1]] = float(data[0][1]) / 1000 # currently in milliseconds
-
-    with open(f"benchmarking/results/{benchmark_name}_opt_jvml.csv", "r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        data = list(reader)
-
-    if len(data) == 0:
-        time_by_compiler["jvml (unoptimised)"] = 0
-    else:
-        time_by_compiler[data[0][0].split(".")[1]] = float(data[0][1]) / 1000 # currently in milliseconds
-
+    time_by_compiler = {compiler : benchmark_results[compiler]["mean"] for compiler in benchmark_results}
 
     return time_by_compiler
 
@@ -261,7 +300,6 @@ produce a bar plot of performance
 '''
 def plot_peformance_graphs(benchmark_names : list[str]) -> None:
     benchmark_results = {benchmark_name : parse_result_csv(benchmark_name) for benchmark_name in benchmark_names}
-    print(benchmark_results)
     ordered_benchmarks_by_compiler = defaultdict(list)
     for benchmark_name in benchmark_results:
         for compiler in benchmark_results[benchmark_name]:
@@ -275,9 +313,8 @@ def plot_peformance_graphs(benchmark_names : list[str]) -> None:
 
 
     for compiler, execution_time in ordered_benchmarks_by_compiler.items():
-        print(execution_time)
         offset = width * multiplier
-        rects = ax.bar(x + offset, execution_time, width, label=compiler)
+        ax.bar(x + offset, execution_time, width, label=compiler)
         for i in range(len(execution_time)):
             if execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"{compiler} failed", rotation="vertical", size=6, ha="center")
@@ -293,21 +330,20 @@ def plot_peformance_graphs(benchmark_names : list[str]) -> None:
 
 benchmark_details = [
     #("life", 1),
-    #("tak", 1),
+    ("tak", 1),
     #("mandlebrot", 1),
-    ("quicksort", 100),
+    #("quicksort", 100),
     #("brzozowski", 1000)
     ]
 
 
 if __name__ == "__main__":
     for benchmark_name, number_of_runs in benchmark_details:
-    #    generate_sml_executables(benchmark_name, number_of_runs)
-
-    #   run_sml_benchmarking(benchmark_name, warmups=1, runs=1) #lazy for now
-        generate_jvml_executables(benchmark_name, number_of_runs, opt=True)
-        run_jvml_benchmarking(benchmark_name, opt=True)
-        generate_jvml_executables(benchmark_name, number_of_runs, opt=False)
-        run_jvml_benchmarking(benchmark_name, opt=False)
+        generate_sml_executables(benchmark_name, number_of_runs)
+        run_sml_benchmarking(benchmark_name, warmups=1, runs=1) #lazy for now
+        generate_jvml_executables(benchmark_name, number_of_runs, ALL_OPTIMISATIONS, "_opt")
+        run_jvml_benchmarking(benchmark_name, "_opt")
+        generate_jvml_executables(benchmark_name, number_of_runs, [], "")
+        run_jvml_benchmarking(benchmark_name, "")
 
     plot_peformance_graphs([b[0] for b in benchmark_details])
