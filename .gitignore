@@ -5,3 +5,4 @@ _coverage/
 
 benchmarking/out
 benchmarking/results
+benchmarking/jmh/src/main/java/jvml/benchmark
