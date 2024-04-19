@@ -91,6 +91,7 @@ let rec replace_call_with_dps fn_name dst_ty e =
           [ Ident (dst_ty, "dst"); Ident (Typed_ast.TyInt, "i") ] @ arg_es )
   (* case to avoid calling the dps version twice when multiple opportunities for tmc *)
   | Let (_, x, _, _) when x = "dst" || x = "dst'" -> e
+  | Set_Tuple _ -> e
   | e ->
       Desugar.Utils.map_over_sub_expr (replace_call_with_dps fn_name dst_ty) e
 
@@ -101,7 +102,12 @@ let rec transform_tmc_dps_expr fn_name e =
         replace_first_direct_with_hole fn_name es
       in
       match maybe_dapp with
-      | None -> e
+      | None ->
+          Set_Tuple
+            ( Ident (Typed_ast.TyInt, "i"),
+              (* choose random type, as I don't believe it is used *)
+              Ident (dummy_ty, "dst"),
+              e )
       | Some (i, (_, args_ty, _, name, args)) ->
           (* add dst tuple and i argument *)
           let dps_direct_app =
@@ -245,8 +251,11 @@ let rec transform_tmc_decl decl =
           Desugar.Utils.clear_shared_expr_seen no_dps_body;
           let no_dps_fun = Desugar.Utils.replace_funargs funargs no_dps_body in
           [
-            ValRec (dps_ty, fname ^ "_dps", dps_fun);
-            ValRec (ty, fname, no_dps_fun);
+            And
+              [
+                ValRec (dps_ty, fname ^ "_dps", dps_fun);
+                ValRec (ty, fname, no_dps_fun);
+              ];
           ])
   | And decls -> [ And (List.map transform_tmc_decl decls |> List.flatten) ]
   | _ -> [ decl ]
