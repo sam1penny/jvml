@@ -91,7 +91,7 @@ let move_variable_patterns (Clause (pats, body)) =
   in
   let body' =
     List.fold_right
-      (fun (access, (ty, x)) body -> Let (ty, x, access, body))
+      (fun (access, (_, x)) body -> Let (get_expr_type body, x, access, body))
       bindings body
   in
   Clause (pats', body')
