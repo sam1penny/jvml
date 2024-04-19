@@ -1,5 +1,0 @@
-val x = (1, 2)
-val y = ((1, 2), 3)
-val z = (1, (2, 3))
-val w = (1, 2, 3)
-type lazy_list = Nil | Cons of int * unit -> lazy_list

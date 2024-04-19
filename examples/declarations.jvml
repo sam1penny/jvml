@@ -1,3 +1,0 @@
-val x = 3
-val y = 3 + 10
-val double = fun x -> 2 * x

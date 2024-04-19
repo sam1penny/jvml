@@ -1,6 +1,0 @@
-type 'a list = Nil | Cons of 'a * 'a list
-
-val map = fun f -> fun x ->
-    match x with
-        | Nil -> Nil
-        | Cons(x, xs) -> Cons(f x, map f xs)

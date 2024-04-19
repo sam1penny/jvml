@@ -1,0 +1,45 @@
+val rec map = fun f -> fun l ->
+    match l with
+        | [] -> []
+        | x::xs -> f x :: map f xs
+
+val rev = fun l ->
+    let rec rev_inner = fun acc -> fun l ->
+        match l with
+            | [] -> acc
+            | x::xs -> rev_inner (x::acc) xs
+    in
+    rev_inner [] l
+
+val tr_rev_map = fun f -> fun l ->
+    let rec tr_rev_map_inner = fun acc -> fun l ->
+        match l with
+            | [] -> rev acc
+            | x::xs -> tr_rev_map_inner (f x :: acc) xs
+    in
+    tr_rev_map_inner [] l
+
+val map_cps = fun f -> fun l ->
+    let rec map_cps_inner = fun l -> fun k ->
+        match l with
+            | [] -> k []
+            | x::xs ->
+                map_cps_inner xs (fun l -> k (f x :: l))
+    in
+    map_cps_inner l (fun x -> x)
+
+val generate = fun n ->
+    let rec inner = fun i ->
+        if i = n then []
+        else i :: inner (i+1)
+    in
+    inner 0
+
+val test =
+    let l = generate 10 in
+    let double = fun x -> 2 * x in
+    do {
+        print(map double l);
+        print(tr_rev_map double l);
+        print(map_cps double l)
+    }

@@ -1,0 +1,92 @@
+(*
+  Basic regular expression matching algorithm using Brzozowski derivatives,
+  shown on slides 13-15 on the handout.
+*)
+
+type regex =
+  EmptySet
+  |EmptyString
+  |Character of string
+  |Union of regex * regex
+  |Concat of regex * regex
+  |Star of regex
+  |And of regex * regex
+  |Not of regex
+
+val rec nullable r =
+  match r with
+  EmptySet -> false
+  |EmptyString -> true
+  |Character(_) -> false
+  |Union(r, s) -> (nullable r) || (nullable s)
+  |Concat(r, s) -> (nullable r) && (nullable s)
+  |Star(_) -> true
+  |And(r, s) -> (nullable r) && (nullable s)
+  |Not(r) -> not (nullable r)
+
+val rec derive r c =
+  match r with
+    | EmptySet -> EmptySet
+    | EmptyString -> EmptySet
+    | Character(c2) -> (if c = c2 then EmptyString
+                      else EmptySet)
+    | Union(r, s) -> Union (derive r c, derive s c)
+    | Concat(r, s) -> (if nullable r then
+                        Union (Concat (derive r c, s), derive s c)
+                      else
+                        Concat(derive r c, s)
+                    )
+    | Star(r) -> Concat (derive r c,  Star(r))
+    | And(r, s) -> And(derive r c, derive r c)
+    | Not(r) -> Not(derive r c)
+
+val rec fold_left f acc l =
+    match l with
+        | [] -> acc
+        | x::xs -> fold_left f (f acc x) xs
+
+val rec map f l =
+  match l with
+      [] -> []
+      | x::xs -> f x :: map f xs
+
+val regexmatch r char_list = nullable (fold_left derive r char_list)
+
+val union_list l = fold_left (fun acc -> fun c -> Union(acc, c)) EmptySet l
+val concat_list l = fold_left (fun acc -> fun c -> Concat(acc, c)) EmptyString l
+val to_characters l = map (fun c -> Character c) l
+
+val lowercase_letter = union_list (to_characters ["a"; "b"; "c"; "d"; "e"; "f"; "g"; "h"; "i"; "j"; "k"; "l"; "m"; "n"; "o"; "p"; "q"; "r"; "s"; "t"; "u"; "v"; "w"; "x"; "y"; "z"])
+val digit = union_list (to_characters ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"])
+
+val one_or_more r = Concat(r, Star(r))
+
+
+val test_regex =
+        Concat(
+            one_or_more (union_list [lowercase_letter; digit; Character "-"; Character "_"; Character "."]),
+            Concat(
+                Character "@",
+                Concat(
+                    one_or_more (union_list [lowercase_letter; digit]),
+                    Concat (
+                        Character ".",
+                        Union(
+                            one_or_more lowercase_letter,
+                            Character "."
+                        )
+                    )
+                )
+            )
+        )
+
+val doit_once dead = regexmatch test_regex
+    ["c"; "s"; "t"; "-"; "g"; "r"; "a"; "d"; "u"; "a"; "t"; "e"; "-"; "a"; "d"; "m"; "i"; "s"; "s"; "i"; "o"; "n"; "s"; "@"; "c"; "s"; "t"; "."; "c"; "a"; "m"; "."; "a"; "c"; "."; "u"; "k"]
+
+val doit size =
+    let
+        rec loop n =
+            if n = 0 then ()
+            else do {doit_once(); loop(n - 1)}
+    in
+        loop size

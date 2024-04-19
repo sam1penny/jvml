@@ -2,3 +2,6 @@ _opam/
 .DS_STORE
 _build/
 _coverage/
+
+benchmarking/out
+benchmarking/results

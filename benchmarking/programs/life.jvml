@@ -1,0 +1,243 @@
+(* From the SML/NJ benchmark suite. *)
+
+
+val compose f g x = f (g x)
+val rec map f l = match l with [] -> [] | a :: x -> f a :: map f x
+
+val rev l =
+  let rec rev_inner acc l =
+    match l with [] -> acc | x :: xs -> rev_inner (x :: acc) xs
+  in
+  rev_inner [] l
+
+val accumulate f =
+  let rec foldf a l = match l with [] -> a | b :: x -> foldf (f a b) x in
+  foldf
+
+val filter p =
+  let consifp x a = if p a then a :: x else x in
+  compose rev (accumulate consifp [])
+
+val exists p =
+  let rec existsp l =
+    match l with [] -> false | a :: x -> (if p a then true else existsp x)
+  in
+  existsp
+
+val equal a b = a = b
+val member x a = exists (equal a) x
+val revorder f x y = f y x
+val cons a x = a :: x
+val revonto x = accumulate (revorder cons) x
+
+val length x =
+  let count n a = n + 1 in
+  accumulate count 0 x
+
+val repeat f =
+  let rec rptf n x = if n = 0 then x else rptf (n - 1) (f x) in
+  let check n = if n < 0 then n else n in
+  compose rptf check
+
+val copy n x = repeat (cons x) n []
+
+val rec string_concat joiner l =
+  match l with [] -> "" | x :: xs -> x ^ joiner ^ string_concat joiner xs
+
+val spaces n = string_concat "" (copy n " ")
+
+val lexless arg1 arg2 =
+  match (arg1, arg2) with
+    | ((a1, b1), (a2, b2)) -> (if a2 < a1 then true else if a2 = a1 then b2 < b1 else false)
+
+val lexgreater pr1 pr2 = lexless pr2 pr1
+
+val rec append l1 l2 =
+  match l1 with
+    | [] -> l2
+    | x::xs -> x :: append xs l2
+
+val rec lexordset l =
+  match l with
+  | [] -> []
+  | a :: x -> (
+      append (append (lexordset (filter (lexless a) x)) [a])
+        (lexordset (filter (lexgreater a) x))
+  )
+
+val collect f list =
+  let rec accumf sofar l =
+    match l with [] -> sofar | a :: x -> accumf (revonto sofar (f a)) x
+  in
+  accumf [] list
+
+
+val occurs3 x =
+  let diff x y = filter (compose (fun x -> not x) (member y)) x in
+
+  let rec f xover x3 x2 x1 l =
+    match l with
+    | [] -> diff x3 xover
+    | a :: x -> (
+        if member xover a then f xover x3 x2 x1 x
+        else if member x3 a then f (a :: xover) x3 x2 x1 x
+        else if member x2 a then f xover (a :: x3) x2 x1 x
+        else if member x1 a then f xover x3 (a :: x2) x1 x
+        else f xover x3 x2 (a :: x1) x
+    )
+  in
+  f [] [] [] [] x
+
+type generation = GEN of (int * int) list
+
+val alive g =
+  match g with
+    | GEN livecoords -> livecoords
+
+val mkgen coordlist = GEN (lexordset coordlist)
+
+val mk_nextgen_fn neighbours gen =
+  let living = alive gen in
+  let isalive = member living in
+  let liveneighbours = compose length (compose (filter isalive) neighbours) in
+  let twoorthree n = (n = 2) || (n = 3) in
+  let survivors = filter (compose twoorthree liveneighbours) living in
+  let newnbrlist =
+    collect (compose (filter (compose (fun x -> not x) isalive)) neighbours) living
+  in
+  let newborn = occurs3 newnbrlist in
+  mkgen (append survivors newborn)
+
+val neighbours pos =
+  match pos with
+    | (i, j) ->
+      [
+        (i - 1, j - 1);
+        (i - 1, j);
+        (i - 1, j + 1);
+        (i, j - 1);
+        (i, j + 1);
+        (i + 1, j - 1);
+        (i + 1, j);
+        (i + 1, j + 1)
+      ]
+
+val xstart = 0
+val ystart = 0
+val markafter n s = s ^ spaces n ^ "0"
+
+val rec plotfrom pos (* current position *)
+  str (* current line being prepared -- a string *)
+  coords (* coordinates to be plotted ((x1,y1)::more) *) =
+  match pos with
+    | (x, y) ->
+      (
+        match coords with
+        | (x1, y1) :: more -> (
+            if x = x1 then
+              (* same line so extend str and continue from y1+1 *)
+              plotfrom ((x, y1 + 1)) (markafter (y1 - y) str) more
+            else
+              (* flush current line and start a new line *)
+              str :: plotfrom (x + 1, ystart) "" ((x1, y1) :: more)
+        )
+        | [] -> [ str ]
+      )
+
+val good pos = match pos with (x, y) -> (x >= xstart) && (y >= ystart)
+val plot coordlist = plotfrom ((xstart, ystart)) "" (filter good coordlist)
+
+val at coordlist pos =
+  match pos with (x, y) -> (
+  let move pos = match pos with (a, b) -> ((a + x, b + y)) in
+  map move coordlist
+  )
+
+val rotate = map (fun pos -> match pos with (x, y) -> (y, 0 - x))
+val glider = [ (0, 0); (0, 2); (1, 1); (1, 2); (2, 1) ]
+val bail = [ (0, 0); (0, 1); (1, 0); (1, 1) ]
+
+val barberpole n =
+  let rec f i =
+    if i = n then [ (n + n - 1, n + n); (n + n, n + n) ]
+    else (i + i, i + i + 1) :: (i + i + 2, i + i + 1) :: f (i + 1)
+  in
+  (0, 0) :: (1, 0) :: f 0
+
+val genB =
+  mkgen (append (append (at glider (2, 2)) (at bail (2, 12))) (rotate (at (barberpole 4) (5, 20))))
+
+val rec nthgen g n =
+  match n with 0 -> g | i -> nthgen (mk_nextgen_fn neighbours g) (i - 1)
+
+val gun =
+  mkgen
+    [
+      (2, 20);
+      (3, 19);
+      (3, 21);
+      (4, 18);
+      (4, 22);
+      (4, 23);
+      (4, 32);
+      (5, 7);
+      (5, 8);
+      (5, 18);
+      (5, 22);
+      (5, 23);
+      (5, 29);
+      (5, 30);
+      (5, 31);
+      (5, 32);
+      (5, 36);
+      (6, 7);
+      (6, 8);
+      (6, 18);
+      (6, 22);
+      (6, 23);
+      (6, 28);
+      (6, 29);
+      (6, 30);
+      (6, 31);
+      (6, 36);
+      (7, 19);
+      (7, 21);
+      (7, 28);
+      (7, 31);
+      (7, 40);
+      (7, 41);
+      (8, 20);
+      (8, 28);
+      (8, 29);
+      (8, 30);
+      (8, 31);
+      (8, 40);
+      (8, 41);
+      (9, 29);
+      (9, 30);
+      (9, 31);
+      (9, 32)
+    ]
+
+val app = map
+
+val show pr =
+  compose
+    (app (fun s -> pr s))
+    (compose plot alive)
+
+val doit_once x = show (fun x -> ()) (nthgen gun 25000)
+
+val doit size =
+  let rec loop n =
+    if n = 0 then ()
+    else do {
+      doit_once ();
+      loop (n - 1)
+    }
+  in
+  loop size
+
+val testit dead =
+  let x = show (fun s -> print s) (nthgen gun 50) in
+  ()
