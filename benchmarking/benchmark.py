@@ -416,20 +416,17 @@ def plot_tail_mod_cons_graph(plot_name : str, list_sizes : list[int]) -> None:
     ordered_benchmarks_by_size = defaultdict(list)
     for benchmark_name in benchmark_results:
             for map_type in benchmark_results[benchmark_name]:
-                if benchmark_results[benchmark_name]["jvml_naive_map"] != 0:
-                    ordered_benchmarks_by_size[map_type].append(100 * benchmark_results[benchmark_name][map_type])
-                else:
-                    ordered_benchmarks_by_size[map_type].append(0)
+                ordered_benchmarks_by_size[map_type].append(benchmark_results[benchmark_name][map_type] / benchmark_results[benchmark_name]["jvml_map_rev"])
+
 
     _, ax = plt.subplots()
     for map_type, relative_execution_time in ordered_benchmarks_by_size.items():
         ax.plot(list_sizes, relative_execution_time, label=map_type)
 
     ax.set_xscale("log")
-    ax.set_yscale
 
     ax.set_xlabel("log(list size)")
-    ax.set_ylabel("log(Execution time)")
+    ax.set_ylabel("execution time relative to map + rev")
 
     ax.legend()
     plt.show()
@@ -484,19 +481,19 @@ def compare_individual_optimisations():
 
 def compare_tail_mod_cons():
     plot_name = "tail_mod_cons"
-    list_sizes = [1, 3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000, 33_333, 66_666, 100_000]
+    list_sizes = [1, 3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000, 33_333, 66_666, 100_000, 333_333, 666_666, 1_000_000]
     for list_size in list_sizes:
         generate_jvml_executables("map", list_size, ["-tmc", "-tco"], f"_map_tmc")
         run_jvml_benchmarking(plot_name, "map", f"_map_tmc", result_file=str(list_size))
 
-        generate_jvml_executables("map_cps", list_size, ["-tco"], f"_map_cps")
-        run_jvml_benchmarking(plot_name, "map_cps", f"_map_cps", result_file=str(list_size))
+        generate_jvml_executables("map_cps_defun", list_size, ["-tco"], f"_map_cps_defun")
+        run_jvml_benchmarking(plot_name, "map_cps_defun", f"_map_cps_defun", result_file=str(list_size))
 
         generate_jvml_executables("map_rev", list_size, ["-tco"], f"_map_rev")
         run_jvml_benchmarking(plot_name, "map_rev", f"_map_rev", result_file=str(list_size))
 
-        generate_jvml_executables("map", list_size, ["-tco"], f"_naive_map")
-        run_jvml_benchmarking(plot_name, "map", f"_naive_map", result_file=str(list_size))
+        #generate_jvml_executables("map", list_size, ["-tco"], f"_naive_map")
+        #run_jvml_benchmarking(plot_name, "map", f"_naive_map", result_file=str(list_size))
 
     plot_tail_mod_cons_graph(plot_name, list_sizes)
 
@@ -506,4 +503,5 @@ if __name__ == "__main__":
     #compare_individual_optimisations()
     #plot_individual_opts_graphs("individual_optimisations", ["brzozowski", "tak", "quicksort"])
     #compare_tail_mod_cons()
-    plot_tail_mod_cons_graph("tail_mod_cons", [3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000])
+    list_sizes = [1, 3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000, 33_333, 66_666, 100_000, 333_333, 666_666, 1_000_000]
+    plot_tail_mod_cons_graph("tail_mod_cons", list_sizes)

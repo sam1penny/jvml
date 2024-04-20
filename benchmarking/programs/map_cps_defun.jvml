@@ -1,0 +1,29 @@
+type 'a cont = ID | APP of 'a * 'a cont
+
+val map_cps f l =
+    let rec apply_cont k v =
+        match k with
+            | ID -> v
+            | APP(y, k) -> apply_cont k (y::v)
+    in
+    let rec map_cps_inner l k =
+        match l with
+            | [] -> apply_cont k []
+            | x::xs -> (
+                let y = f x in
+                map_cps_inner xs (APP(y, k))
+            )
+
+    in
+    map_cps_inner l ID
+
+val generate n =
+    let rec loop acc n =
+        if n = 0 then acc
+        else loop (n :: acc) (n - 1)
+    in
+    loop [] n
+
+val doit list_size =
+    let double = fun x -> x * 2 in
+    map_cps double (generate list_size)
