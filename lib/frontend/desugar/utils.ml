@@ -271,3 +271,8 @@ let duplicate_shared_exprs_once e =
     | _ -> map_over_sub_expr duplicate_shared_exprs_once_inner e
   in
   duplicate_shared_exprs_once_inner e
+
+let rec map_over_expr_idents f e =
+  match e with
+  | Ident (ty, x) -> Ident (ty, f x)
+  | _ -> map_over_sub_expr (map_over_expr_idents f) e

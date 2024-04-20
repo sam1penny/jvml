@@ -18,13 +18,13 @@ let%expect_test "test add captured lifted arguments" =
   [%expect
     {|
     └──Val foo_$0
-       └──Fun x_$0 : int -> int -> int -> int
-          └──Fun y_$0 : int -> int -> int
+       └──Fun x_$1 : int -> int -> int -> int
+          └──Fun y_$1 : int -> int -> int
              └──Fun z_$0 : int -> int
                 └──Bop + : int
                    └──Bop + : int
-                      └──Ident x_$0 : int
-                      └──Ident y_$0 : int
+                      └──Ident x_$1 : int
+                      └──Ident y_$1 : int
                    └──Ident z_$0 : int
     └──Val test_$0
        └──Let x_$0
@@ -84,13 +84,13 @@ let%expect_test "test capturing recursive inner function" =
   [%expect
     {|
     └──ValRec fact_$0
-       └──Fun z_$0 : int -> int -> int
+       └──Fun z_$1 : int -> int -> int
           └──Fun x_$0 : int -> int
              └──If
                 └──Bop = : bool
                    └──Ident x_$0 : int
                    └──Int 0
-                └──Ident z_$0 : int
+                └──Ident z_$1 : int
                 └──App
                    └──App
                       └──Ident fact_$0 : int -> int

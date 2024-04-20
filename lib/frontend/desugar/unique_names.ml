@@ -39,23 +39,23 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
     (most_local_version : (string, string) Hashtbl.t) e =
   let rec_rename_expr = rename_expr most_recent_version most_local_version in
   match e with
-  | Ident (ty, var) ->
+  | Ident (ty, var) when not @@ String.contains var '$' ->
       if var = "print" then Ident (ty, "print_$0")
       else Ident (ty, Hashtbl.find most_local_version var)
-  | Fun (t0, t1, x, e) ->
+  | Fun (t0, t1, x, e) when not @@ String.contains x '$' ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let _ = Hashtbl.add most_local_version x x_versioned in
       let e' = rec_rename_expr e in
       let () = restore_previous_version most_local_version x in
       Fun (t0, t1, x_versioned, e')
-  | Let (ty, x, e0, e1) ->
+  | Let (ty, x, e0, e1) when not @@ String.contains x '$' ->
       let e0' = rec_rename_expr e0 in
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let _ = Hashtbl.add most_local_version x x_versioned in
       let e1' = rec_rename_expr e1 in
       let () = restore_previous_version most_local_version x in
       Let (ty, x_versioned, e0', e1')
-  | LetRec (ty, x, e0, e1) ->
+  | LetRec (ty, x, e0, e1) when not @@ String.contains x '$' ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let _ = Hashtbl.add most_local_version x x_versioned in
       let e0' = rec_rename_expr e0 in
@@ -69,12 +69,12 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
 
 let rec rename_decl most_recent_version most_local_version d =
   match d with
-  | Val (ty, x, e) ->
+  | Val (ty, x, e) when not @@ String.contains x '$' ->
       let e' = rename_expr most_recent_version most_local_version e in
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let _ = Hashtbl.add most_local_version x x_versioned in
       Val (ty, x_versioned, e')
-  | ValRec (ty, x, e) ->
+  | ValRec (ty, x, e) when not @@ String.contains x '$' ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let _ = Hashtbl.add most_local_version x x_versioned in
       ValRec
@@ -83,6 +83,10 @@ let rec rename_decl most_recent_version most_local_version d =
       Type (ty, params, tname, value_constructors)
   | And decls ->
       And (List.map (rename_decl most_recent_version most_local_version) decls)
+  | _ ->
+      Utils.map_over_decl_exprs
+        (rename_expr most_recent_version most_local_version)
+        d
 
 let rename_program program =
   let renamings = Hashtbl.create 10 in
@@ -95,4 +99,4 @@ let rename_program program =
     |> List.rev
   in
   Utils.clear_shared_program_seen renamed_program;
-  renamed_program
+  (renamings, renamed_program)

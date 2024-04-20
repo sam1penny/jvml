@@ -158,13 +158,21 @@ let free_vars_with_types_program program =
     program
   |> fun (fv_map, _) -> fv_map
 
-let lift_to_valrec name funargs body =
+let lift_to_valrec most_recent_version name funargs body =
   let fun_body = Utils.replace_funargs funargs body in
-  ValRec (get_expr_type fun_body, name, fun_body)
+  ValRec
+    ( get_expr_type fun_body,
+      name,
+      Unique_names.rename_expr most_recent_version (Hashtbl.create 10) fun_body
+    )
 
-let lift_to_val name funargs body =
+let lift_to_val most_recent_version name funargs body =
   let fun_body = Utils.replace_funargs funargs body in
-  Val (get_expr_type fun_body, name, fun_body)
+  Val
+    ( get_expr_type fun_body,
+      name,
+      Unique_names.rename_expr most_recent_version (Hashtbl.create 10) fun_body
+    )
 
 let apply_captured_vars lifted_fun free_vars =
   List.fold_left
@@ -178,8 +186,14 @@ so it can now be removed from free variable mappings.
 let remove_from_fv_tbls key fv_tbls =
   Hashtbl.iter (fun _ fv_tbl -> Hashtbl.remove fv_tbl key) fv_tbls
 
-let rec lift_lambdas_expr decl_name free_var_tbl e =
-  let rec_lift_lambdas_expr = lift_lambdas_expr decl_name free_var_tbl in
+let remove_uniqueness s =
+  String.split_on_char '$' s |> List.hd |> fun s ->
+  String.sub s 0 (String.length s - 1)
+
+let rec lift_lambdas_expr most_recent_version decl_name free_var_tbl e =
+  let rec_lift_lambdas_expr =
+    lift_lambdas_expr most_recent_version decl_name free_var_tbl
+  in
   let rec_lift_list es =
     let lifted_es = List.map rec_lift_lambdas_expr es in
     let lifted_defs =
@@ -228,9 +242,21 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
         Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
       in
       remove_from_fv_tbls x free_var_tbl;
-      let lifted_args = freevars @ funargs in
-      let defs0, body0 = rec_lift_lambdas_expr body in
-      let lifted_val = lift_to_val x lifted_args body0 in
+      let stripped_freevars =
+        List.map (fun (x, ty) -> (remove_uniqueness x, ty)) freevars
+      in
+      let stripped_body =
+        Utils.map_over_expr_idents
+          (fun x ->
+            if List.exists (fun (fv, _) -> fv = x) freevars then
+              remove_uniqueness x
+            else x)
+          body
+      in
+      let lifted_args = stripped_freevars @ funargs in
+      let defs0, body0 = rec_lift_lambdas_expr stripped_body in
+      Utils.clear_shared_expr_seen stripped_body;
+      let lifted_val = lift_to_val most_recent_version x lifted_args body0 in
       let defs1, e1 = rec_lift_lambdas_expr e1 in
       ([ lifted_val ] @ defs0 @ defs1, e1)
   | Let (ty, x, e0, e1) ->
@@ -243,9 +269,24 @@ let rec lift_lambdas_expr decl_name free_var_tbl e =
         Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
       in
       remove_from_fv_tbls x free_var_tbl;
-      let lifted_args = freevars @ funargs in
-      let defs0, body0 = rec_lift_lambdas_expr body in
-      let lifted_valrec = lift_to_valrec x lifted_args body0 in
+
+      let stripped_freevars =
+        List.map (fun (x, ty) -> (remove_uniqueness x, ty)) freevars
+      in
+      let stripped_body =
+        Utils.map_over_expr_idents
+          (fun x ->
+            if List.exists (fun (fv, _) -> fv = x) freevars then
+              remove_uniqueness x
+            else x)
+          body
+      in
+      let lifted_args = stripped_freevars @ funargs in
+      let defs0, body0 = rec_lift_lambdas_expr stripped_body in
+      Utils.clear_shared_expr_seen stripped_body;
+      let lifted_valrec =
+        lift_to_valrec most_recent_version x lifted_args body0
+      in
       let defs1, e1 = rec_lift_lambdas_expr e1 in
 
       ([ lifted_valrec ] @ defs0 @ defs1, e1)
@@ -325,13 +366,17 @@ let mutual_recursion_required lifted_decls =
     (StringSet.empty, false) (List.rev lifted_decls)
   |> fun (_, required) -> required
 
-let lift_lambdas_decl free_var_map decl =
+let lift_lambdas_decl most_recent_version free_var_map decl =
   match decl with
   | Val (ty, x, e) ->
-      let lifted_decls, e = lift_lambdas_expr x free_var_map e in
+      let lifted_decls, e =
+        lift_lambdas_expr most_recent_version x free_var_map e
+      in
       lifted_decls @ [ Val (ty, x, e) ]
   | ValRec (ty, x, e) ->
-      let lifted_decls, e = lift_lambdas_expr x free_var_map e in
+      let lifted_decls, e =
+        lift_lambdas_expr most_recent_version x free_var_map e
+      in
       Utils.clear_shared_expr_seen e;
       List.iter Utils.clear_shared_decl_seen lifted_decls;
       let lifted_decls = lifted_decls @ [ ValRec (ty, x, e) ] in
@@ -346,11 +391,12 @@ let to_hashtbl fv_map =
   |> Seq.map (fun (x, m) -> (x, StringMap.to_seq m |> Hashtbl.of_seq))
   |> Hashtbl.of_seq
 
-let lift_lambdas_program program =
+let lift_lambdas_program most_recent_version program =
   let fv_map = free_vars_with_types_program program in
   let fv_tbl = to_hashtbl fv_map in
   let lifted_program =
-    List.map (lift_lambdas_decl fv_tbl) program |> List.flatten
+    List.map (lift_lambdas_decl most_recent_version fv_tbl) program
+    |> List.flatten
   in
   Utils.clear_shared_program_seen lifted_program;
   lifted_program

@@ -236,9 +236,18 @@ let consider_inline size_tbl code_tbl occurrence_tbl context x =
   *)
   | Some OnceSafe -> true
   | Some OnceUnsafe ->
-      is_almost_whnf (Hashtbl.find code_tbl x) && not (very_boring context)
+      is_almost_whnf
+        (Hashtbl.find_opt code_tbl x |> function
+         | Some c -> c
+         | None ->
+             raise @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
+      && not (very_boring context)
   | Some MultiUnsafe ->
-      is_almost_whnf (Hashtbl.find code_tbl x)
+      is_almost_whnf
+        (Hashtbl.find_opt code_tbl x |> function
+         | Some c -> c
+         | None ->
+             raise @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
       && small_enough size_tbl code_tbl x context
 
 let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
@@ -251,7 +260,13 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
       e
   | Ident (ty, x) ->
       if consider_inline size_tbl code_tbl occurrence_tbl context x then
-        Hashtbl.find code_tbl x |> copy_shared_exprs |> instantiate_type ty
+        Hashtbl.find_opt code_tbl x
+        |> (function
+             | Some c -> c
+             | None ->
+                 raise
+                 @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
+        |> copy_shared_exprs |> instantiate_type ty
       else e
   | Direct_app (ty, arg_tys, ret_ty, name, arg_es) ->
       let app_contexts =
@@ -389,5 +404,6 @@ let inline_program program =
   let size_tbl = Hashtbl.create 10 in
   let code_tbl = Hashtbl.create 10 in
   let occurrence_tbl = occurrence_analysis program in
+
   List.map (inline_decl size_tbl code_tbl occurrence_tbl) program
   |> List.map beta_reduce_decl
