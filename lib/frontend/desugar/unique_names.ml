@@ -39,35 +39,15 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
     (most_local_version : (string, string) Hashtbl.t) e =
   let rec_rename_expr = rename_expr most_recent_version most_local_version in
   match e with
-  | Int _ | Float _ | String _ | Bool _ | Unit | Match_Failure | Hole -> e
   | Ident (ty, var) ->
       if var = "print" then Ident (ty, "print_$0")
       else Ident (ty, Hashtbl.find most_local_version var)
-  | Bop (ty, e0, bop, e1) ->
-      let e0' = rec_rename_expr e0 in
-      let e1' = rec_rename_expr e1 in
-      Bop (ty, e0', bop, e1')
-  | Uop (ty, uop, e) ->
-      let e' = rec_rename_expr e in
-      Uop (ty, uop, e')
-  | If (ty, e0, e1, e2) ->
-      let e0' = rec_rename_expr e0 in
-      let e1' = rec_rename_expr e1 in
-      let e2' = rec_rename_expr e2 in
-      If (ty, e0', e1', e2')
   | Fun (t0, t1, x, e) ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let _ = Hashtbl.add most_local_version x x_versioned in
       let e' = rec_rename_expr e in
       let () = restore_previous_version most_local_version x in
       Fun (t0, t1, x_versioned, e')
-  | App (ty, e0, e1) ->
-      let e0' = rec_rename_expr e0 in
-      let e1' = rec_rename_expr e1 in
-      App (ty, e0', e1')
-  | Direct_app _ ->
-      raise @@ Failure "invalid ordering - run Unique_names before Direct_calls"
-  | Tuple (ty, es) -> Tuple (ty, List.map rec_rename_expr es)
   | Let (ty, x, e0, e1) ->
       let e0' = rec_rename_expr e0 in
       let x_versioned = fetch_next_version_and_update most_recent_version x in
@@ -82,32 +62,10 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
       let e1' = rec_rename_expr e1 in
       let () = restore_previous_version most_local_version x in
       LetRec (ty, x_versioned, e0', e1')
-  | Constr (ty, cname) -> Constr (ty, cname)
-  | Seq (ty, es) -> Seq (ty, List.map rec_rename_expr es)
-  | TupleGet (ty, i, e) -> TupleGet (ty, i, rec_rename_expr e)
-  | ConstructorGet (ty, c, e) -> ConstructorGet (ty, c, rec_rename_expr e)
-  | Switch (ty, e0, cases, maybe_fallback_expr) ->
-      let e0' = rec_rename_expr e0 in
-      let cases' =
-        List.map
-          (fun (con, case_expr) -> (con, rec_rename_expr case_expr))
-          cases
-      in
-      Switch (ty, e0', cases', Option.map rec_rename_expr maybe_fallback_expr)
-  | Shared_Expr (expr_ref, label_opt, seen) as shared_expr ->
-      if !seen then shared_expr
-      else (
-        seen := true;
-        expr_ref := rec_rename_expr !expr_ref;
-        Shared_Expr (expr_ref, label_opt, seen))
   | While_true _ | Break _ | Assign_Seq _ ->
       raise
       @@ Failure "tail rec constructs should not be present in lambda_lift"
-  | Set_Tuple (e0, e1, e2) ->
-      let e0' = rec_rename_expr e0 in
-      let e1' = rec_rename_expr e1 in
-      let e2' = rec_rename_expr e2 in
-      Set_Tuple (e0', e1', e2')
+  | _ -> Utils.map_over_sub_expr rec_rename_expr e
 
 let rec rename_decl most_recent_version most_local_version d =
   match d with
