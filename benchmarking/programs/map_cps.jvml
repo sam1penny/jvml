@@ -1,0 +1,19 @@
+val map_cps = fun f -> fun l ->
+    let rec map_cps_inner = fun l -> fun k ->
+        match l with
+            | [] -> k []
+            | x::xs ->
+                map_cps_inner xs (fun l -> k (f x :: l))
+    in
+    map_cps_inner l (fun x -> x)
+
+val generate n =
+    let rec loop acc n =
+        if n = 0 then acc
+        else loop (n :: acc) (n - 1)
+    in
+    loop [] n
+
+val doit list_size =
+    let double = fun x -> x * 2 in
+    map_cps double (generate list_size)

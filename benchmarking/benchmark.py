@@ -185,6 +185,8 @@ public class Benchmark{class_name} {{
                 .include(Benchmark{class_name}.class.getSimpleName())
                 .resultFormat(ResultFormatType.JSON)
                 .result("benchmarking/results/{out_name}_tmp.json")
+                .warmupTime(TimeValue.seconds(1))
+                .measurementTime(TimeValue.seconds(1))
                 .forks(1)
                 .build();
         new Runner(opt).run();
@@ -232,7 +234,7 @@ public class Benchmark{class_name} {{
 '''
 rewrite jmh's output .json into our unified format
 '''
-def rewrite_jmh_out_json(plot_name : str, benchmark_name : str, result_suffix : str) -> None:
+def rewrite_jmh_out_json(plot_name : str, benchmark_name : str, result_suffix : str, result_file : str) -> None:
     out_name = benchmark_name + result_suffix
     with open(f"benchmarking/results/{out_name}_tmp.json", "r") as tmp_file:
         tmp_data = json.loads(tmp_file.read())
@@ -247,17 +249,17 @@ def rewrite_jmh_out_json(plot_name : str, benchmark_name : str, result_suffix : 
         }
     }
 
-    if not os.path.exists(f"benchmarking/results/{plot_name}/{benchmark_name}.json"):
-        with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as file:
+    if not os.path.exists(f"benchmarking/results/{plot_name}/{result_file}.json"):
+        with open(f"benchmarking/results/{plot_name}/{result_file}.json", "w") as file:
             file.write("{}")
 
-    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as existing_file:
+    with open(f"benchmarking/results/{plot_name}/{result_file}.json", "r") as existing_file:
         existing_data = json.loads(existing_file.read())
 
     for compiler in modified_json:
         existing_data[compiler] = modified_json[compiler]
 
-    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as existing_file:
+    with open(f"benchmarking/results/{plot_name}/{result_file}.json", "w") as existing_file:
         json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
 
 
@@ -265,7 +267,10 @@ def rewrite_jmh_out_json(plot_name : str, benchmark_name : str, result_suffix : 
 '''
 given that the executables exist in jmh/src/main/..., run each benchmark
 '''
-def run_jvml_benchmarking(plot_name : str, benchmark_name : str, result_suffix : str):
+def run_jvml_benchmarking(plot_name : str, benchmark_name : str, result_suffix : str, result_file : str | None = None):
+
+    if result_file is None:
+        result_file = benchmark_name
 
     if not os.path.exists("benchmarking/results"):
         os.mkdir("benchmarking/results")
@@ -291,7 +296,7 @@ def run_jvml_benchmarking(plot_name : str, benchmark_name : str, result_suffix :
         f"jvml.benchmark.Benchmark{class_name}", "+TieredCompilation", "-Xmx8589934592",
     ])
 
-    rewrite_jmh_out_json(plot_name, benchmark_name, result_suffix)
+    rewrite_jmh_out_json(plot_name, benchmark_name, result_suffix, result_file)
 
     os.remove(f"benchmarking/results/{out_name}_tmp.json")
 
@@ -377,6 +382,60 @@ def plot_individual_opts_graphs(plot_name : str, benchmark_names : list[str]) ->
 
     plt.show()
 
+def plot_tail_mod_cons_bar_graph(plot_name : str, list_sizes : list[int]):
+    benchmark_results = {list_size : parse_result_csv(plot_name, list_size) for list_size in list_sizes}
+    ordered_benchmarks_by_size = defaultdict(list)
+    for benchmark_name in benchmark_results:
+        for map_type in benchmark_results[benchmark_name]:
+            ordered_benchmarks_by_size[map_type].append(benchmark_results[benchmark_name][map_type] / benchmark_results[benchmark_name]["jvml_naive_map"])
+
+    _, ax = plt.subplots()
+
+    x = np.arange(len(list_sizes))  # the label locations
+    width = 0.15  # the width of the bars
+    multiplier = 0
+
+    for map_type, relative_execution_time in ordered_benchmarks_by_size.items():
+        offset = width * multiplier
+        ax.bar(x + offset, relative_execution_time, width, label=map_type)
+        for i in range(len(relative_execution_time)):
+            if relative_execution_time[i] == 0:
+                ax.text((x+offset)[i], 1, f"{map_type} failed", rotation="vertical", size=6, ha="center")
+        multiplier += 1
+
+    ax.set_xlabel("list size")
+    ax.set_ylabel("Execution time relative to naive map")
+    ax.set_xticks(x + width * (len(x)+1)/2, list_sizes)
+
+    ax.legend()
+
+    plt.show()
+
+def plot_tail_mod_cons_graph(plot_name : str, list_sizes : list[int]) -> None:
+    benchmark_results = {list_size : parse_result_csv(plot_name, list_size) for list_size in list_sizes}
+    ordered_benchmarks_by_size = defaultdict(list)
+    for benchmark_name in benchmark_results:
+            for map_type in benchmark_results[benchmark_name]:
+                if benchmark_results[benchmark_name]["jvml_naive_map"] != 0:
+                    ordered_benchmarks_by_size[map_type].append(100 * benchmark_results[benchmark_name][map_type])
+                else:
+                    ordered_benchmarks_by_size[map_type].append(0)
+
+    _, ax = plt.subplots()
+    for map_type, relative_execution_time in ordered_benchmarks_by_size.items():
+        ax.plot(list_sizes, relative_execution_time, label=map_type)
+
+    ax.set_xscale("log")
+    ax.set_yscale
+
+    ax.set_xlabel("log(list size)")
+    ax.set_ylabel("log(Execution time)")
+
+    ax.legend()
+    plt.show()
+
+
+
 
 
 benchmark_details = [
@@ -423,8 +482,28 @@ def compare_individual_optimisations():
 
     plot_individual_opts_graphs(plot_name, [b[0] for b in benchmark_details])
 
+def compare_tail_mod_cons():
+    plot_name = "tail_mod_cons"
+    list_sizes = [1, 3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000, 33_333, 66_666, 100_000]
+    for list_size in list_sizes:
+        generate_jvml_executables("map", list_size, ["-tmc", "-tco"], f"_map_tmc")
+        run_jvml_benchmarking(plot_name, "map", f"_map_tmc", result_file=str(list_size))
+
+        generate_jvml_executables("map_cps", list_size, ["-tco"], f"_map_cps")
+        run_jvml_benchmarking(plot_name, "map_cps", f"_map_cps", result_file=str(list_size))
+
+        generate_jvml_executables("map_rev", list_size, ["-tco"], f"_map_rev")
+        run_jvml_benchmarking(plot_name, "map_rev", f"_map_rev", result_file=str(list_size))
+
+        generate_jvml_executables("map", list_size, ["-tco"], f"_naive_map")
+        run_jvml_benchmarking(plot_name, "map", f"_naive_map", result_file=str(list_size))
+
+    plot_tail_mod_cons_graph(plot_name, list_sizes)
+
 
 if __name__ == "__main__":
     #compare_compiler_benchmark()
     #compare_individual_optimisations()
-    plot_individual_opts_graphs("individual_optimisations", ["brzozowski", "tak", "quicksort"])
+    #plot_individual_opts_graphs("individual_optimisations", ["brzozowski", "tak", "quicksort"])
+    #compare_tail_mod_cons()
+    plot_tail_mod_cons_graph("tail_mod_cons", [3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000])

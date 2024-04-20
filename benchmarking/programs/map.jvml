@@ -1,0 +1,15 @@
+val rec map f l =
+    match l with
+        | [] -> []
+        | x::xs -> f x :: map f xs
+
+val generate n =
+    let rec loop acc n =
+        if n = 0 then acc
+        else loop (n :: acc) (n - 1)
+    in
+    loop [] n
+
+val doit list_size =
+    let double = fun x -> x * 2 in
+    map double (generate list_size)

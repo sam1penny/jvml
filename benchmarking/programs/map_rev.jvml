@@ -1,0 +1,26 @@
+val rev l =
+    let rec rev_inner acc l =
+        match l with
+            | [] -> acc
+            | x::xs -> rev_inner (x::acc) xs
+    in
+    rev_inner [] l
+
+val tr_rev_map f l =
+    let rec tr_rev_map_inner acc l =
+        match l with
+            | [] -> rev acc
+            | x::xs -> tr_rev_map_inner (f x :: acc) xs
+    in
+    tr_rev_map_inner [] l
+
+val generate n =
+    let rec loop acc n =
+        if n = 0 then acc
+        else loop (n :: acc) (n - 1)
+    in
+    loop [] n
+
+val doit list_size =
+    let double = fun x -> x * 2 in
+    tr_rev_map double (generate list_size)
