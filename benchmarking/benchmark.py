@@ -57,7 +57,7 @@ e.g. [ {command : "mosml", time : 5.0}, {command : "mlton", time : 1.0}]
 
 useful for overwriting the results for a single compiler
 '''
-def rewrite_hyperfile_out_json(benchmark_name : str) -> None:
+def rewrite_hyperfile_out_json(plot_name : str, benchmark_name : str) -> None:
     with open(f"benchmarking/results/{benchmark_name}_tmp.json", "r") as tmp_file:
         tmp_data = json.loads(tmp_file.read())
 
@@ -70,17 +70,17 @@ def rewrite_hyperfile_out_json(benchmark_name : str) -> None:
         modified_json[compiler] = compiler_results
 
 
-    if not os.path.exists(f"benchmarking/results/{benchmark_name}.json"):
-        with open(f"benchmarking/results/{benchmark_name}.json", "w") as file:
+    if not os.path.exists(f"benchmarking/results/{plot_name}/{benchmark_name}.json"):
+        with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as file:
             file.write("{}")
 
-    with open(f"benchmarking/results/{benchmark_name}.json", "r") as existing_file:
+    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as existing_file:
         existing_data = json.loads(existing_file.read())
 
     for compiler in modified_json:
         existing_data[compiler] = modified_json[compiler]
 
-    with open(f"benchmarking/results/{benchmark_name}.json", "w") as existing_file:
+    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as existing_file:
         json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
 
 
@@ -89,9 +89,12 @@ given that the executables exist in tmp, run each sml version
 
 for now, just use hyperfine
 '''
-def run_sml_benchmarking(benchmark_name : str, warmups=5, runs=10):
+def run_sml_benchmarking(plot_name : str, benchmark_name : str, warmups=5, runs=10):
     if not os.path.exists("benchmarking/results"):
         os.mkdir("benchmarking/results")
+
+    if not os.path.exists(f"benchmarking/results/{plot_name}"):
+        os.mkdir(f"benchmarking/results/{plot_name}")
 
     subprocess.run(
         ["hyperfine",
@@ -102,7 +105,7 @@ def run_sml_benchmarking(benchmark_name : str, warmups=5, runs=10):
          f"benchmarking/out/{benchmark_name}.polyc"
     ])
 
-    rewrite_hyperfile_out_json(benchmark_name)
+    rewrite_hyperfile_out_json(plot_name, benchmark_name)
 
     os.remove(f"benchmarking/results/{benchmark_name}_tmp.json")
 
@@ -226,8 +229,10 @@ public class Benchmark{class_name} {{
 
     shutil.rmtree("benchmarking/tmp")
 
-
-def rewrite_jmh_out_json(benchmark_name : str, result_suffix : str) -> None:
+'''
+rewrite jmh's output .json into our unified format
+'''
+def rewrite_jmh_out_json(plot_name : str, benchmark_name : str, result_suffix : str) -> None:
     out_name = benchmark_name + result_suffix
     with open(f"benchmarking/results/{out_name}_tmp.json", "r") as tmp_file:
         tmp_data = json.loads(tmp_file.read())
@@ -242,17 +247,17 @@ def rewrite_jmh_out_json(benchmark_name : str, result_suffix : str) -> None:
         }
     }
 
-    if not os.path.exists(f"benchmarking/results/{benchmark_name}.json"):
-        with open(f"benchmarking/results/{benchmark_name}.json", "w") as file:
+    if not os.path.exists(f"benchmarking/results/{plot_name}/{benchmark_name}.json"):
+        with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as file:
             file.write("{}")
 
-    with open(f"benchmarking/results/{benchmark_name}.json", "r") as existing_file:
+    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as existing_file:
         existing_data = json.loads(existing_file.read())
 
     for compiler in modified_json:
         existing_data[compiler] = modified_json[compiler]
 
-    with open(f"benchmarking/results/{benchmark_name}.json", "w") as existing_file:
+    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as existing_file:
         json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
 
 
@@ -260,7 +265,13 @@ def rewrite_jmh_out_json(benchmark_name : str, result_suffix : str) -> None:
 '''
 given that the executables exist in jmh/src/main/..., run each benchmark
 '''
-def run_jvml_benchmarking(benchmark_name : str, result_suffix : str):
+def run_jvml_benchmarking(plot_name : str, benchmark_name : str, result_suffix : str):
+
+    if not os.path.exists("benchmarking/results"):
+        os.mkdir("benchmarking/results")
+
+    if not os.path.exists(f"benchmarking/results/{plot_name}"):
+        os.mkdir(f"benchmarking/results/{plot_name}")
 
     class_name = benchmark_name.capitalize() + result_suffix
     out_name = benchmark_name + result_suffix
@@ -280,26 +291,26 @@ def run_jvml_benchmarking(benchmark_name : str, result_suffix : str):
         f"jvml.benchmark.Benchmark{class_name}", "+TieredCompilation", "-Xmx8589934592",
     ])
 
-    rewrite_jmh_out_json(benchmark_name, result_suffix)
+    rewrite_jmh_out_json(plot_name, benchmark_name, result_suffix)
 
     os.remove(f"benchmarking/results/{out_name}_tmp.json")
 
 
-def parse_result_csv(benchmark_name : str) -> dict[str, float]:
-    with open(f"benchmarking/results/{benchmark_name}.json", "r") as file:
+def parse_result_csv(plot_name : str, benchmark_name : str) -> dict[str, float]:
+    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as file:
         benchmark_results = json.loads(file.read())
 
-    time_by_compiler = {compiler : benchmark_results[compiler]["mean"] for compiler in benchmark_results}
+    time_by_key = {key : benchmark_results[key]["mean"] for key in benchmark_results}
 
-    return time_by_compiler
+    return time_by_key
 
 '''
 given a list of benchmarks that have been run (with results as csv files in the 'csv' directory)
 
 produce a bar plot of performance
 '''
-def plot_peformance_graphs(benchmark_names : list[str]) -> None:
-    benchmark_results = {benchmark_name : parse_result_csv(benchmark_name) for benchmark_name in benchmark_names}
+def plot_peformance_graphs(plot_name : str, benchmark_names : list[str]) -> None:
+    benchmark_results = {benchmark_name : parse_result_csv(plot_name, benchmark_name) for benchmark_name in benchmark_names}
     ordered_benchmarks_by_compiler = defaultdict(list)
     for benchmark_name in benchmark_results:
         for compiler in benchmark_results[benchmark_name]:
@@ -322,28 +333,98 @@ def plot_peformance_graphs(benchmark_names : list[str]) -> None:
 
     ax.set_xlabel("Benchmark")
     ax.set_ylabel("Execution time relative to mlton")
-    ax.set_xticks(x + width, benchmark_names)
+    ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
     ax.legend()
 
     plt.show()
 
 
+def plot_individual_opts_graphs(plot_name : str, benchmark_names : list[str]) -> None:
+    benchmark_results = {benchmark_name : parse_result_csv(plot_name, benchmark_name) for benchmark_name in benchmark_names}
+    ordered_benchmarks_by_opt = defaultdict(list)
+    for benchmark_name in benchmark_results:
+        for optimisation in benchmark_results[benchmark_name]:
+            if optimisation != "jvml_unoptimised":
+                ordered_benchmarks_by_opt[optimisation].append(benchmark_results[benchmark_name][optimisation] / benchmark_results[benchmark_name]["jvml_unoptimised"])
+
+    _, ax = plt.subplots()
+
+    x = np.arange(len(benchmark_names))  # the label locations
+    width = 0.15  # the width of the bars
+    multiplier = 0
+
+    for optimisation, relative_execution_time in ordered_benchmarks_by_opt.items():
+        offset = width * multiplier
+        ax.bar(x + offset, np.array(relative_execution_time)-1, width, bottom=1.0, label=optimisation)
+        for i in range(len(relative_execution_time)):
+            if relative_execution_time[i] == 0:
+                ax.text((x+offset)[i], 1, f"jvml with only {optimisation} failed", rotation="vertical", size=6, ha="center")
+        multiplier += 1
+
+    ax.set_xlabel("Benchmark")
+    ax.set_ylim([0.5, 1.5])
+    ticks = np.arange(0.5, 1.5, 0.1)
+    ax.set_yticks(ticks)
+    ax.set_ylabel("Execution time relative to unoptimised jvml")
+    ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
+
+    ax.spines['bottom'].set_position(('data', 1))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+
+    ax.legend()
+
+    plt.show()
+
+
+
 benchmark_details = [
-    #("life", 1),
+    ("life", 1),
     ("tak", 1),
-    #("mandlebrot", 1),
-    #("quicksort", 100),
-    #("brzozowski", 1000)
+    ("mandlebrot", 1),
+    ("quicksort", 100),
+    ("brzozowski", 1000)
     ]
+
+def compare_compiler_benchmark():
+    plot_name = "comparing_compilers"
+    for benchmark_name, number_of_runs in benchmark_details:
+        generate_sml_executables(benchmark_name, number_of_runs)
+        run_sml_benchmarking(plot_name, benchmark_name, warmups=1, runs=1) #lazy for now
+        generate_jvml_executables(benchmark_name, number_of_runs, ALL_OPTIMISATIONS, "_opt")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_opt")
+        generate_jvml_executables(benchmark_name, number_of_runs, [], "")
+        run_jvml_benchmarking(plot_name, benchmark_name, "")
+
+    plot_peformance_graphs(plot_name, [b[0] for b in benchmark_details])
+
+def compare_individual_optimisations():
+    plot_name = "individual_optimisations"
+    for benchmark_name, number_of_runs in benchmark_details:
+
+        generate_jvml_executables(benchmark_name, number_of_runs, [], "_unoptimised")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_unoptimised")
+
+        generate_jvml_executables(benchmark_name, number_of_runs, ["-const-fp"], "_constant_propagation")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_constant_propagation")
+
+        generate_jvml_executables(benchmark_name, number_of_runs, ["-peep"], "_peephole")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_peephole")
+
+        generate_jvml_executables(benchmark_name, number_of_runs, ["-tco"], "_tco")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_tco")
+
+        generate_jvml_executables(benchmark_name, number_of_runs, ["-tmm", "-tco"], "_tail_mod_monoid")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_tail_mod_monoid")
+
+        generate_jvml_executables(benchmark_name, number_of_runs, ["-tmc", "-tco"], "_tail_mod_cons")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_tail_mod_cons")
+
+    plot_individual_opts_graphs(plot_name, [b[0] for b in benchmark_details])
 
 
 if __name__ == "__main__":
-    for benchmark_name, number_of_runs in benchmark_details:
-        generate_sml_executables(benchmark_name, number_of_runs)
-        run_sml_benchmarking(benchmark_name, warmups=1, runs=1) #lazy for now
-        generate_jvml_executables(benchmark_name, number_of_runs, ALL_OPTIMISATIONS, "_opt")
-        run_jvml_benchmarking(benchmark_name, "_opt")
-        generate_jvml_executables(benchmark_name, number_of_runs, [], "")
-        run_jvml_benchmarking(benchmark_name, "")
-
-    plot_peformance_graphs([b[0] for b in benchmark_details])
+    #compare_compiler_benchmark()
+    #compare_individual_optimisations()
+    plot_individual_opts_graphs("individual_optimisations", ["brzozowski", "tak", "quicksort"])
