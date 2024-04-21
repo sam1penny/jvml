@@ -114,11 +114,19 @@ let rec build_type_mapping tbl general_ty special_ty =
       |> List.iter (fun (g, s) -> build_type_mapping tbl g s)
   | _ -> raise @@ Failure "illegal state, types don't match"
 
+let get_or_fail tbl x =
+  Hashtbl.find_opt tbl x |> function
+  | Some v -> v
+  | None -> raise @@ Failure (Printf.sprintf "failed to find %s in tbl" x)
+
 let instantiate_type called_type code =
   let type_mapping = Hashtbl.create 10 in
   let _ = build_type_mapping type_mapping (get_expr_type code) called_type in
+
   Desugar.Utils.map_over_expr_texprs
-    (Typing.Infer.map_over_texpr_vars (Hashtbl.find type_mapping))
+    (Typing.Infer.map_over_texpr_vars (fun x ->
+         Hashtbl.find_opt type_mapping x
+         |> Option.value ~default:(Typing.Typed_ast.TyVar x)))
     code
 
 let increment_tbl_if_exist tbl key =
@@ -218,7 +226,11 @@ let rec num_applied ctx =
   match ctx with AppCtx c -> 1 + num_applied c | _ -> 0
 
 let compute_inlining_score code_tbl x ctx =
-  size_expr (Hashtbl.find code_tbl x) - num_applied ctx
+  size_expr
+    (Hashtbl.find_opt code_tbl x |> function
+     | Some c -> c
+     | None -> raise @@ Failure (Printf.sprintf "failed to find %s" x))
+  - num_applied ctx
 
 let small_enough _ code_tbl x ctx =
   if
@@ -259,14 +271,14 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
     ->
       e
   | Ident (ty, x) ->
-      if consider_inline size_tbl code_tbl occurrence_tbl context x then
+      if consider_inline size_tbl code_tbl occurrence_tbl context x then (
         Hashtbl.find_opt code_tbl x
         |> (function
              | Some c -> c
              | None ->
                  raise
                  @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
-        |> copy_shared_exprs |> instantiate_type ty
+        |> copy_shared_exprs |> instantiate_type ty)
       else e
   | Direct_app (ty, arg_tys, ret_ty, name, arg_es) ->
       let app_contexts =
@@ -279,7 +291,7 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
       in
       if consider_inline size_tbl code_tbl occurrence_tbl app_contexts name then
         let inlined_method =
-          Hashtbl.find code_tbl name |> copy_shared_exprs
+          get_or_fail code_tbl name |> copy_shared_exprs
           |> instantiate_type specialised_ty
         in
         let applications =
