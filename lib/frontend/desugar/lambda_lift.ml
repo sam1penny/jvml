@@ -26,173 +26,79 @@ let print_fv_maps fv_maps =
 let external_lib = [ "print_$0"; "Nil$"; "Cons$" ] |> StringSet.of_list
 
 let free_vars_with_types_expr bound e =
-  let union_list =
-    List.fold_left
-      (fun (accfree, acc_by_ident) (free, by_ident) ->
-        ( StringMap.union takeleft accfree free,
-          StringMap.union takeleft acc_by_ident by_ident ))
-      (StringMap.empty, StringMap.empty)
-  in
-  let rec aux bound free e =
-    let rec_aux = aux bound free in
-    match e with
-    | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Hole ->
-        (free, StringMap.empty)
+  let open Desugared_ast in
+  let takeleft _ x _ = Some x in
+  let rec aux bound free = function
+    | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ -> free
     | Ident (ty, i) ->
-        ( (if StringSet.mem i bound then free else StringMap.add i ty free),
-          StringMap.empty )
+        if StringSet.mem i bound then free else StringMap.add i ty free
     | Bop (_, e0, _, e1) ->
-        let free0, fvs_by_ident0 = rec_aux e0 in
-        let free1, fvs_by_ident1 = rec_aux e1 in
-        let free = StringMap.union takeleft free0 free1 in
-        let fvs_by_ident =
-          StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
-        in
-        (free, fvs_by_ident)
-    | Uop (_, _, e) -> rec_aux e
-    | If (_, e0, e1, e2) | Set_Tuple (e0, e1, e2) ->
-        let free0, fvs_by_ident0 = rec_aux e0 in
-        let free1, fvs_by_ident1 = rec_aux e1 in
-        let free2, fvs_by_ident2 = rec_aux e2 in
-        let free =
-          StringMap.union takeleft free0 free1 |> StringMap.union takeleft free2
-        in
-        let fvs_by_ident =
-          StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
-          |> StringMap.union takeleft fvs_by_ident2
-        in
-        (free, fvs_by_ident)
+        StringMap.union takeleft (aux bound free e0) (aux bound free e1)
+    | Uop (_, _, e) -> aux bound free e
+    | If (_, e0, e1, e2) ->
+        StringMap.union takeleft (aux bound free e0) (aux bound free e1)
+        |> StringMap.union takeleft (aux bound free e2)
     | Fun (_, _, x, e) ->
-        let free, fvs_by_ident = rec_aux e in
-        (StringMap.remove x free, fvs_by_ident)
+        let bound' = StringSet.add x bound in
+        aux bound' free e
     | App (_, e0, e1) ->
-        let free0, fvs_by_ident0 = rec_aux e0 in
-        let free1, fvs_by_ident1 = rec_aux e1 in
-        let free = StringMap.union takeleft free0 free1 in
-        let fvs_by_ident =
-          StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
+        StringMap.union takeleft (aux bound free e0) (aux bound free e1)
+    | Direct_app (_, args_ty, fun_ret_ty, name, es) ->
+        let acc =
+          if StringSet.mem name bound then StringMap.empty
+          else StringMap.singleton name (assemble_fun_ty args_ty fun_ret_ty)
         in
-        (free, fvs_by_ident)
-    | Direct_app (_, args_ty, fun_arg_ty, name, es) ->
-        List.map rec_aux es |> union_list |> fun (accfree, acc_by_indent) ->
-        ( StringMap.union takeleft accfree
-            (StringMap.singleton name (assemble_fun_ty args_ty fun_arg_ty)),
-          acc_by_indent )
-    | Tuple (_, es) -> List.map rec_aux es |> union_list
-    | Let (_, x, (Fun _ as e0), e1) ->
-        let free0, fvs_by_ident0 = aux bound free e0 in
-        let free1, fvs_by_ident1 = aux bound free e1 in
-        let free1 = StringMap.remove x free1 in
-        (* remove bound value from free1 (still might be free in free0)*)
-        let fvs_by_ident =
-          StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
-          |> StringMap.add x free0
-        in
-        (StringMap.union takeleft free0 free1, fvs_by_ident)
+        List.map (aux bound free) es
+        |> List.fold_left (StringMap.union takeleft) acc
+    | Tuple (_, es) ->
+        List.map (aux bound free) es
+        |> List.fold_left (StringMap.union takeleft) StringMap.empty
     | Let (_, x, e0, e1) ->
-        let free0, fvs_by_ident0 = aux bound free e0 in
-        let free1, fvs_by_ident1 = aux bound free e1 in
-        let free1 = StringMap.remove x free1 in
-        (* remove bound value from free1 (still might be free in free0)*)
-        let fvs_by_ident =
-          StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
-        in
-        (StringMap.union takeleft free0 free1, fvs_by_ident)
+        let free_e0 = aux bound free e0 in
+        let bound' = StringSet.add x bound in
+        StringMap.union takeleft free_e0 (aux bound' free e1)
     | LetRec (_, x, e0, e1) ->
-        let free0, fvs_by_ident0 = aux bound free e0 in
-        let free1, fvs_by_ident1 = aux bound free e1 in
-        let free0 = StringMap.remove x free0 in
-        let free1 = StringMap.remove x free1 in
-        let fvs_by_ident =
-          StringMap.union takeleft fvs_by_ident0 fvs_by_ident1
-          |> StringMap.add x free0
-        in
-        (StringMap.union takeleft free0 free1, fvs_by_ident)
-    | Seq (_, es) -> List.map rec_aux es |> union_list
+        let bound' = StringSet.add x bound in
+        StringMap.union takeleft (aux bound' free e0) (aux bound' free e1)
+    | Seq (_, es) ->
+        List.map (aux bound free) es
+        |> List.fold_left (StringMap.union takeleft) StringMap.empty
     (* index is undecidable, so look at entire e *)
     | TupleGet (_, _, e) -> aux bound free e
     | ConstructorGet (_, _, e) -> aux bound free e
-    | Switch (_, e, cases, fallback_opt) -> (
-        let free_e, by_ident_e = rec_aux e in
+    | Switch (_, e, cases, fallback_opt) ->
+        let free_e = aux bound free e in
         List.map (fun (_, case_expr) -> case_expr) cases
-        |> List.map rec_aux |> union_list
-        |> fun (free, by_ident) ->
-        ( StringMap.union takeleft free_e free,
-          StringMap.union takeleft by_ident_e by_ident )
-        |> fun (accfree, acc_by_indent) ->
-        match fallback_opt with
-        | None -> (accfree, acc_by_indent)
-        | Some fallback_expr ->
-            let fallback_free, fallback_by_ident = rec_aux fallback_expr in
-            ( StringMap.union takeleft accfree fallback_free,
-              StringMap.union takeleft acc_by_indent fallback_by_ident ))
-    | Match_Failure -> (StringMap.empty, StringMap.empty)
-    | Shared_Expr (e, _, _) -> rec_aux !e
-    | While_true _ | Break _ | Assign_Seq _ ->
-        raise
-        @@ Failure "tail rec constructs should not be present in lambda_lift"
+        |> List.map (aux bound free)
+        |> List.fold_left (StringMap.union takeleft) free_e
+        |> StringMap.union takeleft
+             (Option.map (fun e -> aux bound free e) fallback_opt
+             |> Option.value ~default:StringMap.empty)
+    | Match_Failure -> StringMap.empty
+    | Shared_Expr (e, _, _) -> aux bound free !e
+    | While_true e -> aux bound free e
+    | Break e -> aux bound free e
+    | Assign_Seq assignments ->
+        List.map
+          (fun (x, ty, e) ->
+            aux bound free e |> fun m ->
+            if StringSet.mem x bound then StringMap.add x ty m else m)
+          assignments
+        |> List.fold_left (StringMap.union takeleft) StringMap.empty
+    | Hole | Set_Tuple _ -> raise @@ Failure "todo1"
   in
 
   aux bound StringMap.empty e
-
-let free_vars_with_types_decl bound decl =
-  match decl with
-  | Val (_, x, e) ->
-      free_vars_with_types_expr bound e |> fun (fv_val, fv_maps) ->
-      StringMap.add x fv_val fv_maps |> fun fv_maps ->
-      (fv_maps, StringSet.add x bound)
-  | ValRec (_, x, e) ->
-      let bound' = StringSet.add x bound in
-      free_vars_with_types_expr bound' e |> fun (fv_val, fv_map) ->
-      StringMap.add x fv_val fv_map |> fun fv_map -> (fv_map, bound')
-  | Type _ -> (StringMap.empty, bound)
-  | And _ ->
-      raise @@ Failure "mutual recursion should not occur before lambda lifting"
-
-let free_vars_with_types_program program =
-  List.fold_left
-    (fun (fv_map, top_level) decl ->
-      let d_fv_map, new_top_level = free_vars_with_types_decl top_level decl in
-      (StringMap.union takeleft fv_map d_fv_map, new_top_level))
-    (StringMap.empty, external_lib)
-    program
-  |> fun (fv_map, _) -> fv_map
-
-let lift_to_valrec most_recent_version name funargs body =
-  let fun_body = Utils.replace_funargs funargs body in
-  ValRec
-    ( get_expr_type fun_body,
-      name,
-      Unique_names.rename_expr most_recent_version (Hashtbl.create 10) fun_body
-    )
-
-let lift_to_val most_recent_version name funargs body =
-  let fun_body = Utils.replace_funargs funargs body in
-  Val
-    ( get_expr_type fun_body,
-      name,
-      Unique_names.rename_expr most_recent_version (Hashtbl.create 10) fun_body
-    )
 
 let apply_captured_vars lifted_fun free_vars =
   List.fold_left
     (fun acc (arg, arg_ty) -> App (get_expr_type acc, acc, Ident (arg_ty, arg)))
     lifted_fun free_vars
 
-(*
-lambda lifting makes a identifier static/toplevel,
-so it can now be removed from free variable mappings.
-*)
-let remove_from_fv_tbls key fv_tbls =
-  Hashtbl.iter (fun _ fv_tbl -> Hashtbl.remove fv_tbl key) fv_tbls
-
-let remove_uniqueness s =
-  String.split_on_char '$' s |> List.hd |> fun s ->
-  String.sub s 0 (String.length s - 1)
-
-let rec lift_lambdas_expr most_recent_version decl_name free_var_tbl e =
+let rec lift_lambdas_expr decl_name toplevel lifted_freevars_tbl e =
+  let rec_lift_lambda_without_bound = lift_lambdas_expr decl_name in
   let rec_lift_lambdas_expr =
-    lift_lambdas_expr most_recent_version decl_name free_var_tbl
+    lift_lambdas_expr decl_name toplevel lifted_freevars_tbl
   in
   let rec_lift_list es =
     let lifted_es = List.map rec_lift_lambdas_expr es in
@@ -207,11 +113,9 @@ let rec lift_lambdas_expr most_recent_version decl_name free_var_tbl e =
     ->
       ([], e)
   | Ident (_, i) as e_ident -> (
-      match Hashtbl.find_opt free_var_tbl i with
+      match Hashtbl.find_opt lifted_freevars_tbl i with
       | None -> ([], e_ident)
-      | Some fv_tbl ->
-          let freevars = Hashtbl.to_seq fv_tbl |> List.of_seq in
-          ([], apply_captured_vars e_ident freevars))
+      | Some freevars -> ([], apply_captured_vars e_ident freevars))
   | Bop (ty, e0, bop, e1) ->
       let defs0, e0 = rec_lift_lambdas_expr e0 in
       let defs1, e1 = rec_lift_lambdas_expr e1 in
@@ -226,7 +130,9 @@ let rec lift_lambdas_expr most_recent_version decl_name free_var_tbl e =
       (defs0 @ defs1 @ defs2, If (ty, e0, e1, e2))
   (* todo - anonymous lambda lifting *)
   | Fun (t0, t1, x, e) ->
-      let defs, e = rec_lift_lambdas_expr e in
+      let defs, e =
+        rec_lift_lambda_without_bound toplevel lifted_freevars_tbl e
+      in
       (defs, Fun (t0, t1, x, e))
   | App (ty, e0, e1) ->
       let defs0, e0 = rec_lift_lambdas_expr e0 in
@@ -239,25 +145,24 @@ let rec lift_lambdas_expr most_recent_version decl_name free_var_tbl e =
   | Let (_, x, (Fun _ as e0), e1) ->
       let funargs, body = Utils.collect_funargs e0 in
       let freevars =
-        Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
+        free_vars_with_types_expr toplevel e0 |> StringMap.to_seq |> List.of_seq
       in
-      remove_from_fv_tbls x free_var_tbl;
-      let stripped_freevars =
-        List.map (fun (x, ty) -> (remove_uniqueness x, ty)) freevars
+      let lifted_args = freevars @ funargs in
+
+      let defs0, body0 =
+        rec_lift_lambda_without_bound (StringSet.add x toplevel)
+          lifted_freevars_tbl body
       in
-      let stripped_body =
-        Utils.map_over_expr_idents
-          (fun x ->
-            if List.exists (fun (fv, _) -> fv = x) freevars then
-              remove_uniqueness x
-            else x)
-          body
+
+      let lifted_body = Utils.replace_funargs lifted_args body0 in
+      let lifted_val = Val (get_expr_type lifted_body, x, lifted_body) in
+
+      Hashtbl.add lifted_freevars_tbl x freevars;
+
+      let defs1, e1 =
+        rec_lift_lambda_without_bound (StringSet.add x toplevel)
+          lifted_freevars_tbl e1
       in
-      let lifted_args = stripped_freevars @ funargs in
-      let defs0, body0 = rec_lift_lambdas_expr stripped_body in
-      Utils.clear_shared_expr_seen stripped_body;
-      let lifted_val = lift_to_val most_recent_version x lifted_args body0 in
-      let defs1, e1 = rec_lift_lambdas_expr e1 in
       ([ lifted_val ] @ defs0 @ defs1, e1)
   | Let (ty, x, e0, e1) ->
       let defs0, e0 = rec_lift_lambdas_expr e0 in
@@ -266,28 +171,25 @@ let rec lift_lambdas_expr most_recent_version decl_name free_var_tbl e =
   | LetRec (_, x, e0, e1) ->
       let funargs, body = Utils.collect_funargs e0 in
       let freevars =
-        Hashtbl.find free_var_tbl x |> Hashtbl.to_seq |> List.of_seq
+        free_vars_with_types_expr (StringSet.add x toplevel) e0
+        |> StringMap.to_seq |> List.of_seq
       in
-      remove_from_fv_tbls x free_var_tbl;
 
-      let stripped_freevars =
-        List.map (fun (x, ty) -> (remove_uniqueness x, ty)) freevars
+      Hashtbl.add lifted_freevars_tbl x freevars;
+
+      let defs0, body0 =
+        rec_lift_lambda_without_bound (StringSet.add x toplevel)
+          lifted_freevars_tbl body
       in
-      let stripped_body =
-        Utils.map_over_expr_idents
-          (fun x ->
-            if List.exists (fun (fv, _) -> fv = x) freevars then
-              remove_uniqueness x
-            else x)
-          body
+
+      let lifted_args = freevars @ funargs in
+
+      let lifted_body = Utils.replace_funargs lifted_args body0 in
+      let lifted_valrec = ValRec (get_expr_type lifted_body, x, lifted_body) in
+      let defs1, e1 =
+        rec_lift_lambda_without_bound (StringSet.add x toplevel)
+          lifted_freevars_tbl e1
       in
-      let lifted_args = stripped_freevars @ funargs in
-      let defs0, body0 = rec_lift_lambdas_expr stripped_body in
-      Utils.clear_shared_expr_seen stripped_body;
-      let lifted_valrec =
-        lift_to_valrec most_recent_version x lifted_args body0
-      in
-      let defs1, e1 = rec_lift_lambdas_expr e1 in
 
       ([ lifted_valrec ] @ defs0 @ defs1, e1)
   | Tuple (ty, es) ->
@@ -366,23 +268,26 @@ let mutual_recursion_required lifted_decls =
     (StringSet.empty, false) (List.rev lifted_decls)
   |> fun (_, required) -> required
 
-let lift_lambdas_decl most_recent_version free_var_map decl =
+let lift_lambdas_decl toplevel lifted_freevars_tbl decl =
   match decl with
   | Val (ty, x, e) ->
       let lifted_decls, e =
-        lift_lambdas_expr most_recent_version x free_var_map e
+        lift_lambdas_expr x toplevel lifted_freevars_tbl e
       in
-      lifted_decls @ [ Val (ty, x, e) ]
+      let toplevel' = StringSet.add x toplevel in
+      (lifted_decls @ [ Val (ty, x, e) ], toplevel')
   | ValRec (ty, x, e) ->
+      let toplevel' = StringSet.add x toplevel in
       let lifted_decls, e =
-        lift_lambdas_expr most_recent_version x free_var_map e
+        lift_lambdas_expr x toplevel' lifted_freevars_tbl e
       in
       Utils.clear_shared_expr_seen e;
       List.iter Utils.clear_shared_decl_seen lifted_decls;
       let lifted_decls = lifted_decls @ [ ValRec (ty, x, e) ] in
-      if mutual_recursion_required lifted_decls then [ And lifted_decls ]
-      else lifted_decls
-  | Type _ -> [ decl ]
+      if mutual_recursion_required lifted_decls then
+        ([ And lifted_decls ], toplevel')
+      else (lifted_decls, toplevel')
+  | Type _ -> ([ decl ], toplevel)
   | And _ ->
       raise @@ Failure "mutual recursion should not occur before lambda lifting"
 
@@ -391,12 +296,17 @@ let to_hashtbl fv_map =
   |> Seq.map (fun (x, m) -> (x, StringMap.to_seq m |> Hashtbl.of_seq))
   |> Hashtbl.of_seq
 
-let lift_lambdas_program most_recent_version program =
-  let fv_map = free_vars_with_types_program program in
-  let fv_tbl = to_hashtbl fv_map in
+let lift_lambdas_program program =
+  let lifted_freevars_tbl = Hashtbl.create 10 in
   let lifted_program =
-    List.map (lift_lambdas_decl most_recent_version fv_tbl) program
-    |> List.flatten
+    List.fold_left
+      (fun (new_program, toplevel) decl ->
+        let new_decls, toplevel' =
+          lift_lambdas_decl toplevel lifted_freevars_tbl decl
+        in
+        (new_program @ new_decls, toplevel'))
+      ([], StringSet.empty) program
+    |> fun (p, _) -> p
   in
   Utils.clear_shared_program_seen lifted_program;
   lifted_program

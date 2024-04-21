@@ -41,7 +41,16 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
   match e with
   | Ident (ty, var) when not @@ String.contains var '$' ->
       if var = "print" then Ident (ty, "print_$0")
-      else Ident (ty, Hashtbl.find most_local_version var)
+      else
+        Ident
+          ( ty,
+            Hashtbl.find_opt most_local_version var |> function
+            | Some v -> v
+            | None ->
+                raise
+                @@ Failure
+                     (Printf.sprintf "could not find most local version for %s"
+                        var) )
   | Fun (t0, t1, x, e) when not @@ String.contains x '$' ->
       let x_versioned = fetch_next_version_and_update most_recent_version x in
       let _ = Hashtbl.add most_local_version x x_versioned in
@@ -67,7 +76,7 @@ let rec rename_expr (most_recent_version : (string, int) Hashtbl.t)
       @@ Failure "tail rec constructs should not be present in lambda_lift"
   | _ -> Utils.map_over_sub_expr rec_rename_expr e
 
-let rec rename_decl most_recent_version most_local_version d =
+let rename_decl most_recent_version most_local_version d =
   match d with
   | Val (ty, x, e) when not @@ String.contains x '$' ->
       let e' = rename_expr most_recent_version most_local_version e in
@@ -82,7 +91,41 @@ let rec rename_decl most_recent_version most_local_version d =
   | Type (ty, params, tname, value_constructors) ->
       Type (ty, params, tname, value_constructors)
   | And decls ->
-      And (List.map (rename_decl most_recent_version most_local_version) decls)
+      let version_names =
+        List.map
+          (fun d ->
+            match d with
+            | Val (_, x, _) | ValRec (_, x, _) ->
+                let x_versioned =
+                  fetch_next_version_and_update most_recent_version x
+                in
+                let _ = Hashtbl.add most_local_version x x_versioned in
+                x_versioned
+            | _ ->
+                raise @@ Failure "error 'and' should contain only vals/valrecs")
+          decls
+      in
+      let anded_decls =
+        List.combine version_names decls
+        |> List.map (fun (x_versioned, d) ->
+               match d with
+               | Val (ty, x, e) ->
+                   let e' =
+                     rename_expr most_recent_version most_local_version e
+                   in
+                   let _ = Hashtbl.add most_local_version x x_versioned in
+                   Val (ty, x_versioned, e')
+               | ValRec (ty, x, e) ->
+                   let _ = Hashtbl.add most_local_version x x_versioned in
+                   let e' =
+                     rename_expr most_recent_version most_local_version e
+                   in
+                   ValRec (ty, x_versioned, e')
+               | _ ->
+                   raise
+                   @@ Failure "error 'and' should contain only vals/valrecs")
+      in
+      And anded_decls
   | _ ->
       Utils.map_over_decl_exprs
         (rename_expr most_recent_version most_local_version)
@@ -99,4 +142,4 @@ let rename_program program =
     |> List.rev
   in
   Utils.clear_shared_program_seen renamed_program;
-  (renamings, renamed_program)
+  renamed_program

@@ -31,7 +31,7 @@ let temporaries_required funargs arg_es =
        (fun (args_so_far, temp_required) ((arg_name, _), arg_e) ->
          let fvar_set =
            Desugar.Lambda_lift.free_vars_with_types_expr StringSet.empty arg_e
-           |> fun (fvars, _) ->
+           |> fun fvars ->
            StringMap.bindings fvars
            |> List.map (fun (var_name, _) -> var_name)
            |> StringSet.of_list
