@@ -23,7 +23,7 @@ let print_fv_maps fv_maps =
       Printf.printf " --- \n")
     fv_maps
 
-let external_lib = [ "print_$0"; "Nil$"; "Cons$" ] |> StringSet.of_list
+let external_lib = [ "print"; "Nil$"; "Cons$" ] |> StringSet.of_list
 
 let free_vars_with_types_expr bound e =
   let open Desugared_ast in
@@ -305,7 +305,7 @@ let lift_lambdas_program program =
           lift_lambdas_decl toplevel lifted_freevars_tbl decl
         in
         (new_program @ new_decls, toplevel'))
-      ([], StringSet.empty) program
+      ([], external_lib) program
     |> fun (p, _) -> p
   in
   Utils.clear_shared_program_seen lifted_program;

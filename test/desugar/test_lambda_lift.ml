@@ -200,3 +200,23 @@ let%expect_test "test lambda lifting more complex mutual recursion case" =
               └──App
                  └──Ident loop2_$0 : int -> unit
                  └──Ident i_$0 : int |}]
+
+let%expect_test "lambda doesn't lift printing" =
+  let program = {|
+  val foo =
+  let f x = print x in
+  f 3
+  |} in
+  let _ = parse_type_desugar_print program in
+  [%expect
+    {|
+    └──Val f_$0
+       └──Fun x_$0 : 'a -> unit
+          └──App
+             └──Ident print_$0 : 'a -> unit
+             └──Ident x_$0 : 'a
+    └──Val foo_$0
+       └──App
+          └──Ident f_$0 : int -> unit
+          └──Int 3
+  |}]
