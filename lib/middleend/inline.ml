@@ -129,6 +129,19 @@ let instantiate_type called_type code =
          |> Option.value ~default:(Typing.Typed_ast.TyVar x)))
     code
 
+let poor_mans_effect_safety e =
+  let rec poor_mans_effect_safety_inner acc e =
+    match e with
+    | App _ | Direct_app _ -> false (* assume the worst *)
+    | _ ->
+        Desugar.Utils.fold_left_over_sub_expr
+          (fun acc e' -> acc && poor_mans_effect_safety_inner acc e')
+          acc e
+  in
+  let is_safe = poor_mans_effect_safety_inner true e in
+  Desugar.Utils.clear_shared_expr_seen e;
+  is_safe
+
 let increment_tbl_if_exist tbl key =
   match Hashtbl.find_opt tbl key with
   | None -> ()
@@ -149,7 +162,7 @@ let rec safety_of_bindings_expr safe_cnts unsafe_cnts safe_vars e =
       if Hashset.mem safe_vars x then increment_tbl_if_exist safe_cnts x
       else increment_tbl_if_exist unsafe_cnts x;
       List.iter rec_safety_of_bindings_expr arg_es
-  | Let (_, x, e0, e1) ->
+  | Let (_, x, e0, e1) when poor_mans_effect_safety e0 ->
       let () = rec_safety_of_bindings_expr e0 in
       let () = Hashset.add safe_vars x in
       let () = Hashtbl.add safe_cnts x 0 in
@@ -214,10 +227,16 @@ let occurrence_analysis program =
 
 type context = OtherCtx | AppCtx of context | CaseCtx of context
 
-let is_almost_whnf e =
+(*
+identifies the kind of expressions that require only a small piece of work,
+so that inlining will duplicate minimal work
+(or potentially less -- either is a simple lookup)
+
+equivalent to a copy-propagation pass
+*)
+let is_value e =
   match e with
-  | Fun _ -> true
-  | Constr _ -> true (* maybe only if has no args? hmm TODO *)
+  | Fun _ | Constr _ | Int _ | Bool _ | Ident _ | Float _ | String _ -> true
   | _ -> false
 
 let very_boring ctx = match ctx with OtherCtx -> true | _ -> false
@@ -241,21 +260,23 @@ let small_enough _ code_tbl x ctx =
 
 let consider_inline size_tbl code_tbl occurrence_tbl context x =
   match Hashtbl.find_opt occurrence_tbl x with
-  | None -> false (* function argument, not suitable for inlining *)
+  | None -> false
+  (* identifier is either function argument
+     or a side-effecting term, not suitable for inlining *)
   (* todo - if we unconditionally inline as in the paper, we can automatically apply deadcode elimination.contents
 
      Or, we can just add a check to a 'let' expression
   *)
   | Some OnceSafe -> true
   | Some OnceUnsafe ->
-      is_almost_whnf
+      is_value
         (Hashtbl.find_opt code_tbl x |> function
          | Some c -> c
          | None ->
              raise @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
       && not (very_boring context)
   | Some MultiUnsafe ->
-      is_almost_whnf
+      is_value
         (Hashtbl.find_opt code_tbl x |> function
          | Some c -> c
          | None ->
@@ -271,14 +292,14 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
     ->
       e
   | Ident (ty, x) ->
-      if consider_inline size_tbl code_tbl occurrence_tbl context x then (
+      if consider_inline size_tbl code_tbl occurrence_tbl context x then
         Hashtbl.find_opt code_tbl x
         |> (function
              | Some c -> c
              | None ->
                  raise
                  @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
-        |> copy_shared_exprs |> instantiate_type ty)
+        |> copy_shared_exprs |> instantiate_type ty
       else e
   | Direct_app (ty, arg_tys, ret_ty, name, arg_es) ->
       let app_contexts =

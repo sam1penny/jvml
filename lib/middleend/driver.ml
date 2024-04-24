@@ -12,8 +12,10 @@ let iter_constant_opts program =
     if i >= max_iters then p
     else
       let p' =
-        Constant_fold.constant_fold_program p
-        |> Constant_propagate.const_prop_program
+        (if !Config.do_constant_folding_and_prop then
+           Constant_fold.constant_fold_program p
+           |> Constant_propagate.const_prop_program
+         else p)
         |> fun program ->
         if !Config.do_inlining then Inline.inline_program program else program
       in
@@ -23,7 +25,8 @@ let iter_constant_opts program =
 
 let run_middleend program =
   Direct_calls.transform_direct_call_program program |> fun program ->
-  (if !Config.do_constant_folding_and_prop then iter_constant_opts program
+  (if !Config.do_constant_folding_and_prop || !Config.do_inlining then
+     iter_constant_opts program
    else program)
   |> fun program ->
   ( (if !Config.do_tail_mod_monoid then
