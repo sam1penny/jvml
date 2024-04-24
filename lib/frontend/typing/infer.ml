@@ -722,7 +722,7 @@ let type_program_exn input program =
       (* todo install exception printers and raise exception *)
       let _ = Format.fprintf Format.err_formatter "Error: %s\n" message in
       let _ = Format.pp_print_flush Format.err_formatter () in
-      raise (Failure "error in type inference")
+      exit 1
 
 let type_program_exn_from_file filename program =
   type_program_exn (Pp_loc.Input.file filename) program
