@@ -3,7 +3,6 @@ open Common
 
 (*
 TODO - bug occurs when we beta reduce, then code doesn't exist.
-
 *)
 let rec beta_reduce_expr remap e =
   match e with
@@ -283,6 +282,14 @@ let consider_inline size_tbl code_tbl occurrence_tbl context x =
              raise @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
       && small_enough size_tbl code_tbl x context
 
+let rename_bindings e =
+  Desugar.Utils.clear_shared_expr_seen e;
+  let e' =
+    Desugar.Unique_names.rename_expr (Hashtbl.create 10) (Hashtbl.create 10) e
+  in
+  Desugar.Utils.clear_shared_expr_seen e;
+  e'
+
 let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
   let rec_inline_expr_without_ctx =
     inline_expr size_tbl code_tbl occurrence_tbl
@@ -299,7 +306,7 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
              | None ->
                  raise
                  @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
-        |> copy_shared_exprs |> instantiate_type ty
+        |> copy_shared_exprs |> instantiate_type ty |> rename_bindings
       else e
   | Direct_app (ty, arg_tys, ret_ty, name, arg_es) ->
       let app_contexts =
@@ -314,6 +321,7 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
         let inlined_method =
           get_or_fail code_tbl name |> copy_shared_exprs
           |> instantiate_type specialised_ty
+          |> rename_bindings
         in
         let applications =
           List.fold_left
