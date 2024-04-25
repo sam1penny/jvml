@@ -282,17 +282,18 @@ let consider_inline size_tbl code_tbl occurrence_tbl context x =
              raise @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
       && small_enough size_tbl code_tbl x context
 
-let rename_bindings e =
+let rename_bindings most_recent_version e =
   Desugar.Utils.clear_shared_expr_seen e;
   let e' =
-    Desugar.Unique_names.rename_expr (Hashtbl.create 10) (Hashtbl.create 10) e
+    Desugar.Unique_names.rename_expr most_recent_version (Hashtbl.create 10) e
   in
   Desugar.Utils.clear_shared_expr_seen e;
   e'
 
-let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
+let rec inline_expr size_tbl code_tbl occurrence_tbl most_recent_version context
+    e =
   let rec_inline_expr_without_ctx =
-    inline_expr size_tbl code_tbl occurrence_tbl
+    inline_expr size_tbl code_tbl occurrence_tbl most_recent_version
   in
   match e with
   | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Match_Failure | Hole
@@ -306,7 +307,8 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
              | None ->
                  raise
                  @@ Failure (Printf.sprintf "fail to find %s in code_tbl" x))
-        |> copy_shared_exprs |> instantiate_type ty |> rename_bindings
+        |> copy_shared_exprs |> instantiate_type ty
+        |> rename_bindings most_recent_version
       else e
   | Direct_app (ty, arg_tys, ret_ty, name, arg_es) ->
       let app_contexts =
@@ -321,7 +323,7 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
         let inlined_method =
           get_or_fail code_tbl name |> copy_shared_exprs
           |> instantiate_type specialised_ty
-          |> rename_bindings
+          |> rename_bindings most_recent_version
         in
         let applications =
           List.fold_left
@@ -414,16 +416,22 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl context e =
       let e2' = rec_inline_expr_without_ctx OtherCtx e2 in
       Set_Tuple (e0', e1', e2')
 
-let rec inline_decl size_tbl code_tbl occurrence_tbl d =
+let rec inline_decl size_tbl code_tbl occurrence_tbl most_recent_version d =
   let inlined_decl =
     match d with
     | Val (ty, x, e) ->
-        let e' = inline_expr size_tbl code_tbl occurrence_tbl OtherCtx e in
+        let e' =
+          inline_expr size_tbl code_tbl occurrence_tbl most_recent_version
+            OtherCtx e
+        in
         Hashtbl.add code_tbl x e';
         Hashtbl.add size_tbl x (size_expr e');
         Val (ty, x, e')
     | ValRec (ty, x, e) ->
-        let e' = inline_expr size_tbl code_tbl occurrence_tbl OtherCtx e in
+        let e' =
+          inline_expr size_tbl code_tbl occurrence_tbl most_recent_version
+            OtherCtx e
+        in
         (* don't bother inlining recursive expressions for now *)
         ValRec (ty, x, e')
     | Type _ -> d
@@ -436,7 +444,10 @@ let rec inline_decl size_tbl code_tbl occurrence_tbl d =
                 Hashtbl.add size_tbl x (size_expr e)
             | _ -> ())
           decls;
-        And (List.map (inline_decl size_tbl code_tbl occurrence_tbl) decls)
+        And
+          (List.map
+             (inline_decl size_tbl code_tbl occurrence_tbl most_recent_version)
+             decls)
   in
   let () = Desugar.Utils.clear_shared_decl_seen inlined_decl in
   inlined_decl
@@ -444,7 +455,10 @@ let rec inline_decl size_tbl code_tbl occurrence_tbl d =
 let inline_program program =
   let size_tbl = Hashtbl.create 10 in
   let code_tbl = Hashtbl.create 10 in
+  let most_recent_version = Hashtbl.create 10 in
   let occurrence_tbl = occurrence_analysis program in
 
-  List.map (inline_decl size_tbl code_tbl occurrence_tbl) program
+  List.map
+    (inline_decl size_tbl code_tbl occurrence_tbl most_recent_version)
+    program
   |> List.map beta_reduce_decl
