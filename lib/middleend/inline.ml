@@ -111,7 +111,11 @@ let rec build_type_mapping tbl general_ty special_ty =
   | TyCustom (general_tys, _), TyCustom (special_tys, _) ->
       List.combine general_tys special_tys
       |> List.iter (fun (g, s) -> build_type_mapping tbl g s)
-  | _ -> raise @@ Failure "illegal state, types don't match"
+  | _ ->
+      raise
+      @@ Failure
+           (Printf.sprintf "illegal state, types %s and %s don't match."
+              (pp_texpr general_ty) (pp_texpr special_ty))
 
 let get_or_fail tbl x =
   Hashtbl.find_opt tbl x |> function

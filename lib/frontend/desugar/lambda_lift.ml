@@ -112,10 +112,16 @@ let rec lift_lambdas_expr decl_name toplevel lifted_freevars_tbl e =
   | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Match_Failure | Hole
     ->
       ([], e)
-  | Ident (_, i) as e_ident -> (
+  | Ident (ty, i) as e_ident -> (
       match Hashtbl.find_opt lifted_freevars_tbl i with
       | None -> ([], e_ident)
-      | Some freevars -> ([], apply_captured_vars e_ident freevars))
+      | Some freevars ->
+          let lifted_ty =
+            List.fold_left
+              (fun acc (_, arg_ty) -> Typed_ast.TyFun (arg_ty, acc))
+              ty freevars
+          in
+          ([], apply_captured_vars (Ident (lifted_ty, i)) freevars))
   | Bop (ty, e0, bop, e1) ->
       let defs0, e0 = rec_lift_lambdas_expr e0 in
       let defs1, e1 = rec_lift_lambdas_expr e1 in
