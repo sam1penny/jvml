@@ -4,27 +4,14 @@ open Common
 (*
 TODO - bug occurs when we beta reduce, then code doesn't exist.
 *)
-let rec beta_reduce_expr remap e =
+let rec beta_reduce_expr e =
   match e with
-  | Ident (ty, x) ->
-      if Hashset.mem remap x then Ident (ty, x ^ "_beta") else Ident (ty, x)
-  | Direct_app (ty, arg_tys, ret_ty, name, arg_es) when Hashset.mem remap name
-    ->
-      Direct_app
-        ( ty,
-          arg_tys,
-          ret_ty,
-          name ^ "_beta",
-          List.map (beta_reduce_expr remap) arg_es )
   | App (_, Fun (_, t1, x, e0), e1) ->
-      let _ = Hashset.add remap x in
-      Let (t1, x ^ "_beta", beta_reduce_expr remap e1, beta_reduce_expr remap e0)
-  | _ -> Desugar.Utils.map_over_sub_expr (beta_reduce_expr remap) e
+      Let (t1, x, beta_reduce_expr e1, beta_reduce_expr e0)
+  | _ -> Desugar.Utils.map_over_sub_expr beta_reduce_expr e
 
 let beta_reduce_decl d =
-  let reduced_program =
-    Desugar.Utils.map_over_decl_exprs (beta_reduce_expr (Hashset.create 10)) d
-  in
+  let reduced_program = Desugar.Utils.map_over_decl_exprs beta_reduce_expr d in
   let () = Desugar.Utils.clear_shared_decl_seen reduced_program in
   reduced_program
 
@@ -201,14 +188,10 @@ let safety_of_bindings_program program =
   let () = Desugar.Utils.clear_shared_program_seen program in
   (safe_cnts, unsafe_cnts)
 
-type binding_occurrence = OnceSafe | OnceUnsafe | MultiUnsafe
+type binding_occurrence = Dead | OnceSafe | OnceUnsafe | MultiUnsafe
 [@@deriving show]
 
 let occurrence_analysis program =
-  let get_or_default tbl k default =
-    Hashtbl.find_opt tbl k |> Option.value ~default
-  in
-
   let occurrence_tbl = Hashtbl.create 10 in
   let safe_cnts, unsafe_cnts = safety_of_bindings_program program in
   let keys =
@@ -218,12 +201,10 @@ let occurrence_analysis program =
   in
   StringSet.iter
     (fun var ->
-      match
-        (get_or_default safe_cnts var 0, get_or_default unsafe_cnts var 0)
-      with
+      match (Hashtbl.find safe_cnts var, Hashtbl.find unsafe_cnts var) with
+      | 0, 0 -> Hashtbl.add occurrence_tbl var Dead
       | 1, 0 -> Hashtbl.add occurrence_tbl var OnceSafe
       | 0, 1 -> Hashtbl.add occurrence_tbl var OnceUnsafe
-      (* maybe todo - add dead case *)
       | _ -> Hashtbl.add occurrence_tbl var MultiUnsafe)
     keys;
   occurrence_tbl
@@ -270,6 +251,7 @@ let consider_inline size_tbl code_tbl occurrence_tbl context x =
 
      Or, we can just add a check to a 'let' expression
   *)
+  | Some Dead -> raise @@ Failure "inlining dead expression"
   | Some OnceSafe -> true
   | Some OnceUnsafe ->
       is_value
@@ -362,12 +344,15 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl most_recent_version context
       let e0' = rec_inline_expr_without_ctx (AppCtx context) e0 in
       let e1' = rec_inline_expr_without_ctx context e1 in
       App (ty, e0', e1')
-  | Let (ty, x, e0, e1) ->
-      let e0' = rec_inline_expr_without_ctx OtherCtx e0 in
-      let () = Hashtbl.add code_tbl x e0' in
-      let () = Hashtbl.add size_tbl x (size_expr e0') in
-      let e1' = rec_inline_expr_without_ctx context e1 in
-      Let (ty, x, e0', e1')
+  | Let (ty, x, e0, e1) -> (
+      match Hashtbl.find_opt occurrence_tbl x with
+      | Some Dead -> rec_inline_expr_without_ctx context e1
+      | _ ->
+          let e0' = rec_inline_expr_without_ctx OtherCtx e0 in
+          let () = Hashtbl.add code_tbl x e0' in
+          let () = Hashtbl.add size_tbl x (size_expr e0') in
+          let e1' = rec_inline_expr_without_ctx context e1 in
+          Let (ty, x, e0', e1'))
   | LetRec (ty, x, e0, e1) ->
       let e0' = rec_inline_expr_without_ctx OtherCtx e0 in
       let e1' = rec_inline_expr_without_ctx context e1 in

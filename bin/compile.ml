@@ -36,7 +36,7 @@ let speclist =
     ("-inline", Arg.Unit (add_opt "-inline"), "Enable inlining");
     ( "-inl-threshold",
       Arg.Set_int Common.Config.inlining_score_threshold,
-      "Adjust threshold for expression score in order to apply inlining. \
+      " Adjust threshold for expression score in order to apply inlining. \
        Default 10" );
     ("-tmm", Arg.Unit (add_opt "-tmm"), " Enable tail recursion modulo monoid");
     ("-tco", Arg.Unit (add_opt "-tco"), " Enable tail call optimisation");

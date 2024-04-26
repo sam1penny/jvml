@@ -38,7 +38,7 @@ let%expect_test "small MultiUnsafe function is inlined" =
              └──Ident x_$0 : int
              └──Int 2
     └──Val foo_$0
-       └──Let x_$0_beta
+       └──Let x_$0_$0
           └──Int 3
           └──Bop * : int
              └──Int 3
@@ -86,17 +86,15 @@ let%expect_test "large MultiUnsafe function is not inlined, smaller \
              └──Ident x_$1 : int
     └──Val bar_$0
        └──Seq
-          └──Let x_$0_beta
-             └──Int 3
+          └──Bop + : int
              └──Bop + : int
                 └──Bop + : int
                    └──Bop + : int
-                      └──Bop + : int
-                         └──Int 3
-                         └──Int 3
+                      └──Int 3
                       └──Int 3
                    └──Int 3
                 └──Int 3
+             └──Int 3
           └──App
              └──Ident large_fun_$0 : int -> int
              └──Int 4
