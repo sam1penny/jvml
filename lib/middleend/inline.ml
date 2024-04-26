@@ -123,6 +123,7 @@ let poor_mans_effect_safety e =
   let rec poor_mans_effect_safety_inner acc e =
     match e with
     | App _ | Direct_app _ -> false (* assume the worst *)
+    | Fun _ -> true (* all effects latent *)
     | _ ->
         Desugar.Utils.fold_left_over_sub_expr
           (fun acc e' -> acc && poor_mans_effect_safety_inner acc e')
