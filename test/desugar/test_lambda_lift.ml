@@ -33,7 +33,7 @@ let%expect_test "test add captured lifted arguments" =
              └──Int 2
              └──App
                 └──App
-                   └──Ident foo_$0 : int -> int
+                   └──Ident foo_$0 : int -> int -> int -> int
                    └──Ident x_$1 : int
                 └──Ident y_$1 : int |}]
 
@@ -93,7 +93,7 @@ let%expect_test "test capturing recursive inner function" =
                 └──Ident z_$0 : int
                 └──App
                    └──App
-                      └──Ident fact_$0 : int -> int
+                      └──Ident fact_$0 : int -> int -> int
                       └──Ident z_$0 : int
                    └──Bop - : int
                       └──Ident x_$0 : int
@@ -103,7 +103,7 @@ let%expect_test "test capturing recursive inner function" =
           └──Int 3
           └──App
              └──App
-                └──Ident fact_$0 : int -> int
+                └──Ident fact_$0 : int -> int -> int
                 └──Ident z_$1 : int
              └──Int 5 |}]
 
