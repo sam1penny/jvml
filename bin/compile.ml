@@ -35,7 +35,7 @@ let speclist =
     ( "-const-fp",
       Arg.Unit (add_opt "-const-fp"),
       " Enable constant folding and propagation" );
-    ("-inline", Arg.Unit (add_opt "-inline"), "Enable inlining");
+    ("-inline", Arg.Unit (add_opt "-inline"), " Enable inlining");
     ( "-inl-threshold",
       Arg.Set_int Common.Config.inlining_score_threshold,
       " Adjust threshold for expression score in order to apply inlining. \
@@ -46,6 +46,9 @@ let speclist =
     ( "-dyn-lambdas",
       Arg.Set Common.Config.use_dynamic_lambdas,
       " Compile lambas using invokedynamic" );
+    ( "-dump_debug",
+      Arg.String (fun x -> Common.Config.debug_file := Some x),
+      " Dump debug information (currently just compile times) to json file" );
   ]
   |> Arg.align
 
@@ -75,4 +78,11 @@ let () =
     | String program_text ->
         Jvml.Run_jvml.compile_program_from_string program_text
   in
-  Printf.fprintf out_chan "%s" jvm_assembly
+  (match !Common.Config.debug_file with
+  | None -> ()
+  | Some debug_file ->
+      let debug_chan = open_out debug_file in
+      Yojson.Basic.pretty_to_channel debug_chan !Common.debug_json;
+      close_out debug_chan);
+  Printf.fprintf out_chan "%s" jvm_assembly;
+  close_out out_chan

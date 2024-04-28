@@ -84,4 +84,25 @@ module Hashset = struct
   let iter f set = Hashtbl.iter (fun x _ -> f x) set
 end
 
+let debug_json = ref (Yojson.Basic.from_string "{}")
+
+let update_json k v =
+  match !debug_json with
+  | `Assoc assoc_list ->
+      let rec loop l =
+        match l with
+        | [] -> [ (k, v) ]
+        | (k', v') :: xs -> if k = k' then (k, v) :: xs else (k', v') :: loop xs
+      in
+      debug_json := `Assoc (loop assoc_list)
+  | _ -> raise @@ Failure "invalid json format"
+
+let maybe_record_compiler_time compiler_phase program =
+  (match !Config.debug_file with
+  | None -> ()
+  | Some _ ->
+      update_json compiler_phase
+        (Yojson.Basic.from_string (string_of_float @@ Sys.time ())));
+  program
+
 module Config = Config

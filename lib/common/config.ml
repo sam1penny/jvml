@@ -13,6 +13,7 @@ Default name for a class is 'Foo' if unset.
 Otherwise set by command line option
 *)
 let generated_class_name = ref "Foo"
+let debug_file : string option ref = ref None
 
 let set_all_opt () =
   do_constant_folding_and_prop := true;

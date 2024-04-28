@@ -7,32 +7,51 @@ let file_to_string filename =
   Option.get s
 
 let run_frontend filename =
-  Parsing.Driver.parse_string filename |> Typing.Driver.type_program |> fun p ->
+  Parsing.Driver.parse_string filename
+  |> Common.maybe_record_compiler_time "parsing"
+  |> Typing.Driver.type_program
+  |> Common.maybe_record_compiler_time "typing"
+  |> fun p ->
   Result.bind p (fun program -> Ok (Desugar.desugar_program program))
 
 let run_frontend_exn_from_file filename program =
   Parsing.Driver.parse_string program
+  |> Common.maybe_record_compiler_time "parsing"
   |> Typing.Infer.type_program_exn_from_file filename
+  |> Common.maybe_record_compiler_time "typing"
   |> Desugar.desugar_program
+  |> Common.maybe_record_compiler_time "desugaring"
 
 let run_frontend_exn_from_string program_text =
   Parsing.Driver.parse_string program_text
+  |> Common.maybe_record_compiler_time "parsing"
   |> Typing.Infer.type_program_exn_from_string program_text
+  |> Common.maybe_record_compiler_time "typing"
   |> Desugar.desugar_program
+  |> Common.maybe_record_compiler_time "desugaring"
 
 let linear_ir_from_string program_text =
   run_frontend_exn_from_string program_text
   |> Middle_end.Driver.run_middleend
+  |> Common.maybe_record_compiler_time "middle_end"
   |> Linearise.Driver.lower_program_to_linear_ir
+  |> Common.maybe_record_compiler_time "linearise"
   |> Linearise.Instruction.show_program
 
 let run_backend typed_tree =
   Middle_end.Driver.run_middleend typed_tree
-  |> Linearise.Driver.lower_program_to_linear_ir |> Jvm.Driver.lower_ir
+  |> Common.maybe_record_compiler_time "middle_end"
+  |> Linearise.Driver.lower_program_to_linear_ir
+  |> Common.maybe_record_compiler_time "linearise"
+  |> Jvm.Driver.lower_ir
+  |> Common.maybe_record_compiler_time "lower_jvm"
 
 let compile_program_from_string program_text =
-  run_frontend_exn_from_string program_text |> run_backend
+  Common.maybe_record_compiler_time "startup" program_text
+  |> run_frontend_exn_from_string |> run_backend
 
 let compile_program_from_file filename =
-  let program_text = file_to_string filename in
-  run_frontend_exn_from_file filename program_text |> run_backend
+  Common.maybe_record_compiler_time "startup" filename
+  |> file_to_string
+  |> run_frontend_exn_from_file filename
+  |> run_backend
