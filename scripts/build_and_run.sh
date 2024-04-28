@@ -5,12 +5,12 @@ copy_args=( "$@" )
 generated_class="Foo"
 while :; do
     case $1 in
-        -o)
+        -c)
         if [ "$2" ]; then
             generated_class=$2
             shift
         else
-            printf 'error: "-o" requires an argument\n'
+            printf 'error: "-c" requires an argument\n'
             exit 1
         fi
         ;;
@@ -24,7 +24,7 @@ while :; do
 done
 
 mkdir tmp/
-dune exec -- _build/default/bin/compile.exe "${copy_args[@]}" > tmp/tmp.j || exit 1
+dune exec -- _build/default/bin/compile.exe "${copy_args[@]}" -o tmp/tmp.j || exit 1
 krak2 asm --out "tmp/${generated_class}.zip" tmp/tmp.j > /dev/null
 cd tmp
 unzip -u "${generated_class}" >/dev/null

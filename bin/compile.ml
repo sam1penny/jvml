@@ -5,6 +5,7 @@ type program_input = String of string | File of string
 let program_input = ref None
 let opt_list : string list ref = ref []
 let add_opt opt () = opt_list := opt :: !opt_list
+let output_file = ref ""
 
 let set_opt opt =
   match opt with
@@ -25,9 +26,10 @@ let speclist =
     ( "-f",
       Arg.String (fun x -> program_input := Some (File x)),
       " Set file to compile" );
-    ( "-o",
+    ( "-c",
       Arg.Set_string Common.Config.generated_class_name,
       " Set name of generated class" );
+    ("-o", Arg.Set_string output_file, " Set output file");
     ("-opt-all", Arg.Unit (add_opt "-opt-all"), " Enable all optimisations");
     ("-peep", Arg.Unit (add_opt "-peep"), " Enable peephole optimisations");
     ( "-const-fp",
@@ -50,15 +52,27 @@ let speclist =
 let () =
   Arg.parse speclist
     (fun _ ->
-      print_endline usage_msg;
-      exit 0)
+      prerr_endline usage_msg;
+      exit 1)
     usage_msg;
   List.iter set_opt !opt_list;
-  (match !program_input with
-  | Some (File filename) -> Jvml.Run_jvml.compile_program_from_file filename
-  | Some (String program_text) ->
-      Jvml.Run_jvml.compile_program_from_string program_text
-  | None ->
-      prerr_endline usage_msg;
-      exit 0)
-  |> print_endline
+  let input =
+    match !program_input with
+    | Some i -> i
+    | None ->
+        prerr_endline "Input file not specified";
+        exit 1
+  in
+  let out_chan =
+    if !output_file == "" then (
+      prerr_endline "Output file not specified";
+      exit 1)
+    else open_out !output_file
+  in
+  let jvm_assembly =
+    match input with
+    | File filename -> Jvml.Run_jvml.compile_program_from_file filename
+    | String program_text ->
+        Jvml.Run_jvml.compile_program_from_string program_text
+  in
+  Printf.fprintf out_chan "%s" jvm_assembly
