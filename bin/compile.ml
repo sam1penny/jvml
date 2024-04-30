@@ -10,7 +10,7 @@ let output_file = ref ""
 let set_opt opt =
   match opt with
   | "-opt-all" -> Common.Config.set_all_opt ()
-  | "-peep" -> Common.Config.do_peephole := true
+  | "-peep" -> Common.Config.set_all_peephole_opts ()
   | "-const-fp" -> Common.Config.do_constant_folding_and_prop := true
   | "-tmm" -> Common.Config.do_tail_mod_monoid := true
   | "-tco" -> Common.Config.do_tail_call_elimination := true
@@ -46,6 +46,30 @@ let speclist =
     ( "-dyn-lambdas",
       Arg.Set Common.Config.use_dynamic_lambdas,
       " Compile lambas using invokedynamic" );
+    ( "-peep-box",
+      Arg.Unit
+        (fun () ->
+          Common.Config.do_peephole := true;
+          Common.Config.do_peep_box := true),
+      " Enable boxing peephole optimisation" );
+    ( "-peep-push-pop",
+      Arg.Unit
+        (fun () ->
+          Common.Config.do_peephole := true;
+          Common.Config.do_peep_push_pop := true),
+      " Enable push-pop peephole optimisation" );
+    ( "-peep-goto-label",
+      Arg.Unit
+        (fun () ->
+          Common.Config.do_peephole := true;
+          Common.Config.do_peep_goto_label := true),
+      " Enable goto-label peephole optimisation" );
+    ( "-peep-store-load",
+      Arg.Unit
+        (fun () ->
+          Common.Config.do_peephole := true;
+          Common.Config.do_peep_store_load := true),
+      " Enable store-load peephole optimisation" );
     ( "-dump_debug",
       Arg.String (fun x -> Common.Config.debug_file := Some x),
       " Dump debug information (currently just compile times) to json file" );

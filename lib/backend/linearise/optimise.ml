@@ -14,10 +14,13 @@ let apply_over_instructions f program =
         program.static_methods;
   }
 
+let maybe_run_peephole condition peephole program =
+  if condition then apply_over_instructions peephole program else program
+
 let run_optimisations program =
   if !Config.do_peephole then
-    apply_over_instructions Peephole.boxunbox_opt program
-    |> apply_over_instructions Peephole.storeload_opt
-    |> apply_over_instructions Peephole.gotolabel_opt
-    |> apply_over_instructions Peephole.pushpop_opt
+    maybe_run_peephole !Config.do_peep_box Peephole.boxunbox_opt program
+    |> maybe_run_peephole !Config.do_peep_store_load Peephole.storeload_opt
+    |> maybe_run_peephole !Config.do_peep_goto_label Peephole.gotolabel_opt
+    |> maybe_run_peephole !Config.do_peep_push_pop Peephole.pushpop_opt
   else program
