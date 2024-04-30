@@ -171,7 +171,7 @@ let rec safety_of_bindings_decl safe_cnts unsafe_cnts safe_vars d =
       let () = Hashset.add safe_vars x in
       let () = Hashtbl.add safe_cnts x 0 in
       (* for now, say that toplevel bindings are unsafe, since they are exported *)
-      Hashtbl.add unsafe_cnts x 1
+      Hashtbl.add unsafe_cnts x 2
   | ValRec (_, _, e) ->
       (* ignore inlining recursive functions *)
       safety_of_bindings_expr safe_cnts unsafe_cnts safe_vars e
