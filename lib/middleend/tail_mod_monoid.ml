@@ -23,10 +23,16 @@ let rec has_tmm_expr fn_name e =
   | Bop (_, _, ((ADD | MUL) as bop), Direct_app (_, _, _, name, _))
     when name = fn_name ->
       Some bop
-  | Bop (_, Direct_app (_, _, _, name, _), ((ADD | MUL) as bop), _)
-    when name = fn_name ->
+  | Bop (_, Direct_app (_, _, _, name, _), ((ADD | MUL) as bop), e1)
+    when name = fn_name
+         && Inline.poor_mans_effect_safety_with_exceptions
+              (StringSet.singleton fn_name)
+              e1 ->
       Some bop
-  | Bop (_, e0, ((ADD | MUL) as bop), e1) ->
+  | Bop (_, e0, ((ADD | MUL) as bop), e1)
+    when Inline.poor_mans_effect_safety_with_exceptions
+           (StringSet.singleton fn_name)
+           e1 ->
       rec_has_tmm e0
       >>= (fun b -> if b = bop then Some bop else None)
       |> or_else rec_has_tmm e1
@@ -124,11 +130,6 @@ let rec transform_tmm_expr modulo_bop fn_name e =
         e',
         ((ADD | MUL) as bop),
         Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es) )
-  | Bop
-      ( _,
-        Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es),
-        ((ADD | MUL) as bop),
-        e' )
     when bop = modulo_bop ->
       if name = fn_name then
         Direct_app
@@ -138,7 +139,28 @@ let rec transform_tmm_expr modulo_bop fn_name e =
             name ^ "_acc$",
             [ rec_transform_tmm e' ] @ arg_es )
       else e
-  | Bop (_, e0, ((ADD | MUL) as bop), e1) when bop = modulo_bop -> (
+  | Bop
+      ( _,
+        Direct_app (ret_ty, arg_tys, fun_ret_ty, name, arg_es),
+        ((ADD | MUL) as bop),
+        e' )
+    when bop = modulo_bop
+         && Inline.poor_mans_effect_safety_with_exceptions
+              (StringSet.singleton fn_name)
+              e' ->
+      if name = fn_name then
+        Direct_app
+          ( ret_ty,
+            [ Typed_ast.TyInt ] @ arg_tys,
+            fun_ret_ty,
+            name ^ "_acc$",
+            [ rec_transform_tmm e' ] @ arg_es )
+      else e
+  | Bop (_, e0, ((ADD | MUL) as bop), e1)
+    when bop = modulo_bop
+         && Inline.poor_mans_effect_safety_with_exceptions
+              (StringSet.singleton fn_name)
+              e1 -> (
       let transformed_e0 = rec_transform_tmm e0 in
       let transformed_e1 = rec_transform_tmm e1 in
       match (transformed_e0, transformed_e1) with

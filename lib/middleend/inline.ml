@@ -119,9 +119,11 @@ let instantiate_type called_type code =
          |> Option.value ~default:(Typing.Typed_ast.TyVar x)))
     code
 
-let poor_mans_effect_safety e =
+let poor_mans_effect_safety_with_exceptions safe_functions e =
   let rec poor_mans_effect_safety_inner acc e =
     match e with
+    | Direct_app (_, _, _, name, _) when StringSet.mem name safe_functions ->
+        true
     | App _ | Direct_app _ -> false (* assume the worst *)
     | Fun _ -> true (* all effects latent *)
     | _ ->
@@ -132,6 +134,9 @@ let poor_mans_effect_safety e =
   let is_safe = poor_mans_effect_safety_inner true e in
   Desugar.Utils.clear_shared_expr_seen e;
   is_safe
+
+let poor_mans_effect_safety e =
+  poor_mans_effect_safety_with_exceptions StringSet.empty e
 
 let increment_tbl_if_exist tbl key =
   match Hashtbl.find_opt tbl key with

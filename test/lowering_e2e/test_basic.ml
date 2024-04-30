@@ -427,6 +427,24 @@ let%expect_test "test trmm - with tail call" =
   54
   |}]
 
+let%expect_test "test trmm does not change evaluation semantics" =
+  let program =
+    {|
+  val rec foo n =
+    if n = 0 then n
+    else foo (n - 1) + (do {print(n); n})
+
+    val test = foo 4
+    |}
+  in
+  let _ = build_and_run program in
+  [%expect {|
+  1
+  2
+  3
+  4
+  |}]
+
 let%expect_test "test trmm - test one call suitable for trmc, one not" =
   let program =
     {|
