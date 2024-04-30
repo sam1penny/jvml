@@ -8,6 +8,21 @@ from collections import defaultdict
 import json
 
 
+def write_empty_json_if_not_exists(path : str) -> None:
+    if not os.path.exists(path):
+        with open(path, "w") as file:
+            file.write("{}")
+
+def update_json_file(path : str, new_dict : dict) -> None:
+    with open(path, "r") as existing_file:
+        existing_data = json.loads(existing_file.read())
+
+    for key, val in new_dict.items():
+        existing_data[key] = val
+
+    with open(path, "w") as existing_file:
+        json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
+
 '''
 given the name of a benchmark, who has a corresponding .ml file, this function will generate
 executables for Moscow ML, MLTon, and PolyML in the 'out' folder
@@ -69,20 +84,11 @@ def rewrite_hyperfile_out_json(plot_name : str, benchmark_name : str) -> None:
         compiler = command.split(".")[1]
         modified_json[compiler] = compiler_results
 
+    result_file = f"benchmarking/results/{plot_name}/{benchmark_name}.json"
 
-    if not os.path.exists(f"benchmarking/results/{plot_name}/{benchmark_name}.json"):
-        with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as file:
-            file.write("{}")
+    write_empty_json_if_not_exists(result_file)
 
-    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as existing_file:
-        existing_data = json.loads(existing_file.read())
-
-    for compiler in modified_json:
-        existing_data[compiler] = modified_json[compiler]
-
-    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as existing_file:
-        json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
-
+    update_json_file(result_file, modified_json)
 
 '''
 given that the executables exist in tmp, run each sml version
@@ -146,7 +152,7 @@ def generate_jvml_jar(benchmark_name : str, number_runs : int, optimisation_flag
 
     subprocess.run(["bash", "scripts/build_jar.sh",
                     "-f", f"benchmarking/tmp/{benchmark_name}.jvml",
-                    "-o", class_name] + optimisation_flags
+                    "-c", class_name] + optimisation_flags
                     )
 
     subprocess.run(["mv", f"{class_name}.jar", f"benchmarking/jmh/lib/{out_name}.jar"])
@@ -214,9 +220,9 @@ public class Benchmark{class_name} {{
 
 
     with open("benchmarking/jmh/pom.xml", "r") as file:
-        config = file.read()
+        config_s = file.read()
 
-    config = config.split("</dependencies>")
+    config = config_s.split("</dependencies>")
 
     config[0] += f"""
 
@@ -255,18 +261,9 @@ def rewrite_jmh_out_json(plot_name : str, benchmark_name : str, result_suffix : 
         }
     }
 
-    if not os.path.exists(f"benchmarking/results/{plot_name}/{result_file}.json"):
-        with open(f"benchmarking/results/{plot_name}/{result_file}.json", "w") as file:
-            file.write("{}")
+    write_empty_json_if_not_exists(f"benchmarking/results/{plot_name}/{result_file}.json")
 
-    with open(f"benchmarking/results/{plot_name}/{result_file}.json", "r") as existing_file:
-        existing_data = json.loads(existing_file.read())
-
-    for compiler in modified_json:
-        existing_data[compiler] = modified_json[compiler]
-
-    with open(f"benchmarking/results/{plot_name}/{result_file}.json", "w") as existing_file:
-        json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
+    update_json_file(f"benchmarking/results/{plot_name}/{result_file}.json", modified_json)
 
 
 '''
@@ -323,22 +320,14 @@ def compute_jvml_file_size(plot_name : str, benchmark_name : str, result_suffix 
     create_result_directories_if_not_exist(plot_name)
 
     out_name = benchmark_name + result_suffix
+    result_file = f"benchmarking/results/{plot_name}/{result_file}.json"
 
     file_size = os.path.getsize(f"benchmarking/jmh/lib/{out_name}.jar")
 
-    if not os.path.exists(f"benchmarking/results/{plot_name}/{result_file}.json"):
-        with open(f"benchmarking/results/{plot_name}/{result_file}.json", "w") as file:
-            file.write("{}")
+    write_empty_json_if_not_exists(result_file)
 
-    with open(f"benchmarking/results/{plot_name}/{result_file}.json", "r") as existing_file:
-        existing_data = json.loads(existing_file.read())
+    update_json_file(result_file, {"jvml" + result_suffix : {"file size" : file_size}})
 
-    existing_data["jvml" + result_suffix] = {
-        "file size" : file_size
-    }
-
-    with open(f"benchmarking/results/{plot_name}/{result_file}.json", "w") as existing_file:
-        json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
 
 '''
 todo refactor into one 'get file size method'
@@ -346,41 +335,38 @@ todo refactor into one 'get file size method'
 def compute_sml_file_sizes(plot_name : str, benchmark_name : str):
 
     create_result_directories_if_not_exist(plot_name)
+    result_file = f"benchmarking/results/{plot_name}/{benchmark_name}.json"
+    write_empty_json_if_not_exists(result_file)
 
+    file_sizes = {}
     for compiler in ["mlton", "mosml", "polyc"]:
-        file_size = os.path.getsize(f"benchmarking/out/{benchmark_name}.{compiler}")
-        if not os.path.exists(f"benchmarking/results/{plot_name}/{benchmark_name}.json"):
-            with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as file:
-                file.write("{}")
-
-        with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as existing_file:
-            existing_data = json.loads(existing_file.read())
-
-        existing_data[compiler] = {
-        "file size" : file_size
+        file_sizes[compiler] = {
+            "file size" : os.path.getsize(f"benchmarking/out/{benchmark_name}.{compiler}")
         }
 
-        with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "w") as existing_file:
-            json.dump(existing_data, existing_file, indent=4, ensure_ascii=False)
+    update_json_file(result_file, file_sizes)
 
 
-
-
-def parse_result_csv(plot_name : str, benchmark_name : str) -> dict[str, float]:
+def parse_result_json(plot_name : str, benchmark_name : str, param_name : str) -> dict[str, int | float]:
     with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as file:
         benchmark_results = json.loads(file.read())
 
-    time_by_key = {key : benchmark_results[key]["mean"] for key in benchmark_results}
+    time_by_key = {key : benchmark_results[key][param_name] for key in benchmark_results}
 
     return time_by_key
+
+def save_figure(plot_name : str) -> None:
+    if not os.path.exists("benchmarking/figures"):
+        os.mkdir("benchmarking/figures")
+    plt.savefig(f"benchmarking/figures/{plot_name}.png")
 
 '''
 given a list of benchmarks that have been run (with results as csv files in the 'csv' directory)
 
 produce a bar plot of performance
 '''
-def plot_peformance_graphs(plot_name : str, benchmark_names : list[str]) -> None:
-    benchmark_results = {benchmark_name : parse_result_csv(plot_name, benchmark_name) for benchmark_name in benchmark_names}
+def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) -> None:
+    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_compiler = defaultdict(list)
     for benchmark_name in benchmark_results:
         for compiler in benchmark_results[benchmark_name]:
@@ -406,13 +392,11 @@ def plot_peformance_graphs(plot_name : str, benchmark_names : list[str]) -> None
     ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
     ax.legend()
 
-    if not os.path.exists("benchmarking/figures"):
-        os.mkdir("benchmarking/figures")
-    plt.savefig(f"benchmarking/figures/{plot_name}.png")
+    save_figure(plot_name)
 
 
-def plot_individual_opts_graphs(plot_name : str, benchmark_names : list[str]) -> None:
-    benchmark_results = {benchmark_name : parse_result_csv(plot_name, benchmark_name) for benchmark_name in benchmark_names}
+def plot_individual_opts_time(plot_name : str, benchmark_names : list[str]) -> None:
+    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_opt = defaultdict(list)
     for benchmark_name in benchmark_results:
         for optimisation in benchmark_results[benchmark_name]:
@@ -447,12 +431,10 @@ def plot_individual_opts_graphs(plot_name : str, benchmark_names : list[str]) ->
 
     ax.legend()
 
-    if not os.path.exists("benchmarking/figures"):
-        os.mkdir("benchmarking/figures")
-    plt.savefig(f"benchmarking/figures/{plot_name}.png")
+    save_figure(plot_name)
 
 def plot_tail_mod_cons_bar_graph(plot_name : str, list_sizes : list[int]):
-    benchmark_results = {list_size : parse_result_csv(plot_name, list_size) for list_size in list_sizes}
+    benchmark_results = {list_size : parse_result_json(plot_name, str(list_size), "mean") for list_size in list_sizes}
     ordered_benchmarks_by_size = defaultdict(list)
     for benchmark_name in benchmark_results:
         for map_type in benchmark_results[benchmark_name]:
@@ -478,12 +460,10 @@ def plot_tail_mod_cons_bar_graph(plot_name : str, list_sizes : list[int]):
 
     ax.legend()
 
-    if not os.path.exists("benchmarking/figures"):
-        os.mkdir("benchmarking/figures")
-    plt.savefig(f"benchmarking/figures/{plot_name}.png")
+    save_figure(plot_name)
 
 def plot_tail_mod_cons_graph(plot_name : str, list_sizes : list[int]) -> None:
-    benchmark_results = {list_size : parse_result_csv(plot_name, list_size) for list_size in list_sizes}
+    benchmark_results = {list_size : parse_result_json(plot_name, str(list_size), "mean") for list_size in list_sizes}
     ordered_benchmarks_by_size = defaultdict(list)
     for benchmark_name in benchmark_results:
             for map_type in benchmark_results[benchmark_name]:
@@ -499,19 +479,12 @@ def plot_tail_mod_cons_graph(plot_name : str, list_sizes : list[int]) -> None:
     ax.set_ylabel("execution time relative to naive non tail recursive map")
 
     ax.legend()
-    if not os.path.exists("benchmarking/figures"):
-        os.mkdir("benchmarking/figures")
-    plt.savefig(f"benchmarking/figures/{plot_name}.png")
+
+    save_figure(plot_name)
 
 def plot_individual_opts_code_size(plot_name : str, benchmark_names : list[str]) -> None:
-    def parse_result_csv(benchmark_name : str):
-        with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as file:
-            benchmark_results = json.loads(file.read())
 
-        time_by_key = {key : benchmark_results[key]["file size"] for key in benchmark_results}
-
-        return time_by_key
-    benchmark_results = {benchmark_name : parse_result_csv(benchmark_name) for benchmark_name in benchmark_names}
+    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "file size") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_size = defaultdict(list)
     for benchmark_name in benchmark_results:
         for optimisation in benchmark_results[benchmark_name]:
@@ -545,23 +518,10 @@ def plot_individual_opts_code_size(plot_name : str, benchmark_names : list[str])
 
     ax.legend()
 
-    if not os.path.exists("benchmarking/figures"):
-        os.mkdir("benchmarking/figures")
-    plt.savefig(f"benchmarking/figures/{plot_name}.png")
+    save_figure(plot_name)
 
 def plot_compiler_size(plot_name : str, benchmark_names : list[str]) -> None:
-    '''
-    todo refactor into generic by parameter method
-    '''
-    def parse_result_csv(benchmark_name : str):
-        with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as file:
-            benchmark_results = json.loads(file.read())
-
-        time_by_key = {key : benchmark_results[key]["file size"] for key in benchmark_results}
-
-        return time_by_key
-
-    benchmark_results = {benchmark_name : parse_result_csv(benchmark_name) for benchmark_name in benchmark_names}
+    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "file size") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_size = defaultdict(list)
     for benchmark_name in benchmark_results:
         for compiler in benchmark_results[benchmark_name]:
@@ -585,12 +545,10 @@ def plot_compiler_size(plot_name : str, benchmark_names : list[str]) -> None:
 
     ax.legend()
 
-    if not os.path.exists("benchmarking/figures"):
-        os.mkdir("benchmarking/figures")
-    plt.savefig(f"benchmarking/figures/{plot_name}.png")
+    save_figure(plot_name)
 
 def plot_varied_inlining_threshold(plot_name : str, benchmark_names : list[str]) -> None:
-    benchmark_results = {benchmark_name : parse_result_csv(plot_name, benchmark_name) for benchmark_name in benchmark_names}
+    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_size = defaultdict(list)
     for benchmark_name in benchmark_results:
         for threshold in benchmark_results[benchmark_name]:
@@ -614,9 +572,7 @@ def plot_varied_inlining_threshold(plot_name : str, benchmark_names : list[str])
 
     ax.legend()
 
-    if not os.path.exists("benchmarking/figures"):
-        os.mkdir("benchmarking/figures")
-    plt.savefig(f"benchmarking/figures/{plot_name}.png")
+    save_figure(plot_name)
 
 
 benchmark_details = [
@@ -685,7 +641,7 @@ def compare_tail_mod_cons():
     #plot_tail_mod_cons_graph(plot_name, list_sizes)
 
 
-def compare_individual_opt_sizes():
+def compare_individual_opt_size():
     plot_name = "individual_opt_size"
     for benchmark_name, number_of_runs in benchmark_details:
         generate_jvml_jar(benchmark_name, number_of_runs, [], "_unoptimised")
@@ -708,8 +664,8 @@ def compare_individual_opt_sizes():
 
     #plot_individual_opts_code_size(plot_name, [b[0] for b in benchmark_details])
 
-def compare_compiler_sizes():
-    plot_name = "comparing_compiler_size"
+def compare_compilers_size():
+    plot_name = "comparing_compilers_size"
     for benchmark_name, number_of_runs in benchmark_details:
         generate_jvml_jar(benchmark_name, number_of_runs, ["-opt-all"], "_opt")
         compute_jvml_file_size(plot_name, benchmark_name, "_opt")
@@ -724,8 +680,7 @@ def compare_compiler_sizes():
 
 def compare_varied_inlining_threshold():
     plot_name = "comparing_inlining_threshold"
-    #inlining_thresholds = [0, 5, 10, 15, 20, 25, 30, 45, 50]
-    inlining_thresholds = [0, 10, 20]
+    inlining_thresholds = [0, 5, 10, 15, 20]
     for threshold in inlining_thresholds:
         for benchmark_name, number_of_runs in benchmark_details:
             generate_jmh_executables(benchmark_name, number_of_runs, ["-opt-all", "-inl-threshold", f"{threshold}"], f"_{threshold}")
@@ -744,5 +699,19 @@ if __name__ == "__main__":
     plot_individual_opts_code_size("individual_opt_size", [b[0] for b in benchmark_details])
     plot_compiler_size("comparing_compiler_size", [b[0] for b in benchmark_details])
     '''
-    plot_individual_opts_graphs("individual_opt_time", [b[0] for b in benchmark_details])
+    '''
+    compare_compilers_size()
+    compare_individual_opt_size()
+    compare_compilers_time()
+    compare_individual_opt_time()
+    compare_varied_inlining_threshold()
+    compare_tail_mod_cons()
+    '''
+    #compare_compilers_size()
+    #compare_individual_opt_size()
+    #compare_compilers_time()
+    #compare_individual_opt_time()
+    #compare_varied_inlining_threshold()
 
+    #plot_comparing_compilers_time("comparing_compilers_time", [b[0] for b in benchmark_details])
+    plot_tail_mod_cons_graph("tail_mod_cons", [1, 3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000, 33_333, 66_666, 100_000, 333_333, 666_666, 1_000_000])
