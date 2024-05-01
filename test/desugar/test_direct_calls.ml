@@ -2,7 +2,6 @@ let parse_type_desugar_direct_print s =
   Parsing.Driver.parse_string s
   |> Typing.Infer.type_program_exn_from_string "test_env"
   |> Desugar.desugar_program
-  |> Middle_end.Direct_calls.transform_direct_call_program
   |> List.iter Desugar.Desugared_ast.pp_decl
 
 let%expect_test "test single arg direct call toplevel definition" =

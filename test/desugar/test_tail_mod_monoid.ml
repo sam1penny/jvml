@@ -1,9 +1,7 @@
 let run s =
   Parsing.Driver.parse_string s
   |> Typing.Infer.type_program_exn_from_string "test_env"
-  |> Desugar.desugar_program
-  |> Middle_end.Direct_calls.transform_direct_call_program
-  |> Middle_end.Tail_mod_monoid.transform_tmm_program
+  |> Desugar.desugar_program |> Middle_end.Tail_mod_monoid.transform_tmm_program
   |> List.iter Desugar.Desugared_ast.pp_decl
 
 let%expect_test "test simple recursive sum" =

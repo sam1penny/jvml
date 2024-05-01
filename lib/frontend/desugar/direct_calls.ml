@@ -12,7 +12,7 @@ avoiding the need to create any closures.
 required to spot tail recursion
 *)
 open Common
-open Desugar.Desugared_ast
+open Desugared_ast
 
 let maybe_transform_direct env e =
   let rec maybe_transform_direct_inner nargs e =
@@ -61,7 +61,7 @@ let rec transform_direct_call_expr env e =
       let e0' = rec_transform_direct e0 in
 
       let env' =
-        match Desugar.Utils.collect_funargs e0 with
+        match Utils.collect_funargs e0 with
         | [], _ -> env
         | funargs, body ->
             let ty_args = List.map (fun (_, ty) -> ty) funargs in
@@ -70,7 +70,7 @@ let rec transform_direct_call_expr env e =
       let e1' = transform_direct_call_expr env' e1 in
       Let (ty, x, e0', e1')
   | LetRec (ty, x, e0, e1) ->
-      let funargs, body = Desugar.Utils.collect_funargs e0 in
+      let funargs, body = Utils.collect_funargs e0 in
       let ty_args = List.map (fun (_, ty) -> ty) funargs in
       let env' = StringMap.add x (ty_args, get_expr_type body) env in
       let e0' = transform_direct_call_expr env' e0 in
@@ -101,7 +101,7 @@ let rec transform_direct_call_expr env e =
 
 let update_env env = function
   | Val (_, x, (Fun _ as e)) | ValRec (_, x, e) ->
-      let funargs, body = Desugar.Utils.collect_funargs e in
+      let funargs, body = Utils.collect_funargs e in
       let ty_args = List.map (fun (_, ty) -> ty) funargs in
       let env' = StringMap.add x (ty_args, get_expr_type body) env in
       env'
@@ -139,5 +139,5 @@ let transform_direct_call_program program =
       ([], StringMap.empty) program
     |> fun (transformed_program, _) -> transformed_program
   in
-  Desugar.Utils.clear_shared_program_seen transformed_program;
+  Utils.clear_shared_program_seen transformed_program;
   transformed_program

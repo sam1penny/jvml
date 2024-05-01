@@ -1,7 +1,9 @@
 let parse_type_desugar_print s =
   Parsing.Driver.parse_string s
   |> Typing.Infer.type_program_exn_from_string "test_env"
-  |> Desugar.desugar_program
+  |> Desugar.desugared_ast_of_program
+  |> Desugar.Lambda_lift.lift_lambdas_program
+  |> Desugar.Unique_names.rename_program
   |> List.iter Desugar.Desugared_ast.pp_decl
 
 let%expect_test "test add captured lifted arguments" =

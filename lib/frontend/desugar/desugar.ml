@@ -100,11 +100,13 @@ let desugared_ast_of_program program =
 let desugar_program program =
   desugared_ast_of_program program
   |> Lambda_lift.lift_lambdas_program |> Unique_names.rename_program
+  |> Direct_calls.transform_direct_call_program
 
 module Desugared_ast = Desugared_ast
 module Compile_patterns = Compile_patterns
 
 (* todo - consider moving lambda lift into middle_end *)
 module Lambda_lift = Lambda_lift
+module Direct_calls = Direct_calls
 module Unique_names = Unique_names
 module Utils = Utils

@@ -1,9 +1,7 @@
 let run s =
   Parsing.Driver.parse_string s
   |> Typing.Infer.type_program_exn_from_string "test_env"
-  |> Desugar.desugar_program
-  |> Middle_end.Direct_calls.transform_direct_call_program
-  |> Middle_end.Trmc.transform_tmc_program
+  |> Desugar.desugar_program |> Middle_end.Trmc.transform_tmc_program
   |> List.iter Desugar.Desugared_ast.pp_decl
 
 let%expect_test "test List.map" =

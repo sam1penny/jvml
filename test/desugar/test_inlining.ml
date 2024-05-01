@@ -95,8 +95,7 @@ let%expect_test "large MultiUnsafe function is not inlined, smaller \
                    └──Int 3
                 └──Int 3
              └──Int 3
-          └──App
-             └──Ident large_fun_$0 : int -> int
+          └──Direct_app : large_fun_$0
              └──Int 4
 
   |}]

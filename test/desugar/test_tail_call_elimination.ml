@@ -2,7 +2,6 @@ let parse_type_desugar_tco_print s =
   Parsing.Driver.parse_string s
   |> Typing.Infer.type_program_exn_from_string "test_env"
   |> Desugar.desugar_program
-  |> Middle_end.Direct_calls.transform_direct_call_program
   |> Middle_end.Tail_call_optimise.transform_tail_call_program
   |> List.iter Desugar.Desugared_ast.pp_decl
 

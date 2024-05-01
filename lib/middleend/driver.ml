@@ -24,7 +24,6 @@ let iter_constant_opts program =
   loop_until_no_changes 0 program
 
 let run_middleend program =
-  Direct_calls.transform_direct_call_program program |> fun program ->
   (if !Config.do_constant_folding_and_prop || !Config.do_inlining then
      iter_constant_opts program
    else program)
