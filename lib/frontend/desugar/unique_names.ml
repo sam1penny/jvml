@@ -141,4 +141,4 @@ let rename_program program =
     |> List.rev
   in
   Utils.clear_shared_program_seen renamed_program;
-  renamed_program
+  (renamings, renamed_program)
