@@ -97,7 +97,9 @@ let apply_captured_vars lifted_fun free_vars =
 
 let strip_uniqueness s =
   let with_underscore = String.split_on_char '$' s |> List.hd in
-  let stripped = String.sub with_underscore 0 (String.length with_underscore - 1) in
+  let stripped =
+    String.sub with_underscore 0 (String.length with_underscore - 1)
+  in
   stripped
 
 let rec lift_lambdas_expr renamings decl_name toplevel lifted_freevars_tbl e =
@@ -158,68 +160,95 @@ let rec lift_lambdas_expr renamings decl_name toplevel lifted_freevars_tbl e =
       let freevars =
         free_vars_with_types_expr toplevel e0 |> StringMap.to_seq |> List.of_seq
       in
-      let stripped_fvars = List.map (fun (x, ty) -> (strip_uniqueness x, ty)) freevars in
-      let unique_fvars = List.map (
-        fun (x, ty) -> (Unique_names.fetch_next_version_and_update renamings x, ty)
-      ) stripped_fvars in
+      let stripped_fvars =
+        List.map (fun (x, ty) -> (strip_uniqueness x, ty)) freevars
+      in
+      let unique_fvars =
+        List.map
+          (fun (x, ty) ->
+            (Unique_names.fetch_next_version_and_update renamings x, ty))
+          stripped_fvars
+      in
 
-      let e0_stripped_reunique = Utils.map_over_expr_idents (
-        fun x -> match List.find_opt (fun (fv_name, _) -> fv_name = x) freevars with
-          | None -> x
-          | Some _ -> strip_uniqueness x |> Unique_names.fetch_current_version renamings
-      ) body
+      let e0_stripped_reunique =
+        Utils.map_over_expr_idents
+          (fun x ->
+            match List.find_opt (fun (fv_name, _) -> fv_name = x) freevars with
+            | None -> x
+            | Some _ ->
+                strip_uniqueness x
+                |> Unique_names.fetch_current_version renamings)
+          body
       in
       let () = Utils.clear_shared_expr_seen e0_stripped_reunique in
 
-      let defs0, body0 = rec_lift_lambda_without_bound toplevel lifted_freevars_tbl e0_stripped_reunique in
+      let defs0, body0 =
+        rec_lift_lambda_without_bound toplevel lifted_freevars_tbl
+          e0_stripped_reunique
+      in
 
       let lifted_body = Utils.replace_funargs (unique_fvars @ funargs) body0 in
-      let lifted_val = Val(get_expr_type lifted_body, x, lifted_body) in
+      let lifted_val = Val (get_expr_type lifted_body, x, lifted_body) in
 
       (* add original freevars to apply at callsites *)
       let () = Hashtbl.add lifted_freevars_tbl x freevars in
-      let defs1, e1 = rec_lift_lambda_without_bound (StringSet.add x toplevel) lifted_freevars_tbl e1 in
+      let defs1, e1 =
+        rec_lift_lambda_without_bound (StringSet.add x toplevel)
+          lifted_freevars_tbl e1
+      in
 
-      ([lifted_val] @ defs0 @ defs1, e1)
-
+      ([ lifted_val ] @ defs0 @ defs1, e1)
   | Let (ty, x, e0, e1) ->
       let defs0, e0 = rec_lift_lambdas_expr e0 in
       let defs1, e1 = rec_lift_lambdas_expr e1 in
       (defs0 @ defs1, Let (ty, x, e0, e1))
   | LetRec (_, x, e0, e1) ->
-
       let funargs, body = Utils.collect_funargs e0 in
-      let toplevel' = (StringSet.add x toplevel) in
+      let toplevel' = StringSet.add x toplevel in
       let freevars =
-        free_vars_with_types_expr toplevel' e0 |> StringMap.to_seq |> List.of_seq
+        free_vars_with_types_expr toplevel' e0
+        |> StringMap.to_seq |> List.of_seq
       in
-      let stripped_fvars = List.map (fun (x, ty) -> (strip_uniqueness x, ty)) freevars in
-      let unique_fvars = List.map (
-        fun (x, ty) -> (Unique_names.fetch_next_version_and_update renamings x, ty)
-      ) stripped_fvars in
+      let stripped_fvars =
+        List.map (fun (x, ty) -> (strip_uniqueness x, ty)) freevars
+      in
+      let unique_fvars =
+        List.map
+          (fun (x, ty) ->
+            (Unique_names.fetch_next_version_and_update renamings x, ty))
+          stripped_fvars
+      in
 
-      let e0_stripped_reunique = Utils.map_over_expr_idents (
-        fun x -> match List.find_opt (fun (fv_name, _) -> fv_name = x) freevars with
-          | None -> x
-          | Some _ -> strip_uniqueness x |> Unique_names.fetch_current_version renamings
-      ) body
+      let e0_stripped_reunique =
+        Utils.map_over_expr_idents
+          (fun x ->
+            match List.find_opt (fun (fv_name, _) -> fv_name = x) freevars with
+            | None -> x
+            | Some _ ->
+                strip_uniqueness x
+                |> Unique_names.fetch_current_version renamings)
+          body
       in
 
       let () = Utils.clear_shared_expr_seen e0_stripped_reunique in
 
       let () = Hashtbl.add lifted_freevars_tbl x unique_fvars in
-      let defs0, body0 = rec_lift_lambda_without_bound toplevel' lifted_freevars_tbl e0_stripped_reunique in
+      let defs0, body0 =
+        rec_lift_lambda_without_bound toplevel' lifted_freevars_tbl
+          e0_stripped_reunique
+      in
 
       let lifted_body = Utils.replace_funargs (unique_fvars @ funargs) body0 in
-      let lifted_val = ValRec(get_expr_type lifted_body, x, lifted_body) in
+      let lifted_val = ValRec (get_expr_type lifted_body, x, lifted_body) in
 
       (* replace with original freevars for e1 *)
       let () = Hashtbl.replace lifted_freevars_tbl x freevars in
 
-      let defs1, e1 = rec_lift_lambda_without_bound toplevel' lifted_freevars_tbl e1 in
+      let defs1, e1 =
+        rec_lift_lambda_without_bound toplevel' lifted_freevars_tbl e1
+      in
 
-      ([lifted_val] @ defs0 @ defs1, e1)
-
+      ([ lifted_val ] @ defs0 @ defs1, e1)
   | Tuple (ty, es) ->
       let lifted_defs, lifted_es = rec_lift_list es in
       (lifted_defs, Tuple (ty, lifted_es))

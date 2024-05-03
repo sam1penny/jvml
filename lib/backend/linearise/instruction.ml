@@ -126,3 +126,10 @@ type program = {
   static_methods : static_method list;
 }
 [@@deriving show]
+
+let pretty_print_program program =
+  List.iter (fun d -> print_endline (show_declaration d)) program.declarations;
+  List.iter (fun i -> print_endline (show_instruction i)) program.code;
+  List.iter
+    (fun s -> print_endline (show_static_method s))
+    program.static_methods

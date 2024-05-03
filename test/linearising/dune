@@ -1,0 +1,6 @@
+(library
+ (name test_linearsing)
+ (inline_tests)
+ (preprocess
+  (pps ppx_expect))
+ (libraries jvml test_utils))

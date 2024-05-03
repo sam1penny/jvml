@@ -1,9 +1,9 @@
 let parse_type_desugar_print s =
   Parsing.Driver.parse_string s
   |> Typing.Infer.type_program_exn_from_string "test_env"
-  |> Desugar.desugared_ast_of_program
-  |> Desugar.Unique_names.rename_program
-  |> fun (renamings, program) -> Desugar.Lambda_lift.lift_lambdas_program renamings program
+  |> Desugar.desugared_ast_of_program |> Desugar.Unique_names.rename_program
+  |> fun (renamings, program) ->
+  Desugar.Lambda_lift.lift_lambdas_program renamings program
   |> List.iter Desugar.Desugared_ast.pp_decl
 
 let%expect_test "test add captured lifted arguments" =
@@ -222,3 +222,57 @@ let%expect_test "lambda doesn't lift printing" =
           └──Ident f_$0 : int -> unit
           └──Int 3
   |}]
+
+let%expect_test "test lambda lifting shared exprs" =
+  let program =
+    {|
+  val foo x =
+   let bar y =
+      match y with
+         | 0 ->
+            (match x with 0 -> 0 | x -> x + y)
+         | _ -> x
+   in
+   bar x
+  |}
+  in
+  let _ = parse_type_desugar_print program in
+  [%expect
+    {|
+     └──Val bar_$0
+        └──Fun x_$2 : int -> int -> int
+           └──Fun y_$0 : int -> int
+              └──Let desugar_t1_$0
+                 └──Ident y_$0 : int
+                 └──Switch
+                    └──Ident desugar_t1_$0 : int
+                    └── <case>
+                       └──Int(0)
+                       └──Shared
+                          └──Let desugar_t0_$0
+                             └──Ident x_$2 : int
+                             └──Switch
+                                └──Ident desugar_t0_$0 : int
+                                └── <case>
+                                   └──Int(0)
+                                   └──Shared
+                                      └──Int 0
+                                └── <fallback>
+                                   └──Shared
+                                      └──Let x_$1
+                                         └──Ident desugar_t0_$0 : int
+                                         └──Bop + : int
+                                            └──Ident x_$1 : int
+                                            └──Ident y_$0 : int
+                    └── <fallback>
+                       └──Shared
+                          └──Ident x_$2 : int
+     └──Val foo_$0
+        └──Fun x_$0 : int -> int
+           └──App
+              └──App
+                 └──Ident bar_$0 : int -> int -> int
+                 └──Ident x_$0 : int
+              └──Ident x_$0 : int
+
+   |}]

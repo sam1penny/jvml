@@ -169,3 +169,23 @@ let%expect_test "test correct precedence of comparison operations" =
            └──Bop: *
               └──Int 5
               └──Int 4 |}]
+
+let%expect_test "test failure of not binding valrec" =
+  let x = "val rec x = 1" in
+  (try
+     Parsing.Driver.parse_string x
+     |> List.iter (fun x ->
+            Parsing.Parsed_ast.pp_decl x;
+            print_newline ())
+   with Parsing.Jvml_parser.CustomParserError (_, s) -> print_endline s);
+  [%expect {| You must bind a lambda on the rhs of a 'val rec' |}]
+
+let%expect_test "test failure of not binding letrec" =
+  let x = "val test = let rec x = 3 in x " in
+  (try
+     Parsing.Driver.parse_string x
+     |> List.iter (fun x ->
+            Parsing.Parsed_ast.pp_decl x;
+            print_newline ())
+   with Parsing.Jvml_parser.CustomParserError (_, s) -> print_endline s);
+  [%expect {| You must bind a lambda on the rhs of a 'let rec' |}]

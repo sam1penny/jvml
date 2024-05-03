@@ -129,54 +129,6 @@ let free_vars_with_types_expr bound e =
 
   aux bound StringMap.empty e
 
-(*
-the 'sharing' in shared expr is implemented with a GOTO instruction to
-the already compiled code.
-
-this must be reset on exiting a scope (e.g when compiling a method twice).
-
-todo - refactor with Desugar.Utils
-*)
-let rec clear_shared_expr_labels e =
-  let open Desugared_ast in
-  match e with
-  | Int _ | Float _ | String _ | Bool _ | Unit | Constr _ | Ident _
-  | Match_Failure ->
-      ()
-  | Bop (_, e0, _, e1) ->
-      clear_shared_expr_labels e0;
-      clear_shared_expr_labels e1
-  | Uop (_, _, e) -> clear_shared_expr_labels e
-  | If (_, e0, e1, e2) ->
-      clear_shared_expr_labels e0;
-      clear_shared_expr_labels e1;
-      clear_shared_expr_labels e2
-  | Fun (_, _, _, e) -> clear_shared_expr_labels e
-  | App (_, e0, e1) ->
-      clear_shared_expr_labels e0;
-      clear_shared_expr_labels e1
-  | Direct_app (_, _, _, _, es) -> List.iter clear_shared_expr_labels es
-  | Tuple (_, es) -> List.iter clear_shared_expr_labels es
-  | Let (_, _, e0, e1) ->
-      clear_shared_expr_labels e0;
-      clear_shared_expr_labels e1
-  | LetRec (_, _, e0, e1) ->
-      clear_shared_expr_labels e0;
-      clear_shared_expr_labels e1
-  | Seq (_, es) -> List.iter clear_shared_expr_labels es
-  | TupleGet (_, _, e) -> clear_shared_expr_labels e
-  | ConstructorGet (_, _, e) -> clear_shared_expr_labels e
-  | Switch (_, e, cases, fallback_opt) ->
-      clear_shared_expr_labels e;
-      List.iter (fun (_, case_expr) -> clear_shared_expr_labels case_expr) cases;
-      Option.iter clear_shared_expr_labels fallback_opt
-  | Shared_Expr (_, lab_opt_ref, _) -> lab_opt_ref := None
-  | While_true e -> clear_shared_expr_labels e
-  | Break e -> clear_shared_expr_labels e
-  | Assign_Seq assignments ->
-      List.iter (fun (_, _, e) -> clear_shared_expr_labels e) assignments
-  | Hole | Set_Tuple _ -> raise @@ Failure "todo2"
-
 let con_index = function
   | Desugared_ast.IntCon i -> i
   | Desugared_ast.BoolCon b -> if b then 1l else 0l

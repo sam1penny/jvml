@@ -98,9 +98,9 @@ let desugared_ast_of_program program =
   |> fun (_, reversed_program) -> List.rev reversed_program
 
 let desugar_program program =
-  desugared_ast_of_program program
-  |> Unique_names.rename_program
-  |> fun (renamings, program) -> Lambda_lift.lift_lambdas_program renamings program
+  desugared_ast_of_program program |> Unique_names.rename_program
+  |> fun (renamings, program) ->
+  Lambda_lift.lift_lambdas_program renamings program
   |> Direct_calls.transform_direct_call_program
 
 module Desugared_ast = Desugared_ast

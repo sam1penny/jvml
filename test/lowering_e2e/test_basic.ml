@@ -662,3 +662,17 @@ let%expect_test "test correctly compute local variable numbers for doubles" =
   [%expect {|
     10
     3.0 |}]
+
+let%expect_test "test dynamic lambdas" =
+  let program =
+    {|
+    val add x y z = x + y + z
+    val test =
+      let add3 = add 1 2 in
+      print(add3 4)
+    |}
+  in
+  let _ = Common.Config.use_dynamic_lambdas := true in
+  let _ = build_and_run program in
+  let _ = Common.Config.use_dynamic_lambdas := false in
+  [%expect {| 7 |}]
