@@ -57,6 +57,16 @@ def generate_sml_executables(benchmark_name : str, number_runs : int) -> None:
 
     subprocess.run(["polyc", "-o", f"benchmarking/out/{benchmark_name}.polyc", f"benchmarking/tmp/{benchmark_name}_polyc.sml"])
 
+    smlnj_program = "local \nval _ = SMLofNJ.Internals.GC.messages false\n" + prog + "\n in\n" + \
+    f"val _ = SMLofNJ.exportFn (\"{benchmark_name}\", fn _ => (Main.doit {number_runs}; OS.Process.success))\n" + \
+    "end"
+    with open(f"benchmarking/tmp/{benchmark_name}_smlnj.sml", "w") as file:
+        file.write(smlnj_program)
+
+    subprocess.run(["sml", f"benchmarking/tmp/{benchmark_name}_smlnj.sml"])
+    subprocess.run(["mv", f"{benchmark_name}.amd64-darwin", f"benchmarking/out/{benchmark_name}.smlnj"])
+
+
     shutil.rmtree("benchmarking/tmp")
 
 '''
@@ -108,7 +118,8 @@ def run_sml_benchmarking(plot_name : str, benchmark_name : str, warmups=5, runs=
          "--warmup", f"{warmups}", "--min-runs", f"{runs}",
          f"benchmarking/out/{benchmark_name}.mlton",
          f"benchmarking/out/{benchmark_name}.mosml",
-         f"benchmarking/out/{benchmark_name}.polyc"
+         f"benchmarking/out/{benchmark_name}.polyc",
+         f"sml @SMLload=benchmarking/out/{benchmark_name}.smlnj"
     ])
 
     rewrite_hyperfile_out_json(plot_name, benchmark_name)
@@ -374,6 +385,7 @@ PRETTY_NAMES = {
     "mlton" : "MLton",
     "mosml" : "MosML",
     "polyc" : "Poly/ML",
+    "smlnj" : "SML/NJ",
 
     "jvml_map_tmc" : "tail mod cons",
     "jvml_map_cps_defun" : "CPS+defun",

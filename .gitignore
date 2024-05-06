@@ -7,3 +7,4 @@ benchmarking/out
 benchmarking/results
 benchmarking/jmh/src/main/java/jvml/benchmark
 benchmarking/jmh/modified_pom.xml
+benchmarking/figures
