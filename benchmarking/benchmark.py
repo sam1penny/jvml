@@ -409,7 +409,7 @@ def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) 
     benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_compiler = defaultdict(list)
     for benchmark_name in benchmark_results:
-        for compiler in benchmark_results[benchmark_name]:
+        for compiler in sorted(benchmark_results[benchmark_name]):
             ordered_benchmarks_by_compiler[compiler].append(benchmark_results[benchmark_name][compiler] / benchmark_results[benchmark_name]["mlton"])
 
     ordered_benchmarks_by_compiler = prettify_names(ordered_benchmarks_by_compiler)
@@ -441,7 +441,7 @@ def plot_individual_opts_time(plot_name : str, benchmark_names : list[str]) -> N
     benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_opt = defaultdict(list)
     for benchmark_name in benchmark_results:
-        for optimisation in benchmark_results[benchmark_name]:
+        for optimisation in sorted(benchmark_results[benchmark_name]):
             if optimisation != "jvml_unoptimised":
                 ordered_benchmarks_by_opt[optimisation].append(benchmark_results[benchmark_name][optimisation] / benchmark_results[benchmark_name]["jvml_unoptimised"])
 
@@ -538,7 +538,7 @@ def plot_individual_opts_code_size(plot_name : str, benchmark_names : list[str])
     benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "file size") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_opt = defaultdict(list)
     for benchmark_name in benchmark_results:
-        for optimisation in benchmark_results[benchmark_name]:
+        for optimisation in sorted(benchmark_results[benchmark_name]):
             if optimisation != "jvml_unoptimised":
                 ordered_benchmarks_by_opt[optimisation].append(benchmark_results[benchmark_name][optimisation] / benchmark_results[benchmark_name]["jvml_unoptimised"])
 
@@ -577,7 +577,7 @@ def plot_compiler_size(plot_name : str, benchmark_names : list[str]) -> None:
     benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "file size") for benchmark_name in benchmark_names}
     ordered_benchmarks_by_compiler = defaultdict(list)
     for benchmark_name in benchmark_results:
-        for compiler in benchmark_results[benchmark_name]:
+        for compiler in sorted(benchmark_results[benchmark_name]):
             ordered_benchmarks_by_compiler[compiler].append(benchmark_results[benchmark_name][compiler])
 
     ordered_benchmarks_by_compiler = prettify_names(ordered_benchmarks_by_compiler)
