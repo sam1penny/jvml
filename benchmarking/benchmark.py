@@ -144,8 +144,9 @@ Required we currently generate code belonging to the same package,
 which might lead to conflicting names.
 '''
 def clear_java_directories() -> None:
-    for file in os.listdir("benchmarking/jmh/lib"):
-        os.remove("benchmarking/jmh/lib/" + file)
+    if os.path.exists("benchmarking/jmh/lib"):
+        for file in os.listdir("benchmarking/jmh/lib"):
+            os.remove("benchmarking/jmh/lib/" + file)
 
     for file in os.listdir("benchmarking/jmh/src/main/java/jvml/benchmark"):
         os.remove("benchmarking/jmh/src/main/java/jvml/benchmark/" + file)
