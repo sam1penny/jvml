@@ -101,16 +101,26 @@ def rewrite_hyperfile_out_json(plot_name : str, benchmark_name : str) -> None:
     update_json_file(result_file, modified_json)
 
 '''
-given that the executables exist in tmp, run each sml version
 
-for now, just use hyperfine
 '''
-def run_sml_benchmarking(plot_name : str, benchmark_name : str, warmups=5, runs=10):
+def create_result_directories_if_not_exist(plot_name : str) -> None:
     if not os.path.exists("benchmarking/results"):
         os.mkdir("benchmarking/results")
 
     if not os.path.exists(f"benchmarking/results/{plot_name}"):
         os.mkdir(f"benchmarking/results/{plot_name}")
+
+    if not os.path.exists("benchmarking/out"):
+        os.mkdir("benchmarking/out")
+
+'''
+given that the executables exist in tmp, run each sml version
+
+for now, just use hyperfine
+'''
+def run_sml_benchmarking(plot_name : str, benchmark_name : str, warmups=5, runs=10):
+
+    create_result_directories_if_not_exist(plot_name)
 
     subprocess.run(
         ["hyperfine",
@@ -149,6 +159,9 @@ def generate_jvml_jar(benchmark_name : str, number_runs : int, optimisation_flag
     if os.path.exists("benchmarking/tmp"):
         shutil.rmtree("benchmarking/tmp")
     os.mkdir("benchmarking/tmp")
+
+    if not os.path.exists("benchmarking/jmh/lib"):
+        os.mkdir("benchmarking/jmh/lib")
 
     with open(f"benchmarking/programs/{benchmark_name}.jvml", "r") as file:
         prog = file.read()

@@ -5,8 +5,6 @@ val rec tak x y z =
             (tak (y - 1) z x)
             (tak (z - 1) x y)
 
-val doit_once = tak 33 22 11
-
 val rec doit n =
          if n = 0
             then ()
