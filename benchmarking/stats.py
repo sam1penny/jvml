@@ -7,7 +7,7 @@ def print_improvements_of_all_opts():
         with open(f"benchmarking/results/comparing_compilers_time/{filename}", "r") as file:
             data = json.loads(file.read())
 
-        improvement = data["jvml_opt"]["mean"] / data["jvml"]["mean"] * 100
+        improvement = data["jvml_opt"]["primaryMetric"]["score"] / data["jvml"]["primaryMetric"]["score"] * 100
 
         print(f"improvement on {filename} = {100-improvement}%")
 

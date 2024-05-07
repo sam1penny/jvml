@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
 import json
+import extract_errors
 
 
 def write_empty_json_if_not_exists(path : str) -> None:
@@ -113,6 +114,12 @@ def create_result_directories_if_not_exist(plot_name : str) -> None:
     if not os.path.exists("benchmarking/out"):
         os.mkdir("benchmarking/out")
 
+    if not os.path.exists("benchmarking/jmh/lib"):
+        os.mkdir("benchmarking/jmh/lib")
+
+    if not os.path.exists("benchmarking/jmh/src/main/java/jvml/benchmark"):
+        os.makedirs("benchmarking/jmh/src/main/java/jvml/benchmark")
+
 '''
 given that the executables exist in tmp, run each sml version
 
@@ -125,7 +132,7 @@ def run_sml_benchmarking(plot_name : str, benchmark_name : str, warmups=5, runs=
     subprocess.run(
         ["hyperfine",
          "--export-json", f"benchmarking/results/{benchmark_name}_tmp.json",
-         "--warmup", f"{warmups}", "--min-runs", f"{runs}",
+         "--warmup", f"{warmups}", "--runs", f"{runs}",
          f"benchmarking/out/{benchmark_name}.mlton",
          f"benchmarking/out/{benchmark_name}.mosml",
          f"benchmarking/out/{benchmark_name}.polyc",
@@ -231,7 +238,7 @@ public class Benchmark{class_name} {{
     }}
 
     @Benchmark
-    @BenchmarkMode(Mode.AverageTime)
+    @BenchmarkMode(Mode.SampleTime)
     @OutputTimeUnit(TimeUnit.SECONDS)
     @Fork(value = 1, warmups = 1)
     public void bench(Blackhole blackhole) {{
@@ -278,12 +285,10 @@ def rewrite_jmh_out_json(plot_name : str, benchmark_name : str, result_suffix : 
 
 
     compiler = "jvml" + result_suffix
-    mean = tmp_data[0]["primaryMetric"]["score"] if len(tmp_data) > 0 else 0
+    data = tmp_data[0]
 
     modified_json = {
-        compiler: {
-            "mean" : mean
-        }
+        compiler: data
     }
 
     write_empty_json_if_not_exists(f"benchmarking/results/{plot_name}/{result_file}.json")
@@ -381,6 +386,20 @@ def parse_result_json(plot_name : str, benchmark_name : str, param_name : str) -
 
     return time_by_key
 
+def parse_result_json_with_error(plot_name : str, benchmark_name : str) -> dict[str, tuple[float, float]]:
+    with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as file:
+        benchmark_results = json.loads(file.read())
+
+    def get_stats(key):
+        if "jvml" in key:
+            return (benchmark_results[key]["primaryMetric"]["score"], extract_errors.jmh_extract_mean_error(benchmark_results, key, 0.95))
+        else:
+            return (benchmark_results[key]["mean"], extract_errors.hyperfine_extract_mean_error(benchmark_results, key, 0.95))
+
+    time_by_key = {key : get_stats(key) for key in benchmark_results}
+
+    return time_by_key
+
 def save_figure(plot_name : str) -> None:
     if not os.path.exists("benchmarking/figures"):
         os.mkdir("benchmarking/figures")
@@ -413,7 +432,11 @@ PRETTY_NAMES = {
     "jvml_box" : "box/unbox",
     "jvml_push_pop" : "push/pop",
     "jvml_goto_label" : "goto/label",
-    "jvml_store_load" : "store/load"
+    "jvml_store_load" : "store/load",
+
+    "short_life" : "life",
+    "short_mandlebrot" : "mandlebrot",
+    "short_tak" : "tak"
 }
 
 def prettify_names(data):
@@ -432,13 +455,22 @@ given a list of benchmarks that have been run (with results as csv files in the 
 produce a bar plot of performance
 '''
 def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) -> None:
-    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
+    benchmark_results = {benchmark_name : parse_result_json_with_error(plot_name, benchmark_name) for benchmark_name in benchmark_names}
     ordered_benchmarks_by_compiler = defaultdict(list)
+    ordered_errors_by_compiler = defaultdict(list)
     for benchmark_name in benchmark_results:
         for compiler in sorted(benchmark_results[benchmark_name]):
-            ordered_benchmarks_by_compiler[compiler].append(benchmark_results[benchmark_name][compiler] / benchmark_results[benchmark_name]["mlton"])
+            mean, std_error = benchmark_results[benchmark_name][compiler]
+            std_error_proportion = std_error / mean
+            relative_mean = mean / benchmark_results[benchmark_name]["mlton"][0]
+            relative_error = relative_mean * std_error_proportion
+
+            ordered_benchmarks_by_compiler[compiler].append(relative_mean)
+            ordered_errors_by_compiler[compiler].append(relative_error)
+
 
     ordered_benchmarks_by_compiler = prettify_names(ordered_benchmarks_by_compiler)
+    ordered_errors_by_compiler = prettify_names(ordered_errors_by_compiler)
 
     _, ax = plt.subplots()
 
@@ -449,7 +481,7 @@ def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) 
 
     for compiler, execution_time in ordered_benchmarks_by_compiler.items():
         offset = width * multiplier
-        ax.bar(x + offset, execution_time, width, label=compiler)
+        ax.bar(x + offset, execution_time, width, yerr=ordered_errors_by_compiler[compiler], capsize=2, label=compiler)
         for i in range(len(execution_time)):
             if execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"{compiler} failed", rotation="vertical", size=6, ha="center")
@@ -457,7 +489,7 @@ def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) 
 
     ax.set_xlabel("Benchmark")
     ax.set_ylabel("Execution time relative to mlton")
-    ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
+    ax.set_xticks(x + width * (len(x)+1)/2, [PRETTY_NAMES.get(bn, bn) for bn in benchmark_names])
     ax.legend()
 
     save_figure(plot_name)
