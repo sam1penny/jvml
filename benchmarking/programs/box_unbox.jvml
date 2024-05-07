@@ -1,0 +1,14 @@
+(* separate function to avoid constant folding *)
+val add x y z = x + y + z
+
+val rec loop n =
+    if n = 0 then
+        1
+    else
+        do {
+            add n 1 n;
+            loop (n - 1)
+        }
+
+
+val doit dead = loop 20

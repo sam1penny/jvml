@@ -1,0 +1,4 @@
+val doit dead =
+    match 1 with
+        | 0 -> 0
+        | _ -> 2

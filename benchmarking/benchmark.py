@@ -7,6 +7,7 @@ import numpy as np
 from collections import defaultdict
 import json
 import extract_errors
+from dataclasses import dataclass
 
 
 def write_empty_json_if_not_exists(path : str) -> None:
@@ -297,19 +298,9 @@ def rewrite_jmh_out_json(plot_name : str, benchmark_name : str, result_suffix : 
 
 
 '''
-
-'''
-def create_result_directories_if_not_exist(plot_name : str) -> None:
-    if not os.path.exists("benchmarking/results"):
-        os.mkdir("benchmarking/results")
-
-    if not os.path.exists(f"benchmarking/results/{plot_name}"):
-        os.mkdir(f"benchmarking/results/{plot_name}")
-
-'''
 given that the executables exist in jmh/src/main/..., run each benchmark
 '''
-def run_jvml_benchmarking(plot_name : str, benchmark_name : str, result_suffix : str, result_file : str | None = None):
+def run_jvml_benchmarking(plot_name : str, benchmark_name : str, result_suffix : str, result_file : str | None = None, jvm_flags : list[str] = []):
 
     if result_file is None:
         result_file = benchmark_name
@@ -329,10 +320,11 @@ def run_jvml_benchmarking(plot_name : str, benchmark_name : str, result_suffix :
         "-Dfile.encoding=UTF-8",
         "-Dsun.stdout.encoding=UTF-8",
         "-Dsun.stderr.encoding=UTF-8",
-        "-Xmx8589934592", "-Xss1g",
-        "-classpath", f"/Users/sam/jvml/benchmarking/jmh/target/classes:/Users/sam/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar:/Users/sam/.m2/repository/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar:/Users/sam/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/jvml/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.37/jmh-generator-annprocess-1.37.jar:/Users/sam/jvml/benchmarking/jmh/lib/{out_name}.jar",
-        f"jvml.benchmark.Benchmark{class_name}", "+TieredCompilation"
-    ])
+        "-Xmx8589934592", "-Xss1g"] + jvm_flags +
+
+        ["-classpath", f"/Users/sam/jvml/benchmarking/jmh/target/classes:/Users/sam/.m2/repository/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37.jar:/Users/sam/.m2/repository/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4.jar:/Users/sam/.m2/repository/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1.jar:/Users/jvml/.m2/repository/org/openjdk/jmh/jmh-generator-annprocess/1.37/jmh-generator-annprocess-1.37.jar:/Users/sam/jvml/benchmarking/jmh/lib/{out_name}.jar",
+        f"jvml.benchmark.Benchmark{class_name}", "+TieredCompilation"]
+    )
 
     rewrite_jmh_out_json(plot_name, benchmark_name, result_suffix, result_file)
 
@@ -386,15 +378,21 @@ def parse_result_json(plot_name : str, benchmark_name : str, param_name : str) -
 
     return time_by_key
 
-def parse_result_json_with_error(plot_name : str, benchmark_name : str) -> dict[str, tuple[float, float]]:
+@dataclass
+class BenchmarkResult:
+    mean : float
+    error : float
+
+
+def parse_result_json_with_error(plot_name : str, benchmark_name : str) -> dict[str, BenchmarkResult]:
     with open(f"benchmarking/results/{plot_name}/{benchmark_name}.json", "r") as file:
         benchmark_results = json.loads(file.read())
 
     def get_stats(key):
         if "jvml" in key:
-            return (benchmark_results[key]["primaryMetric"]["score"], extract_errors.jmh_extract_mean_error(benchmark_results, key, 0.95))
+            return (BenchmarkResult(mean=benchmark_results[key]["primaryMetric"]["score"], error=extract_errors.jmh_extract_mean_error(benchmark_results, key, 0.95)))
         else:
-            return (benchmark_results[key]["mean"], extract_errors.hyperfine_extract_mean_error(benchmark_results, key, 0.95))
+            return (BenchmarkResult(mean=benchmark_results[key]["mean"], error=extract_errors.hyperfine_extract_mean_error(benchmark_results, key, 0.95)))
 
     time_by_key = {key : get_stats(key) for key in benchmark_results}
 
@@ -449,6 +447,12 @@ def prettify_names(data):
     return res
 
 
+def make_metrics_relative(result : BenchmarkResult, mean_relative_to : float) -> BenchmarkResult:
+    std_error_proportion = result.error / result.mean
+    relative_mean = result.mean / mean_relative_to
+    relative_error = relative_mean * std_error_proportion
+    return BenchmarkResult(mean=relative_mean, error=relative_error)
+
 '''
 given a list of benchmarks that have been run (with results as csv files in the 'csv' directory)
 
@@ -456,21 +460,16 @@ produce a bar plot of performance
 '''
 def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) -> None:
     benchmark_results = {benchmark_name : parse_result_json_with_error(plot_name, benchmark_name) for benchmark_name in benchmark_names}
-    ordered_benchmarks_by_compiler = defaultdict(list)
-    ordered_errors_by_compiler = defaultdict(list)
+    ordered_results_by_compiler = defaultdict(list)
+
     for benchmark_name in benchmark_results:
         for compiler in sorted(benchmark_results[benchmark_name]):
-            mean, std_error = benchmark_results[benchmark_name][compiler]
-            std_error_proportion = std_error / mean
-            relative_mean = mean / benchmark_results[benchmark_name]["mlton"][0]
-            relative_error = relative_mean * std_error_proportion
+            relative_result = make_metrics_relative(benchmark_results[benchmark_name][compiler], benchmark_results[benchmark_name]["mlton"].mean)
 
-            ordered_benchmarks_by_compiler[compiler].append(relative_mean)
-            ordered_errors_by_compiler[compiler].append(relative_error)
+            ordered_results_by_compiler[compiler].append(relative_result)
 
 
-    ordered_benchmarks_by_compiler = prettify_names(ordered_benchmarks_by_compiler)
-    ordered_errors_by_compiler = prettify_names(ordered_errors_by_compiler)
+    ordered_results_by_compiler = prettify_names(ordered_results_by_compiler)
 
     _, ax = plt.subplots()
 
@@ -479,9 +478,12 @@ def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) 
     multiplier = 0
 
 
-    for compiler, execution_time in ordered_benchmarks_by_compiler.items():
+    for compiler, results in ordered_results_by_compiler.items():
+        execution_time = [r.mean for r in results]
+        errors = [r.error for r in results]
+
         offset = width * multiplier
-        ax.bar(x + offset, execution_time, width, yerr=ordered_errors_by_compiler[compiler], capsize=2, label=compiler)
+        ax.bar(x + offset, execution_time, width, yerr=errors, capsize=2, label=compiler)
         for i in range(len(execution_time)):
             if execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"{compiler} failed", rotation="vertical", size=6, ha="center")
@@ -496,24 +498,31 @@ def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) 
 
 
 def plot_individual_opts_time(plot_name : str, benchmark_names : list[str]) -> None:
-    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
-    ordered_benchmarks_by_opt = defaultdict(list)
+    benchmark_results = {benchmark_name : parse_result_json_with_error(plot_name, benchmark_name) for benchmark_name in benchmark_names}
+    ordered_results_by_opt = defaultdict(list)
+
     for benchmark_name in benchmark_results:
         for optimisation in sorted(benchmark_results[benchmark_name]):
             if optimisation != "jvml_unoptimised":
-                ordered_benchmarks_by_opt[optimisation].append(benchmark_results[benchmark_name][optimisation] / benchmark_results[benchmark_name]["jvml_unoptimised"])
+                relative_result = make_metrics_relative(benchmark_results[benchmark_name][optimisation], benchmark_results[benchmark_name]["jvml_unoptimised"].mean)
+
+                ordered_results_by_opt[optimisation].append(relative_result)
 
     _, ax = plt.subplots()
 
-    ordered_benchmarks_by_opt = prettify_names(ordered_benchmarks_by_opt)
+    ordered_results_by_opt = prettify_names(ordered_results_by_opt)
 
     x = np.arange(len(benchmark_names))
     width = 0.15
     multiplier = 0
 
-    for optimisation, relative_execution_time in ordered_benchmarks_by_opt.items():
+    for optimisation, relative_results in ordered_results_by_opt.items():
+
+        relative_execution_time = [r.mean for r in relative_results]
+        errors = [r.error for r in relative_results]
+
         offset = width * multiplier
-        ax.bar(x + offset, np.array(relative_execution_time)-1, width, bottom=1.0, label=optimisation)
+        ax.bar(x + offset, np.array(relative_execution_time)-1, width, yerr=errors, capsize=2, bottom=1.0, label=optimisation)
         for i in range(len(relative_execution_time)):
             if relative_execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"jvml with only {optimisation} failed", rotation="vertical", size=6, ha="center")
@@ -524,7 +533,7 @@ def plot_individual_opts_time(plot_name : str, benchmark_names : list[str]) -> N
     #ticks = np.arange(0.5, 1.5, 0.1)
     #ax.set_yticks(ticks)
     ax.set_ylabel("Execution time relative to unoptimised jvml")
-    ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
+    ax.set_xticks(x + width * (len(x)+1)/2, [PRETTY_NAMES.get(bn, bn) for bn in benchmark_names])
 
     ax.spines['bottom'].set_position(('data', 1))
     ax.spines['top'].set_visible(False)
@@ -536,13 +545,13 @@ def plot_individual_opts_time(plot_name : str, benchmark_names : list[str]) -> N
     save_figure(plot_name)
 
 def plot_tail_mod_cons_bar_graph(plot_name : str, list_sizes : list[int]):
-    benchmark_results = {list_size : parse_result_json(plot_name, str(list_size), "mean") for list_size in list_sizes}
-    ordered_benchmarks_by_size = defaultdict(list)
+    benchmark_results = {list_size : parse_result_json_with_error(plot_name, str(list_size)) for list_size in list_sizes}
+    ordered_results_by_size = defaultdict(list)
     for benchmark_name in benchmark_results:
         for map_type in benchmark_results[benchmark_name]:
-            ordered_benchmarks_by_size[map_type].append(benchmark_results[benchmark_name][map_type])
+            ordered_results_by_size[map_type].append(benchmark_results[benchmark_name][map_type])
 
-    ordered_benchmarks_by_size = prettify_names(ordered_benchmarks_by_size)
+    ordered_results_by_size = prettify_names(ordered_results_by_size)
 
     _, ax = plt.subplots()
 
@@ -550,11 +559,15 @@ def plot_tail_mod_cons_bar_graph(plot_name : str, list_sizes : list[int]):
     width = 0.15
     multiplier = 0
 
-    for map_type, relative_execution_time in ordered_benchmarks_by_size.items():
+    for map_type, results in ordered_results_by_size.items():
+
+        execution_time = [r.mean for r in results]
+        errors = [r.error for r in results]
+
         offset = width * multiplier
-        ax.bar(x + offset, relative_execution_time, width, label=map_type)
-        for i in range(len(relative_execution_time)):
-            if relative_execution_time[i] == 0:
+        ax.bar(x + offset, execution_time, width, yerr=errors, capsize=2, label=map_type)
+        for i in range(len(execution_time)):
+            if execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"{map_type} failed", rotation="vertical", size=6, ha="center")
         multiplier += 1
 
@@ -570,17 +583,24 @@ def plot_tail_mod_cons_bar_graph(plot_name : str, list_sizes : list[int]):
     save_figure(plot_name)
 
 def plot_tail_mod_cons_graph(plot_name : str, list_sizes : list[int]) -> None:
-    benchmark_results = {list_size : parse_result_json(plot_name, str(list_size), "mean") for list_size in list_sizes}
-    ordered_benchmarks_by_size = defaultdict(list)
+    benchmark_results = {list_size : parse_result_json_with_error(plot_name, str(list_size)) for list_size in list_sizes}
+    ordered_results_by_list_size = defaultdict(list)
     for benchmark_name in benchmark_results:
             for map_type in benchmark_results[benchmark_name]:
-                ordered_benchmarks_by_size[map_type].append(benchmark_results[benchmark_name][map_type] / benchmark_results[benchmark_name]["jvml_naive_map"])
+                relative_result = make_metrics_relative(benchmark_results[benchmark_name][map_type], benchmark_results[benchmark_name]["jvml_naive_map"].mean)
 
-    ordered_benchmarks_by_size = prettify_names(ordered_benchmarks_by_size)
+                ordered_results_by_list_size[map_type].append(relative_result)
+
+    ordered_results_by_list_size = prettify_names(ordered_results_by_list_size)
 
     _, ax = plt.subplots()
-    for map_type, relative_execution_time in ordered_benchmarks_by_size.items():
-        ax.plot(list_sizes, relative_execution_time, label=map_type)
+    for map_type, relative_results in ordered_results_by_list_size.items():
+
+        relative_execution_time = [r.mean for r in relative_results]
+        errors = [r.error for r in relative_results]
+
+        #ax.plot(list_sizes, relative_execution_time, label=map_type)
+        ax.errorbar(list_sizes, relative_execution_time, yerr=errors, capsize=2, label=map_type)
 
     ax.set_xscale("log")
 
@@ -661,13 +681,13 @@ def plot_compiler_size(plot_name : str, benchmark_names : list[str]) -> None:
     save_figure(plot_name)
 
 def plot_varied_inlining_threshold(plot_name : str, benchmark_names : list[str]) -> None:
-    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
-    ordered_benchmarks_by_threshold = defaultdict(list)
+    benchmark_results = {benchmark_name : parse_result_json_with_error(plot_name, benchmark_name) for benchmark_name in benchmark_names}
+    ordered_results_by_threshold = defaultdict(list)
     for benchmark_name in benchmark_results:
         for threshold in benchmark_results[benchmark_name]:
-            ordered_benchmarks_by_threshold[threshold].append(benchmark_results[benchmark_name][threshold])
+            ordered_results_by_threshold[threshold].append(benchmark_results[benchmark_name][threshold])
 
-    ordered_benchmarks_by_threshold = prettify_names(ordered_benchmarks_by_threshold)
+    ordered_results_by_threshold = prettify_names(ordered_results_by_threshold)
 
     _, ax = plt.subplots()
 
@@ -675,9 +695,13 @@ def plot_varied_inlining_threshold(plot_name : str, benchmark_names : list[str])
     width = 0.15  # the width of the bars
     multiplier = 0
 
-    for threshold, relative_execution_time in ordered_benchmarks_by_threshold.items():
+    for threshold, results in ordered_results_by_threshold.items():
+
+        execution_time = [r.mean for r in results]
+        errors = [r.error for r in results]
+
         offset = width * multiplier
-        ax.bar(x + offset, relative_execution_time, width, label=threshold)
+        ax.bar(x + offset, execution_time, width, yerr=errors, capsize=2, label=threshold)
         multiplier += 1
 
     ax.set_xlabel("Benchmark")
@@ -689,15 +713,20 @@ def plot_varied_inlining_threshold(plot_name : str, benchmark_names : list[str])
 
     save_figure(plot_name)
 
-def plot_individual_peephole(plot_name : str, benchmark_names : list[str]) -> None:
-    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "mean") for benchmark_name in benchmark_names}
-    ordered_benchmarks_by_peephole = defaultdict(list)
-    for benchmark_name in benchmark_results:
-        for peephole in benchmark_results[benchmark_name]:
-            if peephole != "jvml_unoptimised":
-                ordered_benchmarks_by_peephole[peephole].append(benchmark_results[benchmark_name][peephole] / benchmark_results[benchmark_name]["jvml_unoptimised"])
 
-    ordered_benchmarks_by_peephole = prettify_names(ordered_benchmarks_by_peephole)
+def plot_specialised_peephole(plot_name : str, benchmark_names : list[str]) -> None:
+    benchmark_results = {benchmark_name : parse_result_json_with_error(plot_name, benchmark_name) for benchmark_name in benchmark_names}
+    ordered_results_by_mode = defaultdict(list)
+    for benchmark_name in sorted(benchmark_results):
+        for mode in benchmark_results[benchmark_name]:
+            if mode == "jvml_interpreted_opt":
+                relative_result = make_metrics_relative(benchmark_results[benchmark_name][mode], benchmark_results[benchmark_name]["jvml_interpreted_unoptimised"].mean)
+                ordered_results_by_mode[mode].append(relative_result)
+            if mode == "jvml_jit_opt":
+                relative_result = make_metrics_relative(benchmark_results[benchmark_name][mode], benchmark_results[benchmark_name]["jvml_jit_unoptimised"].mean)
+                ordered_results_by_mode[mode].append(relative_result)
+
+    ordered_results_by_mode = prettify_names(ordered_results_by_mode)
 
     _, ax = plt.subplots()
 
@@ -705,15 +734,19 @@ def plot_individual_peephole(plot_name : str, benchmark_names : list[str]) -> No
     width = 0.15
     multiplier = 0
 
-    for peephole, relative_execution_time in ordered_benchmarks_by_peephole.items():
+    for mode, relative_results in ordered_results_by_mode.items():
+
+        relative_execution_time = [r.mean for r in relative_results]
+        errors = [r.error for r in relative_results]
+
         offset = width * multiplier
-        ax.bar(x + offset, np.array(relative_execution_time)-1, width, bottom=1.0, label=peephole)
+        ax.bar(x + offset, np.array(relative_execution_time)-1, width, yerr=errors, capsize=2, bottom=1.0, label=mode)
         multiplier += 1
 
-    ax.set_xlabel("Benchmark")
+    ax.set_xlabel("Peephole")
 
-    ax.set_ylabel("Execution Time Relative to Unoptimised Execution")
-    ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
+    ax.set_ylabel("Execution Time Relative to (interpreted/jitted) Unoptimised Execution")
+    ax.set_xticks(x + width * ((len(ordered_results_by_mode.keys()))/2-1/2), benchmark_names)
 
     ax.spines['bottom'].set_position(('data', 1))
     ax.spines['top'].set_visible(False)
@@ -734,11 +767,19 @@ benchmark_details = [
     ("brzozowski", 1000)
     ]
 
+quick_benchmark_details = [
+    ("short_life", 1),
+    ("short_tak", 1),
+    ("short_mandlebrot", 1),
+    ("quicksort", 10),
+    ("brzozowski", 100)
+]
+
 def compare_compilers_time():
     plot_name = "comparing_compilers_time"
-    for benchmark_name, number_of_runs in benchmark_details:
+    for benchmark_name, number_of_runs in quick_benchmark_details:
         generate_sml_executables(benchmark_name, number_of_runs)
-        run_sml_benchmarking(plot_name, benchmark_name, warmups=1, runs=1) #lazy for now
+        run_sml_benchmarking(plot_name, benchmark_name, warmups=10, runs=20) #lazy for now
         generate_jmh_executables(benchmark_name, number_of_runs, ALL_OPTIMISATIONS, "_opt")
         run_jvml_benchmarking(plot_name, benchmark_name, "_opt")
         generate_jmh_executables(benchmark_name, number_of_runs, [], "")
@@ -748,7 +789,7 @@ def compare_compilers_time():
 
 def compare_individual_opt_time():
     plot_name = "individual_opt_time"
-    for benchmark_name, number_of_runs in benchmark_details:
+    for benchmark_name, number_of_runs in quick_benchmark_details:
 
         generate_jmh_executables(benchmark_name, number_of_runs, [], "_unoptimised")
         run_jvml_benchmarking(plot_name, benchmark_name, "_unoptimised")
@@ -775,8 +816,8 @@ def compare_individual_opt_time():
 
 def compare_tail_mod_cons():
     plot_name = "tail_mod_cons"
-    list_sizes = [1, 3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000, 33_333, 66_666, 100_000, 333_333, 666_666, 1_000_000]
-    #list_sizes = [1, 3, 6, 10, 33, 66, 100]
+    #list_sizes = [1, 3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000, 33_333, 66_666, 100_000, 333_333, 666_666, 1_000_000]
+    list_sizes = [1, 3, 6, 10, 33, 66, 100]
     for list_size in list_sizes:
         generate_jmh_executables("map", list_size, ["-tmc", "-tco"], f"_map_tmc")
         run_jvml_benchmarking(plot_name, "map", f"_map_tmc", result_file=str(list_size))
@@ -835,34 +876,14 @@ def compare_compilers_size():
 
 def compare_varied_inlining_threshold():
     plot_name = "comparing_inlining_threshold"
-    inlining_thresholds = [0, 5, 10, 15, 20]
+    inlining_thresholds = [0, 3, 12]
     for threshold in inlining_thresholds:
-        for benchmark_name, number_of_runs in benchmark_details:
+        for benchmark_name, number_of_runs in quick_benchmark_details:
             generate_jmh_executables(benchmark_name, number_of_runs, ["-opt-all", "-inl-threshold", f"{threshold}"], f"_{threshold}")
             run_jvml_benchmarking(plot_name, benchmark_name, f"_{threshold}")
 
-    plot_varied_inlining_threshold(plot_name, [b[0] for b in benchmark_details])
+    plot_varied_inlining_threshold(plot_name, [b[0] for b in quick_benchmark_details])
 
-
-def compare_individual_peepholes():
-    plot_name = "comparing_individual_peepholes"
-    for benchmark_name, number_of_runs in benchmark_details:
-        generate_jmh_executables(benchmark_name, number_of_runs, [], "_unoptimised")
-        run_jvml_benchmarking(plot_name, benchmark_name, "_unoptimised")
-
-        generate_jmh_executables(benchmark_name, number_of_runs, ["-peep-box"], "_box")
-        run_jvml_benchmarking(plot_name, benchmark_name, "_box")
-
-        generate_jmh_executables(benchmark_name, number_of_runs, ["-peep-push-pop"], "_push_pop")
-        run_jvml_benchmarking(plot_name, benchmark_name, "_push_pop")
-
-        generate_jmh_executables(benchmark_name, number_of_runs, ["-peep-goto-label"], "_goto_label")
-        run_jvml_benchmarking(plot_name, benchmark_name, "_goto_label")
-
-        generate_jmh_executables(benchmark_name, number_of_runs, ["-peep-store-load"], "_store_load")
-        run_jvml_benchmarking(plot_name, benchmark_name, "_store_load")
-
-    plot_individual_peephole(plot_name, [b[0] for b in benchmark_details])
 
 def plot_compile_times(plot_name, benchmark_names):
     def parse_json(benchmark_name):
@@ -913,6 +934,7 @@ def compute_compile_times():
 
     plot_compile_times(plot_name, [b[0] for b in benchmark_details])
 
+
 def rerun_all_plots():
     benchmark_names = [b[0] for b in benchmark_details]
     plot_comparing_compilers_time("comparing_compilers_time", benchmark_names)
@@ -921,10 +943,32 @@ def rerun_all_plots():
     plot_individual_opts_code_size("individual_opt_size", benchmark_names)
     plot_compiler_size("comparing_compilers_size", benchmark_names)
     plot_varied_inlining_threshold("comparing_inlining_threshold", benchmark_names)
-    plot_individual_peephole("comparing_individual_peepholes", benchmark_names)
     plot_compile_times("compile_times", benchmark_names)
+    plot_specialised_peephole("comparing_individual_peepholes_no_jit", ["box_unbox", "store_load", "goto_label"])
+
+
+def compare_specialised_peepholes():
+    plot_name = "comparing_individual_peepholes_no_jit"
+
+
+    for (benchmark_name, flag) in [("box_unbox", "-peep-box"), ("store_load", "-peep-store-load"), ("goto_label", "-peep-goto-label")]:
+        generate_jmh_executables(benchmark_name, 1, [flag], "_interpreted_opt")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_interpreted_opt", jvm_flags=["-XX:-UseCompiler"])
+
+        generate_jmh_executables(benchmark_name, 1, [], "_interpreted_unoptimised")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_interpreted_unoptimised", jvm_flags=["-XX:-UseCompiler"])
+
+        generate_jmh_executables(benchmark_name, 1, [flag], "_jit_opt")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_jit_opt", jvm_flags=[])
+
+        generate_jmh_executables(benchmark_name, 1, [], "_jit_unoptimised")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_jit_unoptimised", jvm_flags=[])
+
+
 
 if __name__ == "__main__":
-    #compare_individual_opt_size()
-    rerun_all_plots()
+    benchmark_names = [b[0] for b in benchmark_details]
+    quick_benchmark_names = [b[0] for b in quick_benchmark_details]
+
+    plot_specialised_peephole("comparing_individual_peepholes_no_jit", ["box_unbox", "goto_label", "store_load"])
 
