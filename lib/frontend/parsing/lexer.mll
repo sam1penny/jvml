@@ -4,7 +4,10 @@ open Parser
 
 exception LexError of string
 
-(* copied from Real World Ocaml / Compiler-Construction course *)
+(* copied from Real World Ocaml / Compiler-Construction course
+Real World Ocaml - https://dev.realworldocaml.org/parsing-with-ocamllex-and-menhir.html - accessed 10th May
+Compiler-Construction course - https://github.com/yallop/cc_cl_cam_ac_uk/blob/master/slang/lexer.mll - acccessed 10th May
+*)
 let next_line lexbuf =
   let pos = lexbuf.lex_curr_p in
   lexbuf.lex_curr_p <-

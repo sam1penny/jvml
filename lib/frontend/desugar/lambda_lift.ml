@@ -141,7 +141,9 @@ let rec lift_lambdas_expr renamings decl_name toplevel lifted_freevars_tbl e =
       let defs1, e1 = rec_lift_lambdas_expr e1 in
       let defs2, e2 = rec_lift_lambdas_expr e2 in
       (defs0 @ defs1 @ defs2, If (ty, e0, e1, e2))
-  (* todo - anonymous lambda lifting *)
+  (*
+  potential todo - support anonymous lambda lifting
+  *)
   | Fun (t0, t1, x, e) ->
       let defs, e =
         rec_lift_lambda_without_bound toplevel lifted_freevars_tbl e

@@ -1,9 +1,6 @@
 open Desugar.Desugared_ast
 open Common
 
-(*
-TODO - bug occurs when we beta reduce, then code doesn't exist.
-*)
 let rec beta_reduce_expr e =
   match e with
   | App (_, Fun (_, t1, x, e0), e1) ->
@@ -143,9 +140,6 @@ let increment_tbl_if_exist tbl key =
   | None -> ()
   | Some v -> Hashtbl.add tbl key (v + 1)
 
-(*
-todo - add bindings to hashtable and only increment if identifier is actually in the table
-*)
 let rec safety_of_bindings_expr safe_cnts unsafe_cnts safe_vars e =
   let rec_safety_of_bindings_expr =
     safety_of_bindings_expr safe_cnts unsafe_cnts safe_vars
@@ -250,9 +244,9 @@ let small_enough _ code_tbl x ctx =
 
 let consider_inline size_tbl code_tbl occurrence_tbl context x =
   match Hashtbl.find_opt occurrence_tbl x with
-  | None -> false
   (* identifier is either function argument
      or a side-effecting term, not suitable for inlining *)
+  | None -> false
   (* todo - if we unconditionally inline as in the paper, we can automatically apply deadcode elimination.contents
 
      Or, we can just add a check to a 'let' expression
@@ -344,7 +338,6 @@ let rec inline_expr size_tbl code_tbl occurrence_tbl most_recent_version context
       If (ty, e0', e1', e2')
   | Fun (t0, t1, x, e) ->
       let e' = rec_inline_expr_without_ctx context e in
-      (*todo - check this*)
       Fun (t0, t1, x, e')
   | App (ty, e0, e1) ->
       let e0' = rec_inline_expr_without_ctx (AppCtx context) e0 in

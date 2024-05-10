@@ -124,7 +124,10 @@ let free_vars_with_types_expr bound e =
             if StringSet.mem x bound then StringMap.add x ty m else m)
           assignments
         |> List.fold_left (StringMap.union takeleft) StringMap.empty
-    | Hole | Set_Tuple _ -> raise @@ Failure "todo1"
+    | Hole -> free
+    | Set_Tuple (e0, e1, e2) ->
+        StringMap.union takeleft (aux bound free e0) (aux bound free e1)
+        |> StringMap.union takeleft (aux bound free e2)
   in
 
   aux bound StringMap.empty e

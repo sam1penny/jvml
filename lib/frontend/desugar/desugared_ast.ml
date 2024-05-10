@@ -97,11 +97,6 @@ let rec get_expr_type = function
   | Hole -> raise @@ Failure "called get_expr_type on Hole!"
   | Set_Tuple _ -> Typed_ast.TyUnit
 
-(* huge bodge to get match_failure working
-
-   todo - think of an alternative to get this working
-*)
-
 (* printing *)
 
 let string_of_expr_node =

@@ -26,10 +26,6 @@ let stack_size_change = function
   | LOAD_STATIC _ -> 1
   | STORE_STATIC _ -> -1
   | CREATE_DYNAMIC_CLOSURE (_, tys, _, _) -> 1 - List.length tys
-  (* todo - these might have to be increased, as they are transformed
-     into multiple bytecode instructions that, during execution,
-     may push multiple values onto the stack.
-  *)
   | TUPLE_GET _ -> 2
   | CONSTRUCTOR_GET _ -> 0
   | SWITCH _ -> -1
@@ -314,8 +310,7 @@ let lower_body indent clazz b =
 
 let lower_constructor_args args =
   List.map
-    (* todo - consider making private (then requires invokespecial) *)
-      (fun (name, ty) -> sprintf ".field public %s L%s;" name (lower_type ty))
+    (fun (name, ty) -> sprintf ".field public %s L%s;" name (lower_type ty))
     args
   |> String.concat "\n"
 

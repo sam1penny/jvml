@@ -1,5 +1,3 @@
-(* todo - move this into backend *)
-
 open Desugar.Desugared_ast
 open Common
 

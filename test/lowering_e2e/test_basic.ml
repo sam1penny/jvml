@@ -95,8 +95,7 @@ let%expect_test "test recursive type product" =
   let program =
     {|
     type num = Z | S of num
-    val x = print(Z)
-    val y = print(S (S (S Z)))
+    val x = print(Z) val y = print(S (S (S Z)))
   |}
   in
   let _ = build_and_run program in
@@ -131,10 +130,8 @@ let%expect_test "test equality of adts" =
 let%expect_test "test tuple equality" =
   let program =
     {|
-    val a = (1, 2)
-    val b = (1, 2)
-    val c = (1, 3)
-    val d = (3, 2)
+    val a = (1, 2) val b = (1, 2)
+    val c = (1, 3) val d = (3, 2)
 
     val f = print(a = b)
     val g = print(a = c)
@@ -198,9 +195,7 @@ let%expect_test "test basic int match" =
     {|
   val sub = fun x -> match x with 0 -> 0 | n -> (n - 1)
   val test = do {
-    print(sub 0);
-    print(sub 1);
-    print(sub 2)
+    print(sub 0); print(sub 1); print(sub 2)
   }
   |}
   in
@@ -215,8 +210,7 @@ let%expect_test "test basic boolean match" =
     {|
   val flip = fun x -> match x with true -> false | false -> true
   val test = do {
-    print(flip true);
-    print(flip false)
+    print(flip true); print(flip false)
   }
   |}
   in
@@ -257,9 +251,7 @@ let%expect_test "test basic ADT match with args" =
     type either = A of int | B
     val to_int = fun x -> match x with A x -> x | B -> 20
     val test = do {
-      print(to_int (A 1));
-      print(to_int (A 2));
-      print(to_int B)
+      print(to_int (A 1)); print(to_int (A 2)); print(to_int B)
     }
     |}
   in

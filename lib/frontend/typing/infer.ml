@@ -174,7 +174,7 @@ let map_over_decl_texprs f decl =
   | ValRec (loc, ty, x, e) ->
       let ty' = f ty in
       ValRec (loc, ty', x, map_over_expr_texprs f e)
-  | Type _ -> decl (* todo: verify this is correct *)
+  | Type _ -> decl
 
 let instantiate nt bound t =
   let remap =
@@ -493,7 +493,6 @@ let rec type_expr unifications nt env expr =
 and check_case e_type unifications nt env (pattern, case_expr) =
   validate_pattern unifications env nt pattern
   >>=? fun (pattern_node, new_bindings) ->
-  (* todo : give better error than 'cannot unify' *)
   unify unifications e_type
     (get_pattern_type pattern_node)
     (Parsed_ast.get_pattern_loc pattern)
@@ -719,7 +718,6 @@ let type_program_exn input program =
         (Pp_loc.Position.of_lexing x, Pp_loc.Position.of_lexing y)
       in
       let _ = Pp_loc.pp ~input Format.err_formatter [ to_internal_loc loc ] in
-      (* todo install exception printers and raise exception *)
       let _ = Format.fprintf Format.err_formatter "Error: %s\n" message in
       let _ = Format.pp_print_flush Format.err_formatter () in
       exit 1

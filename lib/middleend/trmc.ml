@@ -207,7 +207,11 @@ let rec replace_expr_ty new_ty e =
   | While_true e -> While_true (replace_expr_ty new_ty e)
   | Break e -> Break (replace_expr_ty new_ty e)
   | Seq (_, es) -> Seq (new_ty, es)
-  (* todo other cases *)
+  | Uop(_, uop, e) -> Uop(new_ty, uop, e)
+  | Tuple(_, es) -> Tuple(new_ty, es)
+  | Constr(_, c) -> Constr(new_ty, c)
+  | TupleGet(_, i, e) -> TupleGet(new_ty, i, e)
+  | ConstructorGet(_, c, e) -> ConstructorGet(new_ty, c, e)
   | _ -> e
 
 let rec transform_tmc_decl decl =

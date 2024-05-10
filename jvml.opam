@@ -2,8 +2,8 @@
 opam-version: "2.0"
 synopsis: "A short synopsis"
 description: "A longer description"
-maintainer: ["Sam Penny"]
-authors: ["Sam Penny"]
+maintainer: ["Candidate 23804"]
+authors: ["Candidate 23804"]
 license: "LICENSE"
 depends: [
   "dune" {>= "3.4"}
