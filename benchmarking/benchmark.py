@@ -401,7 +401,7 @@ def parse_result_json_with_error(plot_name : str, benchmark_name : str) -> dict[
 def save_figure(plot_name : str) -> None:
     if not os.path.exists("benchmarking/figures"):
         os.mkdir("benchmarking/figures")
-    plt.savefig(f"benchmarking/figures/{plot_name}.png", bbox_inches='tight')
+    plt.savefig(f"benchmarking/figures/{plot_name}.pdf", bbox_inches='tight')
 
 PRETTY_NAMES = {
     "jvml_constant_propagation" : "constant folding & propagation",
@@ -434,7 +434,28 @@ PRETTY_NAMES = {
 
     "short_life" : "life",
     "short_mandlebrot" : "mandlebrot",
-    "short_tak" : "tak"
+    "short_tak" : "tak",
+
+    "jvml_1" : "1",
+    "jvml_2" : "2",
+    "jvml_3" : "3",
+    "jvml_4" : "4",
+    "jvml_5" : "5",
+    "jvml_6" : "6",
+    "jvml_7" : "7",
+    "jvml_8" : "8",
+    "jvml_9" : "9",
+    "jvml_10" : "10",
+    "jvml_11" : "11",
+    "jvml_12" : "12",
+    "jvml_13" : "13",
+
+    "desugaring" : "lowering to bIRch",
+    "middle_end" : "optimising",
+    "linearise" : "lowering to linearIR",
+    "lower_jvm" : "lowering to bytecode"
+
+
 }
 
 def prettify_names(data):
@@ -471,6 +492,8 @@ def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) 
 
     ordered_results_by_compiler = prettify_names(ordered_results_by_compiler)
 
+    plt.style.use("seaborn-v0_8-deep")
+
     _, ax = plt.subplots()
 
     x = np.arange(len(benchmark_names))
@@ -483,7 +506,7 @@ def plot_comparing_compilers_time(plot_name : str, benchmark_names : list[str]) 
         errors = [r.error for r in results]
 
         offset = width * multiplier
-        ax.bar(x + offset, execution_time, width, yerr=errors, capsize=2, label=compiler)
+        ax.bar(x + offset, execution_time, width, yerr=errors, capsize=2, label=compiler, edgecolor='black',linewidth=0.5)
         for i in range(len(execution_time)):
             if execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"{compiler} failed", rotation="vertical", size=6, ha="center")
@@ -508,6 +531,8 @@ def plot_individual_opts_time(plot_name : str, benchmark_names : list[str]) -> N
 
                 ordered_results_by_opt[optimisation].append(relative_result)
 
+    plt.style.use("seaborn-v0_8-deep")
+
     _, ax = plt.subplots()
 
     ordered_results_by_opt = prettify_names(ordered_results_by_opt)
@@ -522,18 +547,16 @@ def plot_individual_opts_time(plot_name : str, benchmark_names : list[str]) -> N
         errors = [r.error for r in relative_results]
 
         offset = width * multiplier
-        ax.bar(x + offset, np.array(relative_execution_time)-1, width, yerr=errors, capsize=2, bottom=1.0, label=optimisation)
+        ax.bar(x + offset, np.array(relative_execution_time)-1, width, yerr=errors, capsize=2, bottom=1.0, label=optimisation, edgecolor='black',linewidth=0.5)
         for i in range(len(relative_execution_time)):
             if relative_execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"jvml with only {optimisation} failed", rotation="vertical", size=6, ha="center")
         multiplier += 1
 
     ax.set_xlabel("Benchmark")
-    #ax.set_ylim([0.3, 1.7])
-    #ticks = np.arange(0.5, 1.5, 0.1)
-    #ax.set_yticks(ticks)
+
     ax.set_ylabel("Execution time relative to unoptimised jvml")
-    ax.set_xticks(x + width * (len(x)+1)/2, [PRETTY_NAMES.get(bn, bn) for bn in benchmark_names])
+    ax.set_xticks(x + width * (len(x))/2, [PRETTY_NAMES.get(bn, bn) for bn in benchmark_names])
 
     ax.spines['bottom'].set_position(('data', 1))
     ax.spines['top'].set_visible(False)
@@ -553,6 +576,8 @@ def plot_tail_mod_cons_bar_graph(plot_name : str, list_sizes : list[int]):
 
     ordered_results_by_size = prettify_names(ordered_results_by_size)
 
+    plt.style.use("seaborn-v0_8-deep")
+
     _, ax = plt.subplots()
 
     x = np.arange(len(list_sizes))
@@ -565,7 +590,7 @@ def plot_tail_mod_cons_bar_graph(plot_name : str, list_sizes : list[int]):
         errors = [r.error for r in results]
 
         offset = width * multiplier
-        ax.bar(x + offset, execution_time, width, yerr=errors, capsize=2, label=map_type)
+        ax.bar(x + offset, execution_time, width, yerr=errors, capsize=2, label=map_type, edgecolor='black',linewidth=0.5)
         for i in range(len(execution_time)):
             if execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"{map_type} failed", rotation="vertical", size=6, ha="center")
@@ -592,6 +617,8 @@ def plot_tail_mod_cons_graph(plot_name : str, list_sizes : list[int]) -> None:
                 ordered_results_by_list_size[map_type].append(relative_result)
 
     ordered_results_by_list_size = prettify_names(ordered_results_by_list_size)
+
+    plt.style.use("seaborn-v0_8-deep")
 
     _, ax = plt.subplots()
     for map_type, relative_results in ordered_results_by_list_size.items():
@@ -622,6 +649,8 @@ def plot_individual_opts_code_size(plot_name : str, benchmark_names : list[str])
 
     ordered_benchmarks_by_opt = prettify_names(ordered_benchmarks_by_opt)
 
+    plt.style.use("seaborn-v0_8-deep")
+
     _, ax = plt.subplots()
 
     x = np.arange(len(benchmark_names))
@@ -630,7 +659,7 @@ def plot_individual_opts_code_size(plot_name : str, benchmark_names : list[str])
 
     for optimisation, relative_execution_time in ordered_benchmarks_by_opt.items():
         offset = width * multiplier
-        ax.bar(x + offset, np.array(relative_execution_time)-1, width, bottom=1.0, label=optimisation)
+        ax.bar(x + offset, np.array(relative_execution_time)-1, width, bottom=1.0, label=optimisation, edgecolor='black',linewidth=0.5)
         for i in range(len(relative_execution_time)):
             if relative_execution_time[i] == 0:
                 ax.text((x+offset)[i], 1, f"jvml with only {optimisation} failed", rotation="vertical", size=6, ha="center")
@@ -641,7 +670,8 @@ def plot_individual_opts_code_size(plot_name : str, benchmark_names : list[str])
     ticks = np.arange(0.9, 1.22, 0.02)
     ax.set_yticks(ticks)
     ax.set_ylabel("Code size relative to unoptimised jvml")
-    ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
+    ax.set_xticks(x + width * (len(x))/2, benchmark_names)
+    ax.tick_params(axis='x', pad=10)
 
     ax.spines['bottom'].set_position(('data', 1))
     ax.spines['top'].set_visible(False)
@@ -660,6 +690,8 @@ def plot_compiler_size(plot_name : str, benchmark_names : list[str]) -> None:
 
     ordered_benchmarks_by_compiler = prettify_names(ordered_benchmarks_by_compiler)
 
+    plt.style.use("seaborn-v0_8-deep")
+
     _, ax = plt.subplots()
 
     x = np.arange(len(benchmark_names))
@@ -668,13 +700,13 @@ def plot_compiler_size(plot_name : str, benchmark_names : list[str]) -> None:
 
     for compiler, relative_execution_time in ordered_benchmarks_by_compiler.items():
         offset = width * multiplier
-        ax.bar(x + offset, relative_execution_time, width, label=compiler)
+        ax.bar(x + offset, relative_execution_time, width, label=compiler, edgecolor='black',linewidth=0.5)
         multiplier += 1
 
     ax.set_xlabel("Benchmark")
 
     ax.set_ylabel("Code size (bytes)")
-    ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
+    ax.set_xticks(x + width * (len(x)-1)/2, benchmark_names)
 
     ax.legend()
 
@@ -685,9 +717,13 @@ def plot_varied_inlining_threshold(plot_name : str, benchmark_names : list[str])
     ordered_results_by_threshold = defaultdict(list)
     for benchmark_name in benchmark_results:
         for threshold in benchmark_results[benchmark_name]:
-            ordered_results_by_threshold[threshold].append(benchmark_results[benchmark_name][threshold])
+            if threshold != "jvml_no_inlining":
+                relative_result = make_metrics_relative(benchmark_results[benchmark_name][threshold], benchmark_results[benchmark_name]["jvml_no_inlining"].mean)
+                ordered_results_by_threshold[threshold].append(relative_result)
 
     ordered_results_by_threshold = prettify_names(ordered_results_by_threshold)
+
+    plt.style.use("seaborn-v0_8-deep")
 
     _, ax = plt.subplots()
 
@@ -701,13 +737,15 @@ def plot_varied_inlining_threshold(plot_name : str, benchmark_names : list[str])
         errors = [r.error for r in results]
 
         offset = width * multiplier
-        ax.bar(x + offset, execution_time, width, yerr=errors, capsize=2, label=threshold)
+        ax.bar(x + offset, np.array(execution_time)-1, width, bottom=1.0, yerr=errors, capsize=2, label=threshold, edgecolor='black',linewidth=0.5)
         multiplier += 1
 
     ax.set_xlabel("Benchmark")
 
-    ax.set_ylabel("Execution Time")
-    ax.set_xticks(x + width * (len(x)+1)/2, benchmark_names)
+    ax.set_ylabel("Execution time relative to no inlining")
+    ax.set_xticks(x + width * (len(x))/2, [PRETTY_NAMES.get(bn, bn) for bn in benchmark_names])
+    #ax.axhline(y=1, color='r', linestyle='--')
+    #ax.set_ylim((0.8, 1.1))
 
     ax.legend()
 
@@ -728,6 +766,8 @@ def plot_specialised_peephole(plot_name : str, benchmark_names : list[str]) -> N
 
     ordered_results_by_mode = prettify_names(ordered_results_by_mode)
 
+    plt.style.use("seaborn-v0_8-deep")
+
     _, ax = plt.subplots()
 
     x = np.arange(len(benchmark_names))
@@ -740,7 +780,7 @@ def plot_specialised_peephole(plot_name : str, benchmark_names : list[str]) -> N
         errors = [r.error for r in relative_results]
 
         offset = width * multiplier
-        ax.bar(x + offset, np.array(relative_execution_time)-1, width, yerr=errors, capsize=2, bottom=1.0, label=mode)
+        ax.bar(x + offset, np.array(relative_execution_time)-1, width, yerr=errors, capsize=2, bottom=1.0, label=mode, edgecolor='black',linewidth=0.5)
         multiplier += 1
 
     ax.set_xlabel("Peephole")
@@ -777,7 +817,7 @@ quick_benchmark_details = [
 
 def compare_compilers_time():
     plot_name = "comparing_compilers_time"
-    for benchmark_name, number_of_runs in quick_benchmark_details:
+    for benchmark_name, number_of_runs in benchmark_details:
         generate_sml_executables(benchmark_name, number_of_runs)
         run_sml_benchmarking(plot_name, benchmark_name, warmups=10, runs=20) #lazy for now
         generate_jmh_executables(benchmark_name, number_of_runs, ALL_OPTIMISATIONS, "_opt")
@@ -788,7 +828,7 @@ def compare_compilers_time():
     #plot_peformance_graphs(plot_name, [b[0] for b in benchmark_details])
 
 def compare_individual_opt_time():
-    plot_name = "individual_opt_time"
+    plot_name = "individual_opt_time_short"
     for benchmark_name, number_of_runs in quick_benchmark_details:
 
         generate_jmh_executables(benchmark_name, number_of_runs, [], "_unoptimised")
@@ -875,15 +915,73 @@ def compare_compilers_size():
     #plot_compiler_size(plot_name, [b[0] for b in benchmark_details])
 
 def compare_varied_inlining_threshold():
-    plot_name = "comparing_inlining_threshold"
-    inlining_thresholds = [0, 3, 12]
-    for threshold in inlining_thresholds:
-        for benchmark_name, number_of_runs in quick_benchmark_details:
-            generate_jmh_executables(benchmark_name, number_of_runs, ["-opt-all", "-inl-threshold", f"{threshold}"], f"_{threshold}")
+    plot_name = "comparing_inlining_threshold_short_constfp"
+    inlining_thresholds = [1, 3, 5, 7, 9, 11]
+    for benchmark_name, number_of_runs in quick_benchmark_details:
+        #["-peep", "-const-fp", "-tco", "-tmm", "-tmc", "-inline"]
+        for threshold in inlining_thresholds:
+            generate_jmh_executables(benchmark_name, number_of_runs, ["-const-fp", "-inline", "-inl-threshold", f"{threshold}"], f"_{threshold}")
             run_jvml_benchmarking(plot_name, benchmark_name, f"_{threshold}")
 
-    plot_varied_inlining_threshold(plot_name, [b[0] for b in quick_benchmark_details])
+        generate_jmh_executables(benchmark_name, number_of_runs, ["-const-fp"], "_no_inlining")
+        run_jvml_benchmarking(plot_name, benchmark_name, "_no_inlining")
 
+    #plot_varied_inlining_threshold(plot_name, [b[0] for b in benchmark_details])
+
+def compare_varied_inlining_threshold_size():
+    plot_name = "comparing_inlining_threshold_size"
+    inlining_thresholds = [1, 3, 5, 7, 9, 11]
+    for benchmark_name, number_of_runs in benchmark_details:
+        for threshold in inlining_thresholds:
+            generate_jvml_jar(benchmark_name, number_of_runs, ["-opt-all", "-inl-threshold", f"{threshold}"], f"_{threshold}")
+            compute_jvml_file_size(plot_name, benchmark_name, f"_{threshold}")
+
+        generate_jvml_jar(benchmark_name, number_of_runs, ["-peep", "-const-fp", "-tco", "-tmm", "-tmc"], "_no_inlining")
+        compute_jvml_file_size(plot_name, benchmark_name, "_no_inlining")
+
+def plot_varied_inlining_threshold_size(plot_name, benchmark_names):
+    benchmark_results = {benchmark_name : parse_result_json(plot_name, benchmark_name, "file size") for benchmark_name in benchmark_names}
+
+    ordered_size_by_threshold = defaultdict(list)
+    for benchmark_name in benchmark_results:
+        for threshold in sorted(benchmark_results[benchmark_name]):
+            if threshold != "jvml_no_inlining":
+                ordered_size_by_threshold[threshold].append(benchmark_results[benchmark_name][threshold] / benchmark_results[benchmark_name]["jvml_no_inlining"])
+
+    ordered_size_by_threshold = prettify_names(ordered_size_by_threshold)
+
+    plt.style.use("seaborn-v0_8-deep")
+
+    _, ax = plt.subplots()
+
+    x = np.arange(len(benchmark_names))
+    width = 0.15
+    multiplier = 0
+
+    from functools import cmp_to_key
+
+
+
+    for threshold, relative_size in sorted(ordered_size_by_threshold.items(), key = cmp_to_key(lambda t1, t2: int(t1[0]) - int(t2[0]))):
+        offset = width * multiplier
+        ax.bar(x + offset, np.array(relative_size)-1, width, bottom=1.0, label=threshold, edgecolor='black',linewidth=0.5)
+        multiplier += 1
+
+    ax.set_xlabel("Benchmark")
+
+    #ticks = np.arange(0.9, 1.22, 0.02)
+    #ax.set_yticks(ticks)
+    ax.set_ylabel("Code size relative to no inlining")
+    ax.set_xticks(x + width * (len(x))/2, benchmark_names)
+    ax.tick_params(axis='x', pad=10)
+
+    ax.spines['bottom'].set_position(('data', 1))
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    ax.legend(title="Inlining threshold")
+
+    save_figure(plot_name)
 
 def plot_compile_times(plot_name, benchmark_names):
     def parse_json(benchmark_name):
@@ -909,11 +1007,15 @@ def plot_compile_times(plot_name, benchmark_names):
         for phase in benchmark_results[benchmark_name]:
             ordered_benchmarks_by_phase[phase].append(benchmark_results[benchmark_name][phase])
 
+    plt.style.use("seaborn-v0_8-deep")
+
+    ordered_benchmarks_by_phase = prettify_names(ordered_benchmarks_by_phase)
+
     _, ax = plt.subplots()
     bottom = np.zeros(len(ordered_benchmarks_by_phase["parsing"]))
 
     for phase, durations in ordered_benchmarks_by_phase.items():
-        ax.bar(benchmark_names, durations, 0.5, label=phase, bottom=bottom)
+        ax.bar(benchmark_names, durations, 0.5, label=phase, bottom=bottom, edgecolor='black',linewidth=0.5)
         bottom += np.array(durations)
 
     ax.set_title("Compile times by phase")
@@ -935,17 +1037,6 @@ def compute_compile_times():
     plot_compile_times(plot_name, [b[0] for b in benchmark_details])
 
 
-def rerun_all_plots():
-    benchmark_names = [b[0] for b in benchmark_details]
-    plot_comparing_compilers_time("comparing_compilers_time", benchmark_names)
-    plot_individual_opts_time("individual_opt_time", benchmark_names)
-    plot_tail_mod_cons_graph("tail_mod_cons", [1, 3, 6, 10, 33, 66, 100, 333, 666, 1000, 3333, 6666, 10_000, 33_333, 66_666, 100_000, 333_333, 666_666, 1_000_000])
-    plot_individual_opts_code_size("individual_opt_size", benchmark_names)
-    plot_compiler_size("comparing_compilers_size", benchmark_names)
-    plot_varied_inlining_threshold("comparing_inlining_threshold", benchmark_names)
-    plot_compile_times("compile_times", benchmark_names)
-    plot_specialised_peephole("comparing_individual_peepholes_no_jit", ["box_unbox", "store_load", "goto_label"])
-
 
 def compare_specialised_peepholes():
     plot_name = "comparing_individual_peepholes_no_jit"
@@ -964,11 +1055,29 @@ def compare_specialised_peepholes():
         generate_jmh_executables(benchmark_name, 1, [], "_jit_unoptimised")
         run_jvml_benchmarking(plot_name, benchmark_name, "_jit_unoptimised", jvm_flags=[])
 
+def rerun_all_plots():
+    benchmark_names = [b[0] for b in benchmark_details]
+    #plot_comparing_compilers_time("comparing_compilers_time", benchmark_names)
+    plot_individual_opts_time("individual_opt_time", benchmark_names)
+    plot_tail_mod_cons_graph("tail_mod_cons", [1, 3, 6, 10, 33, 66, 100])
+    plot_individual_opts_code_size("individual_opt_size", benchmark_names)
+    plot_compiler_size("comparing_compilers_size", benchmark_names)
+    plot_varied_inlining_threshold("comparing_inlining_threshold", benchmark_names)
+    plot_varied_inlining_threshold_size("comparing_inlining_threshold_size", benchmark_names)
+    plot_compile_times("compile_times", benchmark_names)
+    #plot_specialised_peephole("comparing_individual_peepholes_no_jit", ["box_unbox", "store_load", "goto_label"])
 
 
 if __name__ == "__main__":
     benchmark_names = [b[0] for b in benchmark_details]
     quick_benchmark_names = [b[0] for b in quick_benchmark_details]
 
-    plot_specialised_peephole("comparing_individual_peepholes_no_jit", ["box_unbox", "goto_label", "store_load"])
+    #compare_individual_opt_time()
+    #generate_jmh_executables("quicksort", 10, ["-inline"], "_inline")
+    #run_jvml_benchmarking("individual_opt_time_short", "quicksort", "_inline")
+    compare_varied_inlining_threshold()
+    #plot_individual_opts_time("individual_opt_time_short", quick_benchmark_names)
+    #rerun_all_plots()
+    plot_varied_inlining_threshold("comparing_inlining_threshold_short_constfp", quick_benchmark_names)
+
 
