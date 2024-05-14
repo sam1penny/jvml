@@ -3,7 +3,7 @@
 ## Installation Instructions
 
 1. Install [opam](https://opam.ocaml.org/doc/Install.html)
-2. run `opam switch create 4.14.0`
+2. run `opam switch create 5.1.1`
 3. run `opam install . --deps-only`
 4. Install [Krakatau](https://github.com/Storyyeller/Krakatau)
 5. Install a copy of a JDK.
