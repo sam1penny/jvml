@@ -1,5 +1,9 @@
 # JVML - Optimising functional programming on the JVM!
 
+## About
+
+My undergraduate dissertation, titled 'An optimising compiler from an ML-like language to Java bytecode'. Features include inlining, tail call elimination and tail call modulo context transformations.
+
 ## Installation Instructions
 
 1. Install [opam](https://opam.ocaml.org/doc/Install.html)
